@@ -25,6 +25,61 @@ local function playFireSound(Tool, ShootingHandle)
 	end
 end
 
+local function playFireEffects(Tool, ShootingHandle)
+	if not Tool or not Tool:IsA("Tool") then
+		return
+	end
+
+	local Handle = ShootingHandle or Tool:FindFirstChild("Handle")
+	if not Handle or not Handle:IsA("BasePart") then
+		return
+	end
+
+	local Bolt = Tool:FindFirstChild("Bolt")
+	local BoltBack = Tool:FindFirstChild("BoltBack")
+	local Shell = Tool:FindFirstChild("shell")
+	local Flash = Tool:FindFirstChild("Flash")
+
+	if Bolt then Bolt.Transparency = 1 end
+	if BoltBack then BoltBack.Transparency = 0 end
+
+	if Shell then
+		local Casing = Shell:Clone()
+		Casing.Parent = workspace
+		Casing.Transparency = 0
+		Casing:BreakJoints()
+		Casing.Position = Shell.Position
+
+		task.delay(2, function()
+			if Casing and Casing.Parent then
+				Casing:Destroy()
+			end
+		end)
+	end
+
+	if Flash then
+		local Light = Flash:FindFirstChild("Light")
+		local Lite = Flash:FindFirstChild("lite")
+		if Light then Light.Enabled = true end
+		if Lite then Lite.Enabled = true end
+
+		task.delay(0.08, function()
+			if Light then Light.Enabled = false end
+			if Lite then Lite.Enabled = false end
+		end)
+	else
+		task.delay(0.08, function()
+			if Bolt then Bolt.Transparency = 0 end
+			if BoltBack then BoltBack.Transparency = 1 end
+		end)
+	end
+
+	task.delay(0.08, function()
+		if Bolt then Bolt.Transparency = 0 end
+		if BoltBack then BoltBack.Transparency = 1 end
+	end)
+end
+
 WeaponEffects.OnClientEvent:Connect(function(
 	Effect,
 	Shooter,
@@ -46,7 +101,9 @@ WeaponEffects.OnClientEvent:Connect(function(
 			Tool = Tool or (Character and Character:FindFirstChildOfClass("Tool"))
 
 			if Tool then
-				playFireSound(Tool, ShootingHandle or Tool:FindFirstChild("Handle"))
+				local Handle = ShootingHandle or Tool:FindFirstChild("Handle")
+				playFireSound(Tool, Handle)
+				playFireEffects(Tool, Handle)
 			end
 		end
 
