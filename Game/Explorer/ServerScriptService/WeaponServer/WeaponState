@@ -1,0 +1,119 @@
+local WeaponState = {}
+
+local States = {}
+
+local function getStateKey(Player, Tool)
+	return Player.UserId .. ":" .. Tool:GetDebugId()
+end
+
+local function getSettings(Tool)
+	local Setting = Tool:FindFirstChild("Setting")
+	if not Setting or not Setting:IsA("ModuleScript") then
+		return nil
+	end
+
+	local Settings = require(Setting)
+	if type(Settings) ~= "table" then
+		return nil
+	end
+
+	return Settings
+end
+
+function WeaponState.Get(Player, Tool)
+	local Settings = getSettings(Tool)
+	if not Settings then
+		return nil
+	end
+
+	local Key = getStateKey(Player, Tool)
+	local State = States[Key]
+
+	if not State then
+		State = {
+			Ammo = Settings.AmmoPerClip,
+			Clips = Settings.LimitedClipEnabled and Settings.Clips or 0,
+			Reloading = false,
+			LastShot = 0,
+		}
+		States[Key] = State
+	end
+
+	return State, Settings
+end
+
+function WeaponState.TryFire(Player, Tool)
+	local State, Settings = WeaponState.Get(Player, Tool)
+	if not State or State.Reloading then
+		return false, State, Settings
+	end
+
+	if State.Ammo ~= math.huge and State.Ammo <= 0 then
+		return false, State, Settings
+	end
+
+	local FireRate = math.max(tonumber(Settings.FireRate) or 0, 0.03)
+	local Now = os.clock()
+	if Now - State.LastShot < FireRate then
+		return false, State, Settings
+	end
+
+	State.LastShot = Now
+
+	if State.Ammo ~= math.huge then
+		State.Ammo -= 1
+	end
+
+	return true, State, Settings
+end
+
+function WeaponState.TryReload(Player, Tool)
+	local State, Settings = WeaponState.Get(Player, Tool)
+	if not State or State.Reloading then
+		return false, State, Settings
+	end
+
+	if State.Ammo >= Settings.AmmoPerClip then
+		return false, State, Settings
+	end
+
+	if Settings.LimitedClipEnabled and State.Clips <= 0 then
+		return false, State, Settings
+	end
+
+	State.Reloading = true
+
+	task.delay(tonumber(Settings.ReloadTime) or 0, function()
+		if not States[getStateKey(Player, Tool)] then
+			return
+		end
+
+		if not Tool.Parent then
+			State.Reloading = false
+			return
+		end
+
+		local Needed = Settings.AmmoPerClip - State.Ammo
+
+		if Settings.LimitedClipEnabled then
+			Needed = math.min(Needed, State.Clips)
+			State.Clips -= Needed
+		end
+
+		State.Ammo += Needed
+		State.Reloading = false
+	end)
+
+	return true, State, Settings
+end
+
+function WeaponState.ClearPlayer(Player)
+	local Prefix = Player.UserId .. ":"
+	for Key in pairs(States) do
+		if string.sub(Key, 1, #Prefix) == Prefix then
+			States[Key] = nil
+		end
+	end
+end
+
+return WeaponState
