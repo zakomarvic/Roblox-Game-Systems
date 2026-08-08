@@ -1,0 +1,197 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
+local Remotes = WeaponSystem:WaitForChild("Remotes")
+
+local InflictTarget = Remotes:WaitForChild("InflictTarget")
+
+InflictTarget.OnServerEvent:Connect(function(
+	Player,
+	TargetHumanoid,
+	TargetTorso,
+	HitPart,
+	Direction
+)
+	if not Player then
+		return
+	end
+
+	if not TargetHumanoid or not TargetHumanoid:IsA("Humanoid") then
+		return
+	end
+
+	if not TargetTorso or not TargetTorso:IsA("BasePart") then
+		return
+	end
+
+	if not HitPart or not HitPart:IsA("BasePart") then
+		return
+	end
+
+	if TargetHumanoid.Health <= 0 then
+		return
+	end
+
+	local TargetCharacter = TargetHumanoid.Parent
+
+	if not TargetCharacter or not TargetCharacter:IsA("Model") then
+		return
+	end
+	
+	local HitCharacter = HitPart:FindFirstAncestorOfClass("Model")
+
+	if HitCharacter ~= TargetCharacter then
+		return
+	end
+
+	local HitHumanoid = HitCharacter:FindFirstChildOfClass("Humanoid")
+
+	if HitHumanoid ~= TargetHumanoid then
+		return
+	end
+
+	if not HitPart:IsDescendantOf(TargetCharacter) then
+		return
+	end
+
+	if not TargetTorso:IsDescendantOf(TargetCharacter) then
+		return
+	end
+
+	if TargetCharacter == Player.Character then
+		return
+	end
+
+	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then
+		return
+	end
+
+	Direction = Direction.Unit
+
+	local Character = Player.Character
+	local ShooterHumanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+	local ShooterTorso = Character and Character:FindFirstChild("Torso")
+
+	if not ShooterHumanoid or not ShooterTorso or ShooterHumanoid.Health <= 0 then
+		return
+	end
+
+	local Tool = Character:FindFirstChildOfClass("Tool")
+
+	if not Tool then
+		return
+	end
+	
+	local Setting = Tool:FindFirstChild("Setting")
+
+	if not Setting or not Setting:IsA("ModuleScript") then
+		return
+	end
+
+	local Module = require(Setting)
+
+	local Start = (
+		ShooterTorso.CFrame * CFrame.new(0, 1.5, 0)
+	).Position
+
+	local RaycastParams = RaycastParams.new()
+	RaycastParams.FilterType = Enum.RaycastFilterType.Exclude
+	RaycastParams.FilterDescendantsInstances = {
+		Character,
+		Tool
+	}
+	RaycastParams.IgnoreWater = true
+
+	local ToTarget = HitPart.Position - Start
+	local Result = workspace:Raycast(
+		Start,
+		ToTarget,
+		RaycastParams
+	)
+
+	if Result then
+		local HitCharacter =
+			Result.Instance:FindFirstAncestorOfClass("Model")
+
+		if HitCharacter ~= TargetCharacter then
+			return
+		end
+	end
+
+	local ToHit = HitPart.Position - Start
+
+	if ToHit.Magnitude <= 0 then
+		return
+	end
+
+	local AlongShot = ToHit:Dot(Direction)
+
+	if AlongShot <= 0 then
+		return
+	end
+	
+	if AlongShot > 5000 then
+		return
+	end
+
+	local ClosestPoint = Start + Direction * AlongShot
+	local DistanceFromShot =
+		(HitPart.Position - ClosestPoint).Magnitude
+
+	if DistanceFromShot > 8 then
+		return
+	end
+
+	-- Server calculates the final damage.
+	local Damage = tonumber(Module.BaseDamage)
+
+	if not Damage then
+		return
+	end
+
+	if HitPart.Name == "Head" and Module.HeadshotEnabled then
+		Damage *= Module.HeadshotDamageMultiplier
+	end
+
+	local Knockback = tonumber(Module.Knockback) or 0
+	local Lifesteal = tonumber(Module.Lifesteal) or 0
+	local FlamingBullet = Module.FlamingBullet == true
+
+	while TargetHumanoid:FindFirstChild("creator") do
+		TargetHumanoid.creator:Destroy()
+	end
+
+	local Creator = Instance.new("ObjectValue")
+	Creator.Name = "creator"
+	Creator.Value = Player
+	Creator.Parent = TargetHumanoid
+
+	game.Debris:AddItem(Creator, 5)
+
+	TargetHumanoid:TakeDamage(Damage)
+
+	if Knockback > 0 then
+		TargetTorso.Velocity = Direction * Knockback
+	end
+
+	if Lifesteal > 0 and ShooterHumanoid.Health > 0 then
+		ShooterHumanoid.Health += Damage * Lifesteal
+	end
+
+	if FlamingBullet then
+		local Debuff =
+			TargetCharacter:FindFirstChild("IgniteScript")
+
+			or script:FindFirstChild("IgniteScript")
+
+		if not Debuff then
+			return
+		end
+
+		Debuff = Debuff:Clone()
+
+		Debuff.creator.Value = Player
+		Debuff.Disabled = false
+		Debuff.Parent = TargetCharacter
+	end
+end)
