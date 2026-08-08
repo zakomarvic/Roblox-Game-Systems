@@ -41,4 +41,7 @@ function BulletEffects.GetRegistered()
 	return Names
 end
 
+local Incendiary = require(script.Parent:WaitForChild("IncendiaryEffect"))
+BulletEffects.Register("Incendiary", Incendiary.Apply)
+
 return BulletEffects
