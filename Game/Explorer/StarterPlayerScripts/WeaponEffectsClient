@@ -1,0 +1,38 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
+local Remotes = WeaponSystem:WaitForChild("Remotes")
+local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
+
+local function playFireSound(Tool, ShootingHandle)
+	if not Tool or not Tool:IsA("Tool") then
+		return
+	end
+
+	if not ShootingHandle or not ShootingHandle:IsA("BasePart") then
+		return
+	end
+
+	local FireSound = ShootingHandle:FindFirstChild("FireSound") or ShootingHandle:FindFirstChild("shoot")
+	if FireSound and FireSound:IsA("Sound") then
+		FireSound:Play()
+	end
+end
+
+WeaponEffects.OnClientEvent:Connect(function(Effect, Shooter, ...)
+	if Effect ~= "Fire" then
+		return
+	end
+
+	if not Shooter or Shooter == Players.LocalPlayer then
+		return
+	end
+
+	local Tool = Shooter.Character and Shooter.Character:FindFirstChildOfClass("Tool")
+	local ShootingHandle = select(1, ...)
+
+	if Tool then
+		playFireSound(Tool, ShootingHandle or Tool:FindFirstChild("Handle"))
+	end
+end)
