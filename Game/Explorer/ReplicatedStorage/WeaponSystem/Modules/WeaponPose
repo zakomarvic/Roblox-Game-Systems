@@ -8,8 +8,7 @@ local RIGHT_POSE =
 	CFrame.new(0.9, 0.5, 0)
 	* CFrame.Angles(math.rad(-10), math.rad(80), math.rad(0))
 
-
-function WeaponPose.Equip(Character)
+function WeaponPose.Equip(Character, Settings)
 	local Torso = Character:FindFirstChild("Torso")
 
 	if not Torso then
@@ -42,8 +41,8 @@ function WeaponPose.Equip(Character)
 		OldAutoRotate = Humanoid and Humanoid.AutoRotate,
 
 		-- Body aiming settings
-		BodyAimEnabled = true,
-		BodyAimSpeed = 12,
+		BodyAimEnabled = Settings and Settings.BodyAimEnabled ~= false or true,
+		BodyAimSpeed = Settings and Settings.BodyAimSpeed or 12,
 	}
 
 	LeftShoulder.C0 = LEFT_POSE
@@ -55,7 +54,6 @@ function WeaponPose.Equip(Character)
 
 	return PoseData
 end
-
 
 function WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime)
 	if not PoseData or not PoseData.RootPart then
@@ -73,7 +71,6 @@ function WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime)
 	local RootPart = PoseData.RootPart
 	local RootPosition = RootPart.Position
 
-	-- Only rotate the character horizontally.
 	local Direction = Vector3.new(
 		AimPosition.X - RootPosition.X,
 		0,
@@ -107,7 +104,6 @@ function WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime)
 	)
 end
 
-
 function WeaponPose.SetBodyAimEnabled(PoseData, Enabled)
 	if not PoseData then
 		return
@@ -115,7 +111,6 @@ function WeaponPose.SetBodyAimEnabled(PoseData, Enabled)
 
 	PoseData.BodyAimEnabled = Enabled == true
 end
-
 
 function WeaponPose.SetBodyAimSpeed(PoseData, Speed)
 	if not PoseData then
@@ -128,7 +123,6 @@ function WeaponPose.SetBodyAimSpeed(PoseData, Speed)
 
 	PoseData.BodyAimSpeed = math.max(0, Speed)
 end
-
 
 function WeaponPose.Unequip(PoseData)
 	if not PoseData then
@@ -147,6 +141,5 @@ function WeaponPose.Unequip(PoseData)
 		PoseData.Humanoid.AutoRotate = PoseData.OldAutoRotate
 	end
 end
-
 
 return WeaponPose
