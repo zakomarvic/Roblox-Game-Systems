@@ -1,0 +1,88 @@
+local Tool = script.Parent
+
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local WeaponPose = require(
+	ReplicatedStorage.WeaponSystem.Modules.WeaponPose
+)
+
+local Player
+local Character
+local Humanoid
+--local TEAM
+local Module = require(Tool:WaitForChild("Setting"))
+
+local Grip2
+local Handle2
+local CurrentPose
+
+
+
+
+if Module.DualEnabled then
+	Handle2 = Tool:WaitForChild("Handle2",1)
+	if Handle2 == nil and Module.DualEnabled then error("\"Dual\" setting is enabled but \"Handle2\" is missing!") end
+end
+
+
+if Module.IdleAnimationID ~= nil or Module.DualEnabled then
+	local IdleAnim = Instance.new("Animation",Tool)
+	IdleAnim.Name = "IdleAnim"
+	IdleAnim.AnimationId = "rbxassetid://"..(Module.DualEnabled and 53610688 or Module.IdleAnimationID)
+end
+if Module.FireAnimationID ~= nil then
+	local FireAnim = Instance.new("Animation",Tool)
+	FireAnim.Name = "FireAnim"
+	FireAnim.AnimationId = "rbxassetid://"..Module.FireAnimationID
+end
+if Module.ReloadAnimationID ~= nil then
+	local ReloadAnim = Instance.new("Animation",Tool)
+	ReloadAnim.Name = "ReloadAnim"
+	ReloadAnim.AnimationId = "rbxassetid://"..Module.ReloadAnimationID
+end
+if Module.ShotgunClipinAnimationID ~= nil then
+	local ShotgunClipinAnim = Instance.new("Animation",Tool)
+	ShotgunClipinAnim.Name = "ShotgunClipinAnim"
+	ShotgunClipinAnim.AnimationId = "rbxassetid://"..Module.ShotgunClipinAnimationID
+end
+
+
+Tool.Equipped:Connect(function()
+	local Character = Tool.Parent
+
+	CurrentPose = WeaponPose.Equip(Character)
+
+	if Module.DualEnabled and workspace.FilteringEnabled then
+		Handle2.CanCollide = false
+
+		local LeftArm = Character:FindFirstChild("Left Arm")
+		local RightArm = Character:FindFirstChild("Right Arm")
+
+		if RightArm then
+			local Grip = RightArm:WaitForChild("RightGrip", 0.01)
+
+			if Grip then
+				Grip2 = Grip:Clone()
+				Grip2.Name = "LeftGrip"
+				Grip2.Part0 = LeftArm
+				Grip2.Part1 = Handle2
+				Grip2.Parent = LeftArm
+			end
+		end
+	end
+end)
+
+Tool.Unequipped:Connect(function()
+	WeaponPose.Unequip(CurrentPose)
+	CurrentPose = nil
+
+	if Module.DualEnabled and workspace.FilteringEnabled then
+		Handle2.CanCollide = true
+
+		if Grip2 then
+			Grip2:Destroy()
+			Grip2 = nil
+		end
+	end
+end)
