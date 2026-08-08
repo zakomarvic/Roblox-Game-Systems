@@ -1,0 +1,71 @@
+local CharacterController = {}
+CharacterController.__index = CharacterController
+
+local Players = game:GetService("Players")
+
+local Player = Players.LocalPlayer
+
+local WALK_SPEED = 16
+local SPRINT_SPEED = 24
+
+function CharacterController.new()
+	local self = setmetatable({}, CharacterController)
+
+	self.Character = nil
+	self.Humanoid = nil
+	self.Sprinting = false
+	self.SprintChanged = Instance.new("BindableEvent")
+
+	self:_setupCharacter(Player.Character or Player.CharacterAdded:Wait())
+
+	Player.CharacterAdded:Connect(function(Character)
+		self:_setupCharacter(Character)
+	end)
+
+	return self
+end
+
+function CharacterController:_setupCharacter(Character)
+	self.Character = Character
+	self.Humanoid = Character:WaitForChild("Humanoid")
+	self.Sprinting = false
+
+	self.Humanoid.WalkSpeed = WALK_SPEED
+end
+
+function CharacterController:SetSprinting(State)
+	if not self.Humanoid or self.Humanoid.Health <= 0 then
+		return
+	end
+
+	State = State == true
+
+	if self.Sprinting == State then
+		return
+	end
+
+	self.Sprinting = State
+	self.Humanoid.WalkSpeed = State and SPRINT_SPEED or WALK_SPEED
+	self.SprintChanged:Fire(State)
+end
+
+function CharacterController:IsSprinting()
+	return self.Sprinting
+end
+
+function CharacterController:GetHumanoid()
+	return self.Humanoid
+end
+
+function CharacterController:GetCharacter()
+	return self.Character
+end
+
+function CharacterController:Destroy()
+	if self.SprintChanged then
+		self.SprintChanged:Destroy()
+		self.SprintChanged = nil
+	end
+end
+
+return CharacterController
