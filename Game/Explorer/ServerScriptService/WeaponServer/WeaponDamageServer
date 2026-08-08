@@ -2,165 +2,80 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
-
 local InflictTarget = Remotes:WaitForChild("InflictTarget")
-local ShotTimes = {}
+local WeaponState = require(script.Parent:WaitForChild("WeaponState"))
 
 local function getEquippedWeapon(Player)
 	local Character = Player.Character
-	if not Character then
-		return nil, nil
-	end
+	if not Character then return nil, nil end
 
 	local Tool = Character:FindFirstChildOfClass("Tool")
-	if not Tool then
-		return nil, nil
-	end
+	if not Tool then return nil, nil end
 
 	local Setting = Tool:FindFirstChild("Setting")
-	if not Setting or not Setting:IsA("ModuleScript") then
-		return nil, nil
-	end
+	if not Setting or not Setting:IsA("ModuleScript") then return nil, nil end
 
 	local Module = require(Setting)
-	if type(Module) ~= "table" then
-		return nil, nil
-	end
-
+	if type(Module) ~= "table" then return nil, nil end
 	return Tool, Module
 end
 
-InflictTarget.OnServerEvent:Connect(function(
-	Player,
-	TargetHumanoid,
-	TargetTorso,
-	HitPart,
-	Direction
-)
-	if not Player then
-		return
-	end
-
-	if not TargetHumanoid or not TargetHumanoid:IsA("Humanoid") then
-		return
-	end
-
-	if not TargetTorso or not TargetTorso:IsA("BasePart") then
-		return
-	end
-
-	if not HitPart or not HitPart:IsA("BasePart") then
-		return
-	end
-
-	if TargetHumanoid.Health <= 0 then
-		return
-	end
+InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso, HitPart, Direction)
+	if not Player then return end
+	if not TargetHumanoid or not TargetHumanoid:IsA("Humanoid") then return end
+	if not TargetTorso or not TargetTorso:IsA("BasePart") then return end
+	if not HitPart or not HitPart:IsA("BasePart") then return end
+	if TargetHumanoid.Health <= 0 then return end
 
 	local TargetCharacter = TargetHumanoid.Parent
-	if not TargetCharacter or not TargetCharacter:IsA("Model") then
-		return
-	end
-
-	local HitCharacter = HitPart:FindFirstAncestorOfClass("Model")
-	if HitCharacter ~= TargetCharacter then
-		return
-	end
-
-	local HitHumanoid = HitCharacter:FindFirstChildOfClass("Humanoid")
-	if HitHumanoid ~= TargetHumanoid then
-		return
-	end
-
-	if not HitPart:IsDescendantOf(TargetCharacter) then
-		return
-	end
-
-	if not TargetTorso:IsDescendantOf(TargetCharacter) then
-		return
-	end
-
-	if TargetCharacter == Player.Character then
-		return
-	end
-
-	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then
-		return
-	end
+	if not TargetCharacter or not TargetCharacter:IsA("Model") then return end
+	if HitPart:FindFirstAncestorOfClass("Model") ~= TargetCharacter then return end
+	if TargetCharacter:FindFirstChildOfClass("Humanoid") ~= TargetHumanoid then return end
+	if not HitPart:IsDescendantOf(TargetCharacter) then return end
+	if not TargetTorso:IsDescendantOf(TargetCharacter) then return end
+	if TargetCharacter == Player.Character then return end
+	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return end
 
 	Direction = Direction.Unit
 
 	local Character = Player.Character
 	local ShooterHumanoid = Character and Character:FindFirstChildOfClass("Humanoid")
 	local ShooterTorso = Character and Character:FindFirstChild("Torso")
-
-	if not ShooterHumanoid or not ShooterTorso or ShooterHumanoid.Health <= 0 then
-		return
-	end
+	if not ShooterHumanoid or not ShooterTorso or ShooterHumanoid.Health <= 0 then return end
 
 	local Tool, Module = getEquippedWeapon(Player)
-	if not Tool then
-		return
-	end
+	if not Tool then return end
 
-	-- The server owns the fire-rate check. Keep this independent from the
-	-- client-side controller so firing speed cannot be increased by a client.
-	local FireRate = tonumber(Module.FireRate) or 0
-	local MinInterval = math.max(FireRate, 0.03)
-	local Now = os.clock()
-	local LastShot = ShotTimes[Player] or 0
+	-- A valid Fire event must have created a recent server-side shot state.
+	-- The client cannot create damage merely by firing InflictTarget directly.
+	local State = WeaponState.Get(Player, Tool)
+	if not State or State.Reloading then return end
+	if os.clock() - State.LastShot > 0.25 then return end
 
-	if Now - LastShot < MinInterval then
-		return
-	end
-
-	ShotTimes[Player] = Now
-
-	local Start = (
-		ShooterTorso.CFrame * CFrame.new(0, 1.5, 0)
-	).Position
+	local Start = (ShooterTorso.CFrame * CFrame.new(0, 1.5, 0)).Position
 
 	local RaycastParams = RaycastParams.new()
 	RaycastParams.FilterType = Enum.RaycastFilterType.Exclude
-	RaycastParams.FilterDescendantsInstances = {
-		Character,
-		Tool
-	}
+	RaycastParams.FilterDescendantsInstances = {Character, Tool}
 	RaycastParams.IgnoreWater = true
 
 	local ToTarget = HitPart.Position - Start
-	if ToTarget.Magnitude <= 0 or ToTarget.Magnitude > 5000 then
-		return
-	end
+	if ToTarget.Magnitude <= 0 or ToTarget.Magnitude > 5000 then return end
 
-	-- Re-raycast from the shooter's server-known origin. The client can
-	-- suggest a target, but the server decides whether that target is actually
-	-- reachable along the supplied shot direction.
 	local Result = workspace:Raycast(Start, ToTarget, RaycastParams)
-
 	if Result then
 		local ResultCharacter = Result.Instance:FindFirstAncestorOfClass("Model")
-		if ResultCharacter ~= TargetCharacter then
-			return
-		end
+		if ResultCharacter ~= TargetCharacter then return end
 	end
 
 	local AlongShot = ToTarget:Dot(Direction)
-	if AlongShot <= 0 or AlongShot > 5000 then
-		return
-	end
+	if AlongShot <= 0 or AlongShot > 5000 then return end
 
 	local ClosestPoint = Start + Direction * AlongShot
-	local DistanceFromShot = (HitPart.Position - ClosestPoint).Magnitude
-
-	if DistanceFromShot > 8 then
-		return
-	end
+	if (HitPart.Position - ClosestPoint).Magnitude > 8 then return end
 
 	local Damage = tonumber(Module.BaseDamage)
-	if not Damage or Damage <= 0 then
-		return
-	end
+	if not Damage or Damage <= 0 then return end
 
 	if HitPart.Name == "Head" and Module.HeadshotEnabled then
 		Damage *= tonumber(Module.HeadshotDamageMultiplier) or 1
@@ -191,13 +106,8 @@ InflictTarget.OnServerEvent:Connect(function(
 	end
 
 	if FlamingBullet then
-		local Debuff = TargetCharacter:FindFirstChild("IgniteScript")
-			or script:FindFirstChild("IgniteScript")
-
-		if not Debuff then
-			return
-		end
-
+		local Debuff = TargetCharacter:FindFirstChild("IgniteScript") or script:FindFirstChild("IgniteScript")
+		if not Debuff then return end
 		Debuff = Debuff:Clone()
 		Debuff.creator.Value = Player
 		Debuff.Disabled = false
@@ -206,5 +116,5 @@ InflictTarget.OnServerEvent:Connect(function(
 end)
 
 game.Players.PlayerRemoving:Connect(function(Player)
-	ShotTimes[Player] = nil
+	WeaponState.ClearPlayer(Player)
 end)
