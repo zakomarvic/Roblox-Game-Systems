@@ -1,30 +1,11 @@
-local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Player = Players.LocalPlayer
+local CharacterController = require(
+	ReplicatedStorage.CharacterSystem.Modules.CharacterController
+)
 
-local WALK_SPEED = 16
-local SPRINT_SPEED = 24
-
-local Sprinting = false
-local Humanoid
-
-_G.IsSprinting = false
-_G.SprintChanged = Instance.new("BindableEvent")
-
-local function SetupCharacter(Character)
-	Humanoid = Character:WaitForChild("Humanoid")
-
-	Humanoid.WalkSpeed = WALK_SPEED
-	Sprinting = false
-	_G.IsSprinting = false
-end
-
-if Player.Character then
-	SetupCharacter(Player.Character)
-end
-
-Player.CharacterAdded:Connect(SetupCharacter)
+local Controller = CharacterController.new()
 
 UserInputService.InputBegan:Connect(function(Input, GameProcessed)
 	if GameProcessed then
@@ -32,23 +13,12 @@ UserInputService.InputBegan:Connect(function(Input, GameProcessed)
 	end
 
 	if Input.KeyCode == Enum.KeyCode.LeftShift then
-		if Humanoid and Humanoid.Health > 0 then
-			Sprinting = true
-			_G.IsSprinting = true
-			_G.SprintChanged:Fire(true)
-			Humanoid.WalkSpeed = SPRINT_SPEED
-		end
+		Controller:SetSprinting(true)
 	end
 end)
 
 UserInputService.InputEnded:Connect(function(Input)
 	if Input.KeyCode == Enum.KeyCode.LeftShift then
-		Sprinting = false
-		_G.IsSprinting = false
-		_G.SprintChanged:Fire(false)
-
-		if Humanoid then
-			Humanoid.WalkSpeed = WALK_SPEED
-		end
+		Controller:SetSprinting(false)
 	end
 end)
