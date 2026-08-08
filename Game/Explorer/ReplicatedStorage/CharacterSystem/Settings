@@ -1,0 +1,6 @@
+return {
+	SprintEnabled = true,
+	WalkSpeed = 16,
+	SprintWalkSpeed = 24,
+	SprintTransitionSpeed = 10,
+}
