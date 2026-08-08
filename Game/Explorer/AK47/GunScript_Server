@@ -6,40 +6,23 @@ local WeaponPose = require(
 	ReplicatedStorage.WeaponSystem.Modules.WeaponPose
 )
 
-local Player
-local Character
-local Humanoid
---local TEAM
+local WeaponAnimations = require(
+	ReplicatedStorage.WeaponSystem.Modules.WeaponAnimations
+)
+
 local Module = require(Tool:WaitForChild("Setting"))
 
 local Grip2
 local Handle2
 local CurrentPose
 
-if Module.DualEnabled then
-	Handle2 = Tool:WaitForChild("Handle2",1)
-	if Handle2 == nil and Module.DualEnabled then error("\"Dual\" setting is enabled but \"Handle2\" is missing!") end
-end
+WeaponAnimations.Create(Tool, Module)
 
-if Module.IdleAnimationID ~= nil or Module.DualEnabled then
-	local IdleAnim = Instance.new("Animation",Tool)
-	IdleAnim.Name = "IdleAnim"
-	IdleAnim.AnimationId = "rbxassetid://"..(Module.DualEnabled and 53610688 or Module.IdleAnimationID)
-end
-if Module.FireAnimationID ~= nil then
-	local FireAnim = Instance.new("Animation",Tool)
-	FireAnim.Name = "FireAnim"
-	FireAnim.AnimationId = "rbxassetid://"..Module.FireAnimationID
-end
-if Module.ReloadAnimationID ~= nil then
-	local ReloadAnim = Instance.new("Animation",Tool)
-	ReloadAnim.Name = "ReloadAnim"
-	ReloadAnim.AnimationId = "rbxassetid://"..Module.ReloadAnimationID
-end
-if Module.ShotgunClipinAnimationID ~= nil then
-	local ShotgunClipinAnim = Instance.new("Animation",Tool)
-	ShotgunClipinAnim.Name = "ShotgunClipinAnim"
-	ShotgunClipinAnim.AnimationId = "rbxassetid://"..Module.ShotgunClipinAnimationID
+if Module.DualEnabled then
+	Handle2 = Tool:WaitForChild("Handle2", 1)
+	if Handle2 == nil then
+		error('"Dual" setting is enabled but "Handle2" is missing!')
+	end
 end
 
 Tool.Equipped:Connect(function()
