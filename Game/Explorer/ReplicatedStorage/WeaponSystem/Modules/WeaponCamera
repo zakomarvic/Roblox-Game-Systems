@@ -141,17 +141,22 @@ function WeaponCamera:Update(DeltaTime)
 	local BobX = 0
 	local BobY = 0
 
-	if Settings.WalkBobEnabled and Speed > 0.05 then
-		self.WalkBobTime += DeltaTime * (Settings.WalkBobSpeed or 8) * Speed
+	if Settings.WalkBobEnabled then
+		if Speed > 0.05 then
+			self.WalkBobTime += DeltaTime * (Settings.WalkBobSpeed or 8) * Speed
 
-		local Amount = Settings.WalkBobAmount or 0.06
+			local Amount = Settings.WalkBobAmount or 0.06
 
-		if self.AimDown then
-			Amount *= Settings.AimWalkBobMultiplier or 0.3
+			if self.AimDown then
+				Amount *= Settings.AimWalkBobMultiplier or 0.3
+			end
+
+			BobX = math.sin(self.WalkBobTime) * Amount
+			BobY = math.abs(math.cos(self.WalkBobTime)) * Amount
+		else
+			local ReturnAlpha = math.clamp(DeltaTime * 10, 0, 1)
+			self.WalkBobTime += (0 - self.WalkBobTime) * ReturnAlpha
 		end
-
-		BobX = math.sin(self.WalkBobTime) * Amount
-		BobY = math.abs(math.cos(self.WalkBobTime)) * Amount
 	end
 
 	Camera.CFrame *= CFrame.new(BobX, BobY, 0) * CFrame.Angles(
