@@ -3,7 +3,7 @@ local WeaponState = {}
 local States = {}
 
 local function getStateKey(Player, Tool)
-	return Player.UserId .. ":" .. Tool:GetDebugId()
+	return Player.UserId .. ":" .. tostring(Tool)
 end
 
 local function getSettings(Tool)
