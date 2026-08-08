@@ -1,0 +1,214 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
+local Remotes = WeaponSystem:WaitForChild("Remotes")
+local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
+local FireCooldowns = {}
+
+WeaponEffects.OnServerEvent:Connect(function(Player, Tool, Effect,...)
+	if not Player or not Tool then
+		return
+	end
+
+	if not Tool:IsA("Tool") then
+		return
+	end
+
+	if Tool.Parent ~= Player.Character then
+		return
+	end
+	
+	-- BULLET VISUALIZATION
+	if Effect == "Bullet" then
+		local Args = {...}
+
+		local ShootingHandle = Args[1]
+
+		if not ShootingHandle or not ShootingHandle:IsA("BasePart") then
+			return
+		end
+
+		if ShootingHandle ~= Tool:FindFirstChild("Handle")
+			and ShootingHandle ~= Tool:FindFirstChild("Handle2") then
+			return
+		end
+
+		if ShootingHandle.Parent ~= Tool then
+			return
+		end
+		
+		local EndPos = Args[3]
+
+		if typeof(EndPos) ~= "Vector3" then
+			return
+		end
+
+		local HandlePosition = ShootingHandle.Position
+		local Distance = (EndPos - HandlePosition).Magnitude
+
+		if Distance > 5000 then
+			return
+		end
+		
+		local Character = Player.Character
+		local HumanoidRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+
+		if not HumanoidRootPart then
+			return
+		end
+
+		local Origin = HumanoidRootPart.Position
+		local DistanceFromCharacter = (ShootingHandle.Position - Origin).Magnitude
+
+		if DistanceFromCharacter > 15 then
+			return
+		end
+
+		for _, OtherPlayer in ipairs(game.Players:GetPlayers()) do
+			if OtherPlayer ~= Player then
+				WeaponEffects:FireClient(
+					OtherPlayer,
+					"Bullet",
+					Player,
+					unpack(Args)
+				)
+			end
+		end
+
+		return
+	end
+	
+	if Effect == "Reload" then
+		local Handle = Tool:FindFirstChild("Handle")
+		local Mag = Tool:FindFirstChild("Mag")
+
+		if not Handle or not Mag then
+			return
+		end
+
+		local LoadSound = Handle:FindFirstChild("load")
+
+		if LoadSound then
+			LoadSound:Play()
+		end
+
+		local MagClone = Mag:Clone()
+
+		Mag.Transparency = 1
+
+		MagClone.Parent = workspace
+		MagClone:BreakJoints()
+		MagClone.Position = Mag.Position
+
+		task.wait(0.8)
+
+		if Mag and Mag.Parent then
+			Mag.Transparency = 0
+		end
+
+		task.delay(5, function()
+			if MagClone and MagClone.Parent then
+				MagClone:Destroy()
+			end
+		end)
+
+		return
+	end
+	
+	if Effect ~= "Fire" then
+		return
+	end
+
+	local Now = os.clock()
+	local LastFire = FireCooldowns[Player] or 0
+
+	if Now - LastFire < 0.03 then
+		return
+	end
+
+	FireCooldowns[Player] = Now
+
+	local Handle = Tool:FindFirstChild("Handle")
+
+	local Setting = Tool:FindFirstChild("Setting")
+
+	if not Setting or not Setting:IsA("ModuleScript") then
+		return
+	end
+
+	local Module = require(Setting)
+
+	if not Module then
+		return
+	end
+
+	local Handle = Tool:FindFirstChild("Handle")
+	local Bolt = Tool:FindFirstChild("Bolt")
+	local BoltBack = Tool:FindFirstChild("BoltBack")
+	local Shell = Tool:FindFirstChild("shell")
+	local Flash = Tool:FindFirstChild("Flash")
+
+	if not Handle or not Shell or not Flash then
+		warn("[WeaponEffects] Missing required object")
+		return
+	end
+
+	local Shoot = Handle:FindFirstChild("shoot")
+
+	if Shoot then
+		Shoot:Play()
+	end
+
+	if Bolt then
+		Bolt.Transparency = 1
+	end
+
+	if BoltBack then
+		BoltBack.Transparency = 0
+	end
+
+	local Casing = Shell:Clone()
+	Casing.Parent = workspace
+	Casing.Transparency = 0
+	Casing:BreakJoints()
+	Casing.Position = Shell.Position
+
+	local Light = Flash:FindFirstChild("Light")
+	local Lite = Flash:FindFirstChild("lite")
+
+	if Light then
+		Light.Enabled = true
+	end
+
+	if Lite then
+		Lite.Enabled = true
+	end
+
+	task.wait(0.08)
+
+	if Light then
+		Light.Enabled = false
+	end
+
+	if Lite then
+		Lite.Enabled = false
+	end
+
+	if Bolt then
+		Bolt.Transparency = 0
+	end
+
+	if BoltBack then
+		BoltBack.Transparency = 1
+	end
+
+	task.delay(2, function()
+		if Casing and Casing.Parent then
+			Casing:Destroy()
+		end
+	end)
+end)
+
+game.Players.PlayerRemoving:Connect(function(Player)
+	FireCooldowns[Player] = nil
+end)
