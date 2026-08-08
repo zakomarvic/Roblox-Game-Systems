@@ -1,6 +1,17 @@
-return {
-	SprintEnabled = true,
-	WalkSpeed = 16,
-	SprintWalkSpeed = 24,
-	SprintTransitionSpeed = 10,
-}
+local Settings = {}
+
+--========================
+-- MOVEMENT
+--========================
+
+Settings.WalkSpeed = 16
+
+--========================
+-- SPRINT
+--========================
+
+Settings.SprintEnabled = true
+Settings.SprintWalkSpeed = 24
+Settings.SprintTransitionSpeed = 10
+
+return Settings
