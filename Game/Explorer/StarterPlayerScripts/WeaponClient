@@ -8,11 +8,22 @@ local BulletVisualizer = require(
 	WeaponSystem.Modules:WaitForChild("BulletVisualizer")
 )
 
-local WeaponEffects = ReplicatedStorage
-	:WaitForChild("WeaponSystem")
-	:WaitForChild("Remotes")
-	:WaitForChild("WeaponEffects")
+local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
 
+local function playFireSound(Tool, ShootingHandle)
+	if not Tool or not Tool:IsA("Tool") then
+		return
+	end
+
+	if not ShootingHandle or not ShootingHandle:IsA("BasePart") then
+		return
+	end
+
+	local FireSound = ShootingHandle:FindFirstChild("FireSound") or ShootingHandle:FindFirstChild("shoot")
+	if FireSound and FireSound:IsA("Sound") then
+		FireSound:Play()
+	end
+end
 
 WeaponEffects.OnClientEvent:Connect(function(
 	Effect,
@@ -28,6 +39,19 @@ WeaponEffects.OnClientEvent:Connect(function(
 	VisualizeExplosion,
 	VisualizeEnabled
 )
+	if Effect == "Fire" then
+		if Shooter and Shooter ~= Player then
+			local Character = Shooter.Character
+			local Tool = Character and Character:FindFirstChildOfClass("Tool")
+
+			if Tool then
+				playFireSound(Tool, ShootingHandle or Tool:FindFirstChild("Handle"))
+			end
+		end
+
+		return
+	end
+
 	if Effect ~= "Bullet" then
 		return
 	end
