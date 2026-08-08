@@ -27,6 +27,11 @@ local Humanoid = Character:WaitForChild("Humanoid")
 local CharacterControllerInstance = CharacterController.Get()
 local WeaponCameraInstance = WeaponCamera.new(Camera, Humanoid, Character, Module)
 
+Player.CharacterAdded:Connect(function(NewCharacter)
+	local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
+	WeaponCameraInstance:SetCharacter(NewCharacter, NewHumanoid)
+end)
+
 local GUI = script:WaitForChild("GunGUI")
 local IdleAnim
 local FireAnim
