@@ -1,0 +1,152 @@
+local WeaponPose = {}
+
+local LEFT_POSE =
+	CFrame.new(-0.4, 0.5, 0)
+	* CFrame.Angles(math.rad(0), math.rad(-80), math.rad(0))
+
+local RIGHT_POSE =
+	CFrame.new(0.9, 0.5, 0)
+	* CFrame.Angles(math.rad(-10), math.rad(80), math.rad(0))
+
+
+function WeaponPose.Equip(Character)
+	local Torso = Character:FindFirstChild("Torso")
+
+	if not Torso then
+		return nil
+	end
+
+	local LeftShoulder = Torso:FindFirstChild("Left Shoulder")
+	local RightShoulder = Torso:FindFirstChild("Right Shoulder")
+
+	if not LeftShoulder or not RightShoulder then
+		return nil
+	end
+
+	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+	local RootPart = Character:FindFirstChild("HumanoidRootPart")
+
+	local PoseData = {
+		Character = Character,
+		Humanoid = Humanoid,
+
+		Torso = Torso,
+		RootPart = RootPart,
+
+		LeftShoulder = LeftShoulder,
+		RightShoulder = RightShoulder,
+
+		DefaultLeftC0 = LeftShoulder.C0,
+		DefaultRightC0 = RightShoulder.C0,
+
+		OldAutoRotate = Humanoid and Humanoid.AutoRotate,
+
+		-- Body aiming settings
+		BodyAimEnabled = true,
+		BodyAimSpeed = 12,
+	}
+
+	LeftShoulder.C0 = LEFT_POSE
+	RightShoulder.C0 = RIGHT_POSE
+
+	if Humanoid then
+		Humanoid.AutoRotate = false
+	end
+
+	return PoseData
+end
+
+
+function WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime)
+	if not PoseData or not PoseData.RootPart then
+		return
+	end
+
+	if not PoseData.BodyAimEnabled then
+		return
+	end
+
+	if typeof(AimPosition) ~= "Vector3" then
+		return
+	end
+
+	local RootPart = PoseData.RootPart
+	local RootPosition = RootPart.Position
+
+	-- Only rotate the character horizontally.
+	local Direction = Vector3.new(
+		AimPosition.X - RootPosition.X,
+		0,
+		AimPosition.Z - RootPosition.Z
+	)
+
+	if Direction.Magnitude <= 0.001 then
+		return
+	end
+
+	Direction = Direction.Unit
+
+	local TargetCFrame = CFrame.lookAt(
+		RootPosition,
+		RootPosition + Direction
+	)
+
+	local Speed = PoseData.BodyAimSpeed or 12
+
+	local Alpha
+
+	if DeltaTime then
+		Alpha = math.clamp(DeltaTime * Speed, 0, 1)
+	else
+		Alpha = 0.2
+	end
+
+	RootPart.CFrame = RootPart.CFrame:Lerp(
+		TargetCFrame,
+		Alpha
+	)
+end
+
+
+function WeaponPose.SetBodyAimEnabled(PoseData, Enabled)
+	if not PoseData then
+		return
+	end
+
+	PoseData.BodyAimEnabled = Enabled == true
+end
+
+
+function WeaponPose.SetBodyAimSpeed(PoseData, Speed)
+	if not PoseData then
+		return
+	end
+
+	if typeof(Speed) ~= "number" then
+		return
+	end
+
+	PoseData.BodyAimSpeed = math.max(0, Speed)
+end
+
+
+function WeaponPose.Unequip(PoseData)
+	if not PoseData then
+		return
+	end
+
+	if PoseData.LeftShoulder then
+		PoseData.LeftShoulder.C0 = PoseData.DefaultLeftC0
+	end
+
+	if PoseData.RightShoulder then
+		PoseData.RightShoulder.C0 = PoseData.DefaultRightC0
+	end
+
+	if PoseData.Humanoid then
+		PoseData.Humanoid.AutoRotate = PoseData.OldAutoRotate
+	end
+end
+
+
+return WeaponPose
