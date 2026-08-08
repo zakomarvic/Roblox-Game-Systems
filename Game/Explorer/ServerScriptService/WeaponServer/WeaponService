@@ -24,7 +24,12 @@ function WeaponService.Initialize(Tool)
 		return ActiveWeapons[Tool]
 	end
 
-	local Module = require(Tool:WaitForChild("Setting"))
+	local Setting = Tool:FindFirstChild("Setting")
+	if not Setting or not Setting:IsA("ModuleScript") then
+		return nil
+	end
+
+	local Module = require(Setting)
 	WeaponAnimations.Create(Tool, Module)
 
 	local State = {
@@ -36,10 +41,23 @@ function WeaponService.Initialize(Tool)
 
 	State.EquippedConnection = Tool.Equipped:Connect(function()
 		local Character = Tool.Parent
+		if not Character or not Character:IsA("Model") then
+			return
+		end
+
+		if State.CurrentPose then
+			WeaponPose.Unequip(State.CurrentPose)
+			State.CurrentPose = nil
+		end
+
+		if State.GripData then
+			WeaponGrip.Unequip(State.GripData)
+			State.GripData = nil
+		end
 
 		State.CurrentPose = WeaponPose.Equip(Character, Module)
 
-		if Module.DualEnabled and workspace.FilteringEnabled then
+		if Module.DualEnabled and not workspace.FilteringEnabled then
 			State.GripData = WeaponGrip.Equip(Tool, Module)
 		end
 	end)
@@ -52,6 +70,10 @@ function WeaponService.Initialize(Tool)
 			WeaponGrip.Unequip(State.GripData)
 			State.GripData = nil
 		end
+	end)
+
+	State.DestroyingConnection = Tool.Destroying:Connect(function()
+		WeaponService.Destroy(Tool)
 	end)
 
 	ActiveWeapons[Tool] = State
@@ -80,6 +102,10 @@ function WeaponService.Destroy(Tool)
 
 	if State.UnequippedConnection then
 		State.UnequippedConnection:Disconnect()
+	end
+
+	if State.DestroyingConnection then
+		State.DestroyingConnection:Disconnect()
 	end
 
 	ActiveWeapons[Tool] = nil
