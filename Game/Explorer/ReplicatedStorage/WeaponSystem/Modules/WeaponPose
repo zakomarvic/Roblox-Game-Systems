@@ -1,3 +1,6 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CharacterController = require(ReplicatedStorage.CharacterSystem.Modules.CharacterController)
+
 local WeaponPose = {}
 
 local LEFT_POSE =
@@ -9,8 +12,20 @@ local RIGHT_POSE =
 	* CFrame.Angles(math.rad(-10), math.rad(80), math.rad(0))
 
 function WeaponPose.Equip(Character, Settings)
-	local Torso = Character:FindFirstChild("Torso")
+	-- Always prefer the CharacterController's current character. Gun scripts can
+	-- retain an older Character reference across a respawn, while the controller
+	-- is explicitly updated on CharacterAdded.
+	local Controller = CharacterController.Get()
+	local CurrentCharacter = Controller and Controller:GetCharacter()
+	if CurrentCharacter and CurrentCharacter.Parent then
+		Character = CurrentCharacter
+	end
 
+	if not Character or not Character.Parent then
+		return nil
+	end
+
+	local Torso = Character:FindFirstChild("Torso")
 	if not Torso then
 		return nil
 	end
@@ -25,6 +40,10 @@ function WeaponPose.Equip(Character, Settings)
 	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
 	local RootPart = Character:FindFirstChild("HumanoidRootPart")
 
+	if not Humanoid or Humanoid.Health <= 0 then
+		return nil
+	end
+
 	local PoseData = {
 		Character = Character,
 		Humanoid = Humanoid,
@@ -38,25 +57,21 @@ function WeaponPose.Equip(Character, Settings)
 		DefaultLeftC0 = LeftShoulder.C0,
 		DefaultRightC0 = RightShoulder.C0,
 
-		OldAutoRotate = Humanoid and Humanoid.AutoRotate,
+		OldAutoRotate = Humanoid.AutoRotate,
 
-		-- Body aiming settings
 		BodyAimEnabled = Settings and Settings.BodyAimEnabled ~= false or true,
 		BodyAimSpeed = Settings and Settings.BodyAimSpeed or 12,
 	}
 
 	LeftShoulder.C0 = LEFT_POSE
 	RightShoulder.C0 = RIGHT_POSE
-
-	if Humanoid then
-		Humanoid.AutoRotate = false
-	end
+	Humanoid.AutoRotate = false
 
 	return PoseData
 end
 
 function WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime)
-	if not PoseData or not PoseData.RootPart then
+	if not PoseData or not PoseData.RootPart or not PoseData.RootPart.Parent then
 		return
 	end
 
@@ -89,7 +104,6 @@ function WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime)
 	)
 
 	local Speed = PoseData.BodyAimSpeed or 12
-
 	local Alpha
 
 	if DeltaTime then
@@ -98,10 +112,7 @@ function WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime)
 		Alpha = 0.2
 	end
 
-	RootPart.CFrame = RootPart.CFrame:Lerp(
-		TargetCFrame,
-		Alpha
-	)
+	RootPart.CFrame = RootPart.CFrame:Lerp(TargetCFrame, Alpha)
 end
 
 function WeaponPose.SetBodyAimEnabled(PoseData, Enabled)
@@ -129,15 +140,15 @@ function WeaponPose.Unequip(PoseData)
 		return
 	end
 
-	if PoseData.LeftShoulder then
+	if PoseData.LeftShoulder and PoseData.LeftShoulder.Parent then
 		PoseData.LeftShoulder.C0 = PoseData.DefaultLeftC0
 	end
 
-	if PoseData.RightShoulder then
+	if PoseData.RightShoulder and PoseData.RightShoulder.Parent then
 		PoseData.RightShoulder.C0 = PoseData.DefaultRightC0
 	end
 
-	if PoseData.Humanoid then
+	if PoseData.Humanoid and PoseData.Humanoid.Parent then
 		PoseData.Humanoid.AutoRotate = PoseData.OldAutoRotate
 	end
 end
