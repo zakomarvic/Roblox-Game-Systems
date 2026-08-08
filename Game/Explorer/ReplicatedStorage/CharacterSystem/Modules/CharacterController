@@ -1,12 +1,13 @@
-local CharacterController = {}
-CharacterController.__index = CharacterController
-
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
+local Settings = require(
+	ReplicatedStorage.CharacterSystem.Settings
+)
 
-local WALK_SPEED = 16
-local SPRINT_SPEED = 24
+local CharacterController = {}
+CharacterController.__index = CharacterController
 
 local Singleton
 
@@ -42,12 +43,16 @@ function CharacterController:_setupCharacter(Character)
 	self.Humanoid = Character:WaitForChild("Humanoid")
 	self.Sprinting = false
 
-	self.Humanoid.WalkSpeed = WALK_SPEED
+	self.Humanoid.WalkSpeed = Settings.WalkSpeed
 end
 
 function CharacterController:SetSprinting(State)
 	if not self.Humanoid or self.Humanoid.Health <= 0 then
 		return
+	end
+
+	if not Settings.SprintEnabled then
+		State = false
 	end
 
 	State = State == true
@@ -57,7 +62,19 @@ function CharacterController:SetSprinting(State)
 	end
 
 	self.Sprinting = State
-	self.Humanoid.WalkSpeed = State and SPRINT_SPEED or WALK_SPEED
+
+	local TargetSpeed = State
+		and Settings.SprintWalkSpeed
+		or Settings.WalkSpeed
+
+	local TransitionSpeed = Settings.SprintTransitionSpeed
+
+	if TransitionSpeed and TransitionSpeed > 0 then
+		self.Humanoid.WalkSpeed = TargetSpeed
+	else
+		self.Humanoid.WalkSpeed = TargetSpeed
+	end
+
 	self.SprintChanged:Fire(State)
 end
 
