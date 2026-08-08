@@ -1,0 +1,40 @@
+local WeaponAnimations = {}
+
+local function createAnimation(Tool, Name, AnimationId)
+	if AnimationId == nil then
+		return nil
+	end
+
+	local Existing = Tool:FindFirstChild(Name)
+	if Existing and Existing:IsA("Animation") then
+		Existing.AnimationId = "rbxassetid://" .. AnimationId
+		return Existing
+	end
+
+	local Animation = Instance.new("Animation")
+	Animation.Name = Name
+	Animation.AnimationId = "rbxassetid://" .. AnimationId
+	Animation.Parent = Tool
+
+	return Animation
+end
+
+function WeaponAnimations.Create(Tool, Settings)
+	if not Tool or not Settings then
+		return
+	end
+
+	if Settings.IdleAnimationID ~= nil or Settings.DualEnabled then
+		createAnimation(
+			Tool,
+			"IdleAnim",
+			Settings.DualEnabled and 53610688 or Settings.IdleAnimationID
+		)
+	end
+
+	createAnimation(Tool, "FireAnim", Settings.FireAnimationID)
+	createAnimation(Tool, "ReloadAnim", Settings.ReloadAnimationID)
+	createAnimation(Tool, "ShotgunClipinAnim", Settings.ShotgunClipinAnimationID)
+end
+
+return WeaponAnimations
