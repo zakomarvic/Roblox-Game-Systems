@@ -18,21 +18,44 @@ WeaponEffects.OnServerEvent:Connect(function(Player, Tool, Effect, ...)
 	if Effect == "Bullet" then
 		local Args = {...}
 		local ShootingHandle = Args[1]
+		local MuzzleOffset = Args[2]
+		local EndPos = Args[3]
+		local MuzzleEffect = Args[4]
+		local HitEffect = Args[5]
+		local HitSound = Args[6]
+		local ExplosiveData = Args[7]
+		local BulletData = Args[8]
+		local VisualizeExplosion = Args[9]
+		local VisualizeEnabled = Args[10]
+
 		if not ShootingHandle or not ShootingHandle:IsA("BasePart") then
 			return
 		end
 		if ShootingHandle ~= Tool:FindFirstChild("Handle") and ShootingHandle ~= Tool:FindFirstChild("Handle2") then
 			return
 		end
-
-		local EndPos = Args[3]
 		if typeof(EndPos) ~= "Vector3" or (EndPos - ShootingHandle.Position).Magnitude > 5000 then
 			return
 		end
 
 		for _, OtherPlayer in ipairs(Players:GetPlayers()) do
 			if OtherPlayer ~= Player then
-				WeaponEffects:FireClient(OtherPlayer, "Bullet", Player, unpack(Args))
+				WeaponEffects:FireClient(
+					OtherPlayer,
+					"Bullet",
+					Player,
+					Tool,
+					ShootingHandle,
+					MuzzleOffset,
+					EndPos,
+					MuzzleEffect,
+					HitEffect,
+					HitSound,
+					ExplosiveData,
+					BulletData,
+					VisualizeExplosion,
+					VisualizeEnabled
+				)
 			end
 		end
 		return
@@ -84,8 +107,6 @@ WeaponEffects.OnServerEvent:Connect(function(Player, Tool, Effect, ...)
 		return
 	end
 
-	-- The server validates the shot and broadcasts the event.
-	-- Client-side WeaponClient handles sound, muzzle flash, bolt and casing presentation.
 	for _, OtherPlayer in ipairs(Players:GetPlayers()) do
 		if OtherPlayer ~= Player then
 			WeaponEffects:FireClient(
