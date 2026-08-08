@@ -1,6 +1,5 @@
 local Tool = script.Parent
 
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local WeaponPose = require(
@@ -17,14 +16,10 @@ local Grip2
 local Handle2
 local CurrentPose
 
-
-
-
 if Module.DualEnabled then
 	Handle2 = Tool:WaitForChild("Handle2",1)
 	if Handle2 == nil and Module.DualEnabled then error("\"Dual\" setting is enabled but \"Handle2\" is missing!") end
 end
-
 
 if Module.IdleAnimationID ~= nil or Module.DualEnabled then
 	local IdleAnim = Instance.new("Animation",Tool)
@@ -47,11 +42,10 @@ if Module.ShotgunClipinAnimationID ~= nil then
 	ShotgunClipinAnim.AnimationId = "rbxassetid://"..Module.ShotgunClipinAnimationID
 end
 
-
 Tool.Equipped:Connect(function()
 	local Character = Tool.Parent
 
-	CurrentPose = WeaponPose.Equip(Character)
+	CurrentPose = WeaponPose.Equip(Character, Module)
 
 	if Module.DualEnabled and workspace.FilteringEnabled then
 		Handle2.CanCollide = false
