@@ -81,17 +81,17 @@ local function RayCast(Start, Direction, Range, Ignore)
 	if Hit then
 		if (
 			Hit.Transparency > 0.75
-			or Hit.Name == "Handle"
-			or Hit.Name == "Effect"
-			or Hit.Name == "Bullet"
-			or Hit.Name == "Laser"
-			or string.lower(Hit.Name) == "water"
-			or Hit.Name == "Rail"
-			or Hit.Name == "Arrow"
-			or (Hit.Parent:FindFirstChild("Humanoid") and Hit.Parent.Humanoid.Health == 0)
-			or (Hit.Parent:FindFirstChild("Humanoid") and Hit.Parent:FindFirstChild("TEAM") and Hit.Parent.TEAM.Value == Hit.Parent.TEAM.Value)
-			or (Hit.Parent:FindFirstChild("Humanoid") and PiercedHumanoid[Hit.Parent.Humanoid])
-		) then
+				or Hit.Name == "Handle"
+				or Hit.Name == "Effect"
+				or Hit.Name == "Bullet"
+				or Hit.Name == "Laser"
+				or string.lower(Hit.Name) == "water"
+				or Hit.Name == "Rail"
+				or Hit.Name == "Arrow"
+				or (Hit.Parent:FindFirstChild("Humanoid") and Hit.Parent.Humanoid.Health == 0)
+				or (Hit.Parent:FindFirstChild("Humanoid") and Hit.Parent:FindFirstChild("TEAM") and Hit.Parent.TEAM.Value == Hit.Parent.TEAM.Value)
+				or (Hit.Parent:FindFirstChild("Humanoid") and PiercedHumanoid[Hit.Parent.Humanoid])
+			) then
 			Hit, EndPos = RayCast(EndPos + Direction * 0.01, Direction, Range - (Start - EndPos).Magnitude, Ignore)
 		end
 	end
@@ -116,10 +116,11 @@ local function Fire(ShootingHandle)
 		FireAnim:Play(nil, nil, Module.FireAnimationSpeed)
 	end
 
-	if not ShootingHandle.FireSound.Playing or not ShootingHandle.FireSound.Looped then
+	if ShootingHandle.FireSound then
 		ShootingHandle.FireSound:Play()
-		WeaponEffects:FireServer(Tool, "Fire")
 	end
+
+	WeaponEffects:FireServer(Tool, "Fire")
 
 	local Start = (Humanoid.Torso.CFrame * CFrame.new(0, 1.5, 0)).Position
 	local Spread = Module.Spread * (AimDown and 1 - Module.SpreadRedution or 1)
@@ -127,7 +128,7 @@ local function Fire(ShootingHandle)
 		math.rad(-Spread + math.random() * (Spread * 2)),
 		math.rad(-Spread + math.random() * (Spread * 2)),
 		0
-	)).LookVector
+		)).LookVector
 
 	while PierceAvailable >= 0 do
 		local Hit, EndPos = RayCast(Start, Direction, 5000, Character)
