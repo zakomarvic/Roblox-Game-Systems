@@ -1,0 +1,170 @@
+local BulletVisualizer = {}
+
+local Debris = game:GetService("Debris")
+local RunService = game:GetService("RunService")
+
+function BulletVisualizer.Visualize(
+	Handle,
+	MuzzleOffset,
+	EndPos,
+	MuzzleEffect,
+	HitEffect,
+	HitSound,
+	ExplosiveData,
+	BulletData,
+	VisualizeExplosion,
+	VisualizeEnabled
+)
+	
+	if not Handle then
+		return
+	end
+
+	local LaserAttachment = Handle:WaitForChild("wow")
+	local MuzzlePos = LaserAttachment.WorldPosition
+	local Distance = (MuzzlePos - EndPos).Magnitude / 2
+
+	-- Muzzle effect
+	local Muzzle = Instance.new("Part")
+	Muzzle.Name = "Bullet"
+	Muzzle.Size = Vector3.new(0.01, 0.01, 0.01)
+	Muzzle.Transparency = 1
+	Muzzle.Anchored = false
+	Muzzle.CanCollide = false
+	Muzzle.TopSurface = Enum.SurfaceType.SmoothNoOutlines
+	Muzzle.BottomSurface = Enum.SurfaceType.SmoothNoOutlines
+
+	local MuzzleParticle = MuzzleEffect:Clone()
+	MuzzleParticle.Parent = Muzzle
+
+	local Weld = Instance.new("Weld")
+	Weld.Part0 = Handle
+	Weld.Part1 = Muzzle
+	Weld.C0 = CFrame.new(
+		MuzzleOffset.X,
+		MuzzleOffset.Y,
+		MuzzleOffset.Z
+	)
+	Weld.Parent = Muzzle
+
+	Muzzle.Position = MuzzlePos
+	Muzzle.Parent = workspace.CurrentCamera
+
+	task.spawn(function()
+		MuzzleParticle:Emit(5)
+	end)
+
+	Debris:AddItem(Muzzle, 10)
+
+	-- Hit effect
+	local HitPart = Instance.new("Part")
+	HitPart.Name = "Bullet"
+	HitPart.Size = Vector3.new(0.01, 0.01, 0.01)
+	HitPart.Transparency = 1
+	HitPart.Anchored = true
+	HitPart.CanCollide = false
+	HitPart.TopSurface = Enum.SurfaceType.SmoothNoOutlines
+	HitPart.BottomSurface = Enum.SurfaceType.SmoothNoOutlines
+
+	local HitParticle = HitEffect:Clone()
+	HitParticle.Parent = HitPart
+
+	local Sound = Instance.new("Sound")
+	Sound.SoundId = "rbxassetid://" .. HitSound
+	Sound.Volume = 1
+	Sound.Parent = HitPart
+
+	HitPart.Position = EndPos
+	HitPart.Parent = workspace.CurrentCamera
+
+	task.spawn(function()
+		HitParticle:Emit(2)
+		Sound:Play()
+	end)
+
+	Debris:AddItem(HitPart, 10)
+
+	-- Explosion
+	if ExplosiveData[1] and VisualizeExplosion then
+		local Explosion = Instance.new("Explosion")
+		Explosion.BlastRadius = ExplosiveData[2]
+		Explosion.BlastPressure = 0
+		Explosion.Position = EndPos
+		Explosion.Parent = workspace.CurrentCamera
+	end
+
+	-- Bullet / tracer
+	if VisualizeEnabled then
+		local Bullet = Instance.new("Part")
+		Bullet.Name = "Bullet"
+		Bullet.Size = Vector3.new(0.2, 0.2, 0.2)
+		Bullet.BrickColor = BulletData[3]
+		Bullet.Transparency = BulletData[4]
+		Bullet.Material = BulletData[5]
+		Bullet.Anchored = true
+		Bullet.CanCollide = false
+		Bullet.TopSurface = Enum.SurfaceType.SmoothNoOutlines
+		Bullet.BottomSurface = Enum.SurfaceType.SmoothNoOutlines
+
+		local Mesh = Instance.new("SpecialMesh")
+		Mesh.MeshType = Enum.MeshType.Brick
+		Mesh.Scale = BulletData[2] * 5
+		Mesh.Offset = Vector3.new(0, 0, -Mesh.Scale.Z / 10)
+		Mesh.Parent = Bullet
+
+		Bullet.CFrame = CFrame.new(MuzzlePos, EndPos)
+		Bullet.Parent = workspace.CurrentCamera
+
+		Debris:AddItem(Bullet, 10)
+
+		if BulletData[1] ~= math.huge then
+			for i = 0, Distance, BulletData[1] do
+				if i ~= 0 then
+					Bullet.CFrame =
+						Bullet.CFrame * CFrame.new(0, 0, -BulletData[1])
+				end
+
+				if (Bullet.Position - EndPos).Magnitude < BulletData[2].Z then
+					Mesh.Scale = Vector3.new(
+						BulletData[2].X,
+						BulletData[2].Y,
+						(Bullet.Position - EndPos).Magnitude
+					) * 5
+
+					Mesh.Offset = Vector3.new(
+						0,
+						0,
+						-Mesh.Scale.Z / 10
+					)
+				end
+
+				RunService.Stepped:Wait()
+			end
+		else
+			Mesh.Scale = Vector3.new(
+				BulletData[2].X,
+				BulletData[2].Y,
+				(Bullet.Position - EndPos).Magnitude
+			) * 5
+
+			Mesh.Offset = Vector3.new(
+				0,
+				0,
+				-Mesh.Scale.Z / 10
+			)
+
+			local Time = RunService.Heartbeat:Wait()
+
+			while Bullet.Transparency < 1 do
+				Bullet.Transparency += Time / BulletData[6]
+				Time = RunService.Heartbeat:Wait()
+			end
+		end
+
+		if Bullet then
+			Bullet:Destroy()
+		end
+	end
+end
+
+return BulletVisualizer
