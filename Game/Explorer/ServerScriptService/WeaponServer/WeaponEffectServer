@@ -1,4 +1,5 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
@@ -29,7 +30,7 @@ WeaponEffects.OnServerEvent:Connect(function(Player, Tool, Effect, ...)
 			return
 		end
 
-		for _, OtherPlayer in ipairs(game.Players:GetPlayers()) do
+		for _, OtherPlayer in ipairs(Players:GetPlayers()) do
 			if OtherPlayer ~= Player then
 				WeaponEffects:FireClient(OtherPlayer, "Bullet", Player, unpack(Args))
 			end
@@ -83,24 +84,23 @@ WeaponEffects.OnServerEvent:Connect(function(Player, Tool, Effect, ...)
 		return
 	end
 
-	local Setting = Tool:FindFirstChild("Setting")
-	if not Setting or not Setting:IsA("ModuleScript") then
-		return
+	-- The firing sound is played locally by the shooter for zero-latency weapon feel.
+	-- Replicate only the validated fire event to other clients.
+	for _, OtherPlayer in ipairs(Players:GetPlayers()) do
+		if OtherPlayer ~= Player then
+			WeaponEffects:FireClient(OtherPlayer, "Fire", Player, Tool, Tool:FindFirstChild("Handle"))
+		end
 	end
 
-	local Module = require(Setting)
-	local Handle = Tool:FindFirstChild("Handle")
 	local Bolt = Tool:FindFirstChild("Bolt")
 	local BoltBack = Tool:FindFirstChild("BoltBack")
 	local Shell = Tool:FindFirstChild("shell")
 	local Flash = Tool:FindFirstChild("Flash")
 
-	if not Handle or not Shell or not Flash then
+	if not Shell or not Flash then
 		return
 	end
 
-	local Shoot = Handle:FindFirstChild("shoot")
-	if Shoot then Shoot:Play() end
 	if Bolt then Bolt.Transparency = 1 end
 	if BoltBack then BoltBack.Transparency = 0 end
 
