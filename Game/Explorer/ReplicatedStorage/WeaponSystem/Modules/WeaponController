@@ -1,0 +1,191 @@
+local WeaponController = {}
+WeaponController.__index = WeaponController
+
+function WeaponController.new(Tool, Settings)
+	local self = setmetatable({}, WeaponController)
+
+	self.Tool = Tool
+	self.Settings = Settings
+
+	self.Ammo = Settings.AmmoPerClip
+	self.Clips = Settings.LimitedClipEnabled and Settings.Clips or 0
+	
+	
+	self.IsFiring = false
+	self.IsReloading = false
+	self.LastFireTime = 0
+	self.Enabled = true
+	self.TriggerHeld = false
+
+	return self
+end
+
+function WeaponController:GetSetting(Name)
+	return self.Settings[Name]
+end
+
+function WeaponController:GetAmmo()
+	return self.Ammo
+end
+
+function WeaponController:GetClips()
+	return self.Clips
+end
+
+function WeaponController:SetAmmo(Amount)
+	self.Ammo = Amount
+end
+
+function WeaponController:SetClips(Amount)
+	self.Clips = Amount
+end
+
+function WeaponController:ConsumeAmmo(Amount)
+	Amount = Amount or 1
+
+	if self.Ammo == math.huge then
+		return true
+	end
+
+	if self.Ammo < Amount then
+		return false
+	end
+
+	self.Ammo -= Amount
+	return true
+end
+
+function WeaponController:CanFire()
+	if self.IsReloading then
+		return false
+	end
+
+	if self.Ammo <= 0 and self.Ammo ~= math.huge then
+		return false
+	end
+
+	return true
+end
+
+function WeaponController:Reload()
+	if self.Ammo == self.Settings.AmmoPerClip then
+		return false
+	end
+
+	if self.Settings.LimitedClipEnabled then
+		if self.Clips <= 0 then
+			return false
+		end
+
+		self.Clips -= 1
+	end
+
+	self.Ammo = self.Settings.AmmoPerClip
+
+	return true
+end
+
+function WeaponController:SetFiring(Value)
+	self.IsFiring = Value
+end
+
+function WeaponController:IsCurrentlyFiring()
+	return self.IsFiring
+end
+
+function WeaponController:SetReloading(Value)
+	self.IsReloading = Value
+end
+
+function WeaponController:IsCurrentlyReloading()
+	return self.IsReloading
+end
+
+function WeaponController:CanFireNow()
+	local FireRate = self.Settings.FireRate
+	local CurrentTime = os.clock()
+
+	if CurrentTime - self.LastFireTime < FireRate then
+		return false
+	end
+
+	if not self:CanFire() then
+		return false
+	end
+
+	self.LastFireTime = CurrentTime
+
+	return true
+end
+
+function WeaponController:StartReload()
+	if self.IsReloading then
+		return false
+	end
+
+	if self.Ammo >= self.Settings.AmmoPerClip then
+		return false
+	end
+
+	if self.Settings.LimitedClipEnabled and self.Clips <= 0 then
+		return false
+	end
+
+	self.IsReloading = true
+	return true
+end
+
+function WeaponController:FinishReload()
+	if not self.IsReloading then
+		return
+	end
+
+	local Needed = self.Settings.AmmoPerClip - self.Ammo
+
+	if self.Settings.LimitedClipEnabled then
+		Needed = math.min(Needed, self.Clips)
+		self.Clips = self.Clips - Needed
+	end
+
+	self.Ammo = self.Ammo + Needed
+	self.IsReloading = false
+end
+
+function WeaponController:SetEnabled(Value)
+	self.Enabled = Value
+end
+
+function WeaponController:SetTriggerHeld(Value)
+	self.TriggerHeld = Value
+end
+
+function WeaponController:IsEnabled()
+	return self.Enabled
+end
+
+function WeaponController:IsTriggerHeld()
+	return self.TriggerHeld
+end
+
+function WeaponController:GetReloading()
+	return self.IsReloading
+end
+
+function WeaponController:StartFiring()
+	if self.IsFiring then
+		return false
+	end
+
+	if not self:CanFire() then
+		return false
+	end
+
+	self.IsFiring = true
+	return true
+end
+
+function WeaponController:StopFiring()
+	self.IsFiring = false
+end
+
+return WeaponController
