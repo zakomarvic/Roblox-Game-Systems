@@ -3,7 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 local InflictTarget = Remotes:WaitForChild("InflictTarget")
-local WeaponState = require(script.Parent:WaitForChild("WeaponState"))
+local WeaponState = require(WeaponSystem.Modules:WaitForChild("WeaponState"))
 
 local function getEquippedWeapon(Player)
 	local Character = Player.Character
@@ -46,8 +46,6 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	local Tool, Module = getEquippedWeapon(Player)
 	if not Tool then return end
 
-	-- A valid Fire event must have created a recent server-side shot state.
-	-- The client cannot create damage merely by firing InflictTarget directly.
 	local State = WeaponState.Get(Player, Tool)
 	if not State or State.Reloading then return end
 	if os.clock() - State.LastShot > 0.25 then return end
