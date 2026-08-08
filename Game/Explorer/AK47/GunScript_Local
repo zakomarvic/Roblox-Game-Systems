@@ -1,0 +1,726 @@
+local Tool = script.Parent
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Module = require(Tool:WaitForChild("Setting"))
+
+local WeaponController = require(
+	ReplicatedStorage.WeaponSystem.Modules.WeaponController
+)
+
+local BulletVisualizer = require(
+	ReplicatedStorage.WeaponSystem.Modules.BulletVisualizer
+)
+
+local WeaponEffects = ReplicatedStorage
+	:WaitForChild("WeaponSystem")
+	:WaitForChild("Remotes")
+	:WaitForChild("WeaponEffects")
+
+
+local Controller = WeaponController.new(Tool, Module)
+local RunService = game:GetService("RunService")
+local CurrentPose
+local AimConnection
+
+print("Weapon Controller Ammo:", Controller:GetAmmo())
+print("Weapon Controller Clips:", Controller:GetClips())
+
+local Handle = Tool:WaitForChild("Handle")
+local Player = game.Players.LocalPlayer
+local Mouse = Player:GetMouse()
+local Camera = Workspace.CurrentCamera
+local RecoilPitch = 0
+local RecoilYaw = 0
+local SwayTime = 0
+local CurrentSwayX = 0
+local CurrentSwayY = 0
+local CurrentStrafeTilt = 0
+local WalkBobTime = 0
+local SprintChanged = _G.SprintChanged
+local Character = Workspace:WaitForChild(Player.Name)
+local Humanoid = Character:WaitForChild("Humanoid")
+--local TEAM = Character:WaitForChild("TEAM")
+
+
+local InflictTarget = ReplicatedStorage
+	:WaitForChild("WeaponSystem")
+	:WaitForChild("Remotes")
+	:WaitForChild("InflictTarget")
+
+local GUI = script:WaitForChild("GunGUI")
+local IdleAnim
+local FireAnim
+local ReloadAnim
+local ShotgunClipinAnim
+local Grip2
+local Handle2
+local HandleToFire = Handle
+
+if Module.DualEnabled then
+	Handle2 = Tool:WaitForChild("Handle2",2)
+	if Handle2 == nil and Module.DualEnabled then error("\"Dual\" setting is enabled but \"Handle2\" is missing!") end
+end
+
+local Equipped = false
+
+
+local AimDown = false
+
+local PiercedHumanoid = {}
+
+if Module.IdleAnimationID ~= nil or Module.DualEnabled then
+	IdleAnim = Tool:WaitForChild("IdleAnim")
+	IdleAnim = Humanoid:LoadAnimation(IdleAnim)
+end
+if Module.FireAnimationID ~= nil then
+	FireAnim = Tool:WaitForChild("FireAnim")
+	FireAnim = Humanoid:LoadAnimation(FireAnim)
+end
+if Module.ReloadAnimationID ~= nil then
+	ReloadAnim = Tool:WaitForChild("ReloadAnim")
+	ReloadAnim = Humanoid:LoadAnimation(ReloadAnim)
+end
+if Module.ShotgunClipinAnimationID ~= nil then
+	ShotgunClipinAnim = Tool:WaitForChild("ShotgunClipinAnim")
+	ShotgunClipinAnim = Humanoid:LoadAnimation(ShotgunClipinAnim)
+end
+
+function wait(TimeToWait)
+	if TimeToWait ~= nil then
+		local TotalTime = 0
+		TotalTime = TotalTime + game:GetService("RunService").Heartbeat:wait()
+		while TotalTime < TimeToWait do
+			TotalTime = TotalTime + game:GetService("RunService").Heartbeat:wait()
+		end
+	else
+		game:GetService("RunService").Heartbeat:wait()
+	end
+end
+
+function RayCast(Start,Direction,Range,Ignore)
+	local Hit,EndPos = game.Workspace:FindPartOnRay(Ray.new(Start,Direction*Range),Ignore)
+	if Hit then
+		if (Hit.Transparency > 0.75
+			or Hit.Name == "Handle"
+			or Hit.Name == "Effect"
+			or Hit.Name == "Bullet"
+			or Hit.Name == "Laser"
+			or string.lower(Hit.Name) == "water"
+			or Hit.Name == "Rail"
+			or Hit.Name == "Arrow"
+			or (Hit.Parent:FindFirstChild("Humanoid") and Hit.Parent.Humanoid.Health == 0)
+			or (Hit.Parent:FindFirstChild("Humanoid") and Hit.Parent:FindFirstChild("TEAM") and TEAM and Hit.Parent.TEAM.Value == TEAM.Value))
+			or (Hit.Parent:FindFirstChild("Humanoid") and PiercedHumanoid[Hit.Parent.Humanoid]) then
+			Hit,EndPos = RayCast(EndPos+(Direction*.01),Direction,Range-((Start-EndPos).magnitude),Ignore)
+		end
+	end
+	return Hit,EndPos
+end
+
+function ShakeCamera()
+	if not Module.RecoilEnabled then
+		return
+	end
+
+	local Up = Module.RecoilUp or 1.5
+	local Side = Module.RecoilSide or 0.35
+
+	if AimDown then
+		local Sensitivity = Module.MouseSensitive or 0.5
+		Up *= Sensitivity
+		Side *= Sensitivity
+	end
+
+	RecoilPitch += Up
+	RecoilYaw += (math.random() * 2 - 1) * Side
+end
+
+game:GetService("RunService").RenderStepped:Connect(function(DeltaTime)
+	--========================
+	-- RECOIL RECOVERY
+	--========================
+
+	if RecoilPitch ~= 0 or RecoilYaw ~= 0 then
+		local Recovery = Module.RecoilRecovery or 8
+		local Alpha = math.clamp(DeltaTime * Recovery, 0, 1)
+
+		local Pitch = RecoilPitch * Alpha
+		local Yaw = RecoilYaw * Alpha
+
+		Camera.CFrame =
+			Camera.CFrame
+			* CFrame.Angles(
+				math.rad(Pitch),
+				math.rad(Yaw),
+				0
+			)
+
+		RecoilPitch -= Pitch
+		RecoilYaw -= Yaw
+
+		if math.abs(RecoilPitch) < 0.001 then
+			RecoilPitch = 0
+		end
+
+		if math.abs(RecoilYaw) < 0.001 then
+			RecoilYaw = 0
+		end
+	end
+
+
+	--========================
+	-- MOVEMENT + IDLE SWAY
+	--========================
+
+	if Equipped then
+		local MoveDirection = Humanoid.MoveDirection
+		local Speed = MoveDirection.Magnitude
+
+		--========================
+		-- MOVEMENT SWAY
+		--========================
+
+		if Module.MovementSwayEnabled and Speed > 0.05 then
+			SwayTime += DeltaTime * (Module.MovementSwaySpeed or 8)
+
+			local Amount = Module.MovementSwayAmount or 0.35
+
+			if AimDown and Module.AimSwayEnabled then
+				Amount *= Module.AimSwayMultiplier or 0.35
+			end
+
+			local TargetX =
+				math.sin(SwayTime) * Amount
+
+			local TargetY =
+				math.cos(SwayTime * 2) * Amount * 0.5
+
+			local SwayAlpha =
+				math.clamp(DeltaTime * 10, 0, 1)
+
+			CurrentSwayX +=
+				(TargetX - CurrentSwayX) * SwayAlpha
+
+			CurrentSwayY +=
+				(TargetY - CurrentSwayY) * SwayAlpha
+
+			--========================
+			-- IDLE / BREATHING SWAY
+			--========================
+
+		elseif Module.IdleSwayEnabled then
+			SwayTime += DeltaTime * (Module.IdleSwaySpeed or 1.5)
+
+			local Amount = Module.IdleSwayAmount or 0.12
+
+			if AimDown then
+				Amount *= 0.5
+			end
+
+			local TargetX =
+				math.sin(SwayTime) * Amount
+
+			local TargetY =
+				math.cos(SwayTime * 0.7) * Amount * 0.5
+
+			local SwayAlpha =
+				math.clamp(DeltaTime * 4, 0, 1)
+
+			CurrentSwayX +=
+				(TargetX - CurrentSwayX) * SwayAlpha
+
+			CurrentSwayY +=
+				(TargetY - CurrentSwayY) * SwayAlpha
+
+			--========================
+			-- RETURN TO NEUTRAL
+			--========================
+
+		else
+			local ReturnAlpha =
+				math.clamp(DeltaTime * 10, 0, 1)
+
+			CurrentSwayX +=
+				(0 - CurrentSwayX) * ReturnAlpha
+
+			CurrentSwayY +=
+				(0 - CurrentSwayY) * ReturnAlpha
+		end
+		
+		--========================
+		-- STRAFE TILT
+		--========================
+
+		local TargetStrafeTilt = 0
+
+		if Module.StrafeTiltEnabled then
+			local MoveDirection = Humanoid.MoveDirection
+
+			if MoveDirection.Magnitude > 0.05 then
+				-- Convert movement into the character's local space.
+				local LocalMove =
+					Character.HumanoidRootPart.CFrame:VectorToObjectSpace(MoveDirection)
+
+				-- Left/right movement.
+				TargetStrafeTilt =
+					-LocalMove.X * (Module.StrafeTiltAmount or 2)
+
+				-- Reduce tilt while aiming.
+				if AimDown then
+					TargetStrafeTilt *=
+						Module.AimStrafeTiltMultiplier or 0.35
+				end
+			end
+		end
+
+		local TiltAlpha =
+			math.clamp(
+				DeltaTime * (Module.StrafeTiltSpeed or 8),
+				0,
+				1
+			)
+
+		CurrentStrafeTilt +=
+			(TargetStrafeTilt - CurrentStrafeTilt) * TiltAlpha
+		
+		
+		--========================
+		-- WALK BOB
+		--========================
+
+		local BobX = 0
+		local BobY = 0
+
+		if Module.WalkBobEnabled and Humanoid.MoveDirection.Magnitude > 0.05 then
+			local MoveSpeed = Humanoid.MoveDirection.Magnitude
+
+			WalkBobTime += DeltaTime
+				* (Module.WalkBobSpeed or 8)
+				* MoveSpeed
+
+			local Amount = Module.WalkBobAmount or 0.06
+
+			if AimDown then
+				Amount *= Module.AimWalkBobMultiplier or 0.3
+			end
+
+			BobX = math.sin(WalkBobTime) * Amount
+			BobY = math.abs(math.cos(WalkBobTime)) * Amount
+		end
+		
+		
+		-- Apply sway
+		Camera.CFrame =
+			Camera.CFrame
+			* CFrame.new(BobX, BobY, 0)
+			* CFrame.Angles(
+				math.rad(CurrentSwayY),
+				math.rad(CurrentSwayX),
+				math.rad(CurrentStrafeTilt)
+			)
+	end
+end)
+
+function Fire(ShootingHandle)
+	local PierceAvailable = Module.Piercing
+	PiercedHumanoid = {}
+	
+	if FireAnim then 
+		FireAnim:Play(nil,nil,Module.FireAnimationSpeed) 
+	end
+	
+	if not ShootingHandle.FireSound.Playing or not ShootingHandle.FireSound.Looped then
+		ShootingHandle.FireSound:Play()
+		WeaponEffects:FireServer(Tool, "Fire")
+	end
+	
+	local Start = (Humanoid.Torso.CFrame * CFrame.new(0,1.5,0)).p--(Handle.CFrame * CFrame.new(Module.MuzzleOffset.X,Module.MuzzleOffset.Y,Module.MuzzleOffset.Z)).p
+	local Spread = Module.Spread*(AimDown and 1-Module.SpreadRedution or 1)
+	local Direction = (CFrame.new(Start,Mouse.Hit.p) * CFrame.Angles(math.rad(-Spread+(math.random()*(Spread*2))),math.rad(-Spread+(math.random()*(Spread*2))),0)).lookVector
+	while PierceAvailable >= 0 do
+		local Hit,EndPos = RayCast(Start,Direction,5000,Character)
+		if not Module.ExplosiveEnabled then
+			if Hit and Hit.Parent then
+				local TargetHumanoid = Hit.Parent:FindFirstChild("Humanoid")
+				local TargetTorso = Hit.Parent:FindFirstChild("Torso")
+				--local TargetTEAM = Hit.Parent:FindFirstChild("TEAM")
+				if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
+					--if TargetTEAM and TargetTEAM.Value ~= TEAM.Value then
+					InflictTarget:FireServer(
+						TargetHumanoid,
+						TargetTorso,
+						Hit,
+						Direction
+					)
+						PiercedHumanoid[TargetHumanoid] = true
+					--end
+				else
+					PierceAvailable = 0
+				end
+			end
+		else
+			local Explosion = Instance.new("Explosion")
+			Explosion.BlastRadius = Module.Radius
+			Explosion.BlastPressure = 0
+			Explosion.Position = EndPos
+			Explosion.Parent = Workspace.CurrentCamera
+			Explosion.Hit:connect(function(Hit)
+				if Hit and Hit.Parent and Hit.Name == "Torso" then
+					local TargetHumanoid = Hit.Parent:FindFirstChild("Humanoid")
+					local TargetTorso = Hit.Parent:FindFirstChild("Torso")
+					if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
+						InflictTarget:FireServer(
+							TargetHumanoid,
+							TargetTorso,
+							Hit,
+							Direction
+						)
+					end
+				end
+			end)
+			PierceAvailable = 0
+		end
+		PierceAvailable = Hit and (PierceAvailable - 1) or -1
+		task.spawn(function()
+		BulletVisualizer.Visualize(ShootingHandle,
+																	Module.MuzzleOffset,
+																	EndPos,
+																	script.MuzzleEffect,
+																	script.HitEffect,
+																	Module.HitSoundIDs[math.random(1,#Module.HitSoundIDs)],
+																	{Module.ExplosiveEnabled,Module.BlastRadius,Module.BlastPressure},
+																	{Module.BulletSpeed,Module.BulletSize,Module.BulletColor,Module.BulletTransparency,Module.BulletMaterial,Module.FadeTime},
+																	false,
+				PierceAvailable == -1 and Module.VisualizerEnabled or false)
+			end)
+		WeaponEffects:FireServer(
+			Tool,
+			"Bullet",
+			ShootingHandle,
+			Module.MuzzleOffset,
+			EndPos,
+			script.MuzzleEffect,
+			script.HitEffect,
+			Module.HitSoundIDs[math.random(1,#Module.HitSoundIDs)],
+			{Module.ExplosiveEnabled,Module.BlastRadius,Module.BlastPressure},
+			{Module.BulletSpeed,Module.BulletSize,Module.BulletColor,Module.BulletTransparency,Module.BulletMaterial,Module.FadeTime},
+			true,
+			PierceAvailable == -1 and Module.VisualizerEnabled or false
+		)
+		Start = EndPos + (Direction*0.01)
+	end
+end
+
+function Reload()
+	if Module.SprintEnabled and _G.IsSprinting then
+		return
+	end
+	if Controller:IsEnabled() and not Controller:GetReloading()
+		and (Controller:GetClips() > 0 or not Module.LimitedClipEnabled)
+		and Controller:GetAmmo() < Module.AmmoPerClip then
+
+		if not Controller:StartReload() then
+			return
+		end
+		
+		if AimDown then
+			Workspace.CurrentCamera.FieldOfView = 70
+			--[[local GUI = game.Players.LocalPlayer.PlayerGui:FindFirstChild("ZoomGui")
+			if GUI then GUI:Destroy() end]]
+			GUI.Scope.Visible = false
+			game.Players.LocalPlayer.CameraMode = Enum.CameraMode.Classic
+			script["Mouse Sensitivity"].Disabled = true
+			AimDown = false
+			Mouse.Icon = "rbxassetid://"..Module.MouseIconID
+		end
+		UpdateGUI()
+		if Module.ShotgunReload then
+			for i = 1,(Module.AmmoPerClip - Controller:GetAmmo()) do
+				if ShotgunClipinAnim then ShotgunClipinAnim:Play(nil,nil,Module.ShotgunClipinAnimationSpeed) end
+				Handle.ShotgunClipin:Play()
+				wait(Module.ShellClipinSpeed)
+			end
+		end
+		if ReloadAnim then ReloadAnim:Play(nil,nil,Module.ReloadAnimationSpeed) end
+		Handle.ReloadSound:Play()
+		WeaponEffects:FireServer(script.Parent, "Reload")
+		wait(Module.ReloadTime)
+		Controller:FinishReload()
+
+		local NewAmmo = Controller:GetAmmo()
+		local NewClips = Controller:GetClips()
+
+		UpdateGUI()
+	end
+end
+
+function UpdateGUI()
+	local CurrentAmmo = Controller:GetAmmo()
+	local CurrentClips = Controller:GetClips()
+
+	GUI.Frame.Ammo.Fill:TweenSizeAndPosition(
+		UDim2.new(CurrentAmmo / Module.AmmoPerClip, 0, 1, 0),
+		UDim2.new(0, 0, 0, 0),
+		Enum.EasingDirection.Out,
+		Enum.EasingStyle.Quint,
+		0.25,
+		true
+	)
+
+	GUI.Frame.Clips.Fill:TweenSizeAndPosition(
+		UDim2.new(CurrentClips / Module.MaxClip, 0, 1, 0),
+		UDim2.new(0, 0, 0, 0),
+		Enum.EasingDirection.Out,
+		Enum.EasingStyle.Quint,
+		0.25,
+		true
+	)
+
+	GUI.Frame.Ammo.Current.Text = CurrentAmmo
+	GUI.Frame.Ammo.Max.Text = Module.AmmoPerClip
+
+	GUI.Frame.Clips.Current.Text = CurrentClips
+	GUI.Frame.Clips.Max.Text = Module.MaxClip
+
+	GUI.Frame.Ammo.Current.Visible = not Controller:GetReloading()
+	GUI.Frame.Ammo.Max.Visible = not Controller:GetReloading()
+	GUI.Frame.Ammo.Frame.Visible = not Controller:GetReloading()
+	GUI.Frame.Ammo.Reloading.Visible = Controller:GetReloading()
+
+	GUI.Frame.Clips.Current.Visible = not (CurrentClips <= 0)
+	GUI.Frame.Clips.Max.Visible = not (CurrentClips <= 0)
+	GUI.Frame.Clips.Frame.Visible = not (CurrentClips <= 0)
+	GUI.Frame.Clips.NoMoreClip.Visible = (CurrentClips <= 0)
+	
+	GUI.Frame.Clips.Visible = Module.LimitedClipEnabled
+	GUI.Frame.Size = Module.LimitedClipEnabled and UDim2.new(0,250,0,100) or UDim2.new(0,250,0,55)
+	GUI.Frame.Position = Module.LimitedClipEnabled and UDim2.new(1,-260,1,-110)or UDim2.new(1,-260,1,-65)
+end
+
+Mouse.Button1Down:connect(function()
+	if Module.SprintEnabled and _G.IsSprinting then
+		return
+	end
+	Controller:SetTriggerHeld(true)
+
+	local IsChargedShot = false
+	if Equipped
+		and Controller:IsEnabled()
+		and Controller:IsTriggerHeld()
+		and not Controller:GetReloading()
+		and Controller:GetAmmo() > 0
+		and Humanoid.Health > 0 then
+
+		if not Controller:StartFiring() then
+			return
+		end
+		
+		Controller:SetEnabled(false)
+		if Module.ChargedShotEnabled then
+			if HandleToFire:FindFirstChild("ChargeSound") then HandleToFire.ChargeSound:Play() end
+			wait(Module.ChargingTime)
+			IsChargedShot = true
+		end
+		if Module.MinigunEnabled then
+			if HandleToFire:FindFirstChild("WindUp") then HandleToFire.WindUp:Play() end
+			wait(Module.DelayBeforeFiring)
+		end
+		while Equipped
+			and not Controller:GetReloading()
+			and not (Module.SprintEnabled and _G.IsSprinting)
+			and (Controller:IsTriggerHeld() or IsChargedShot)
+			and Controller:GetAmmo() > 0
+			and Humanoid.Health > 0 do
+			IsChargedShot = false
+			
+
+			for i = 1,(Module.BurstFireEnabled and Module.BulletPerBurst or 1) do
+				Spawn(ShakeCamera)
+
+				for x = 1,(Module.ShotgunEnabled and Module.BulletPerShot or 1) do
+					Fire(HandleToFire)
+				end
+
+				Controller:ConsumeAmmo(1)
+				UpdateGUI()
+				
+				if Module.BurstFireEnabled then
+					wait(Module.BurstRate)
+				end
+
+				if Controller:GetAmmo() <= 0 then
+					break
+				end
+			end
+
+			HandleToFire = (HandleToFire == Handle and Module.DualEnabled) and Handle2 or Handle
+
+			wait(Module.FireRate)
+
+			if not Module.Auto then break end
+			
+		end
+		if HandleToFire.FireSound.Playing and HandleToFire.FireSound.Looped then HandleToFire.FireSound:Stop() end
+		if Module.MinigunEnabled then
+			if HandleToFire:FindFirstChild("WindDown") then HandleToFire.WindDown:Play() end
+			wait(Module.DelayAfterFiring)
+		end
+		
+		Controller:StopFiring()
+		Controller:SetEnabled(true)
+
+		if Controller:GetAmmo() <= 0 then
+			Reload()
+		end
+	end
+end)
+
+Mouse.Button1Up:connect(function()
+	Controller:SetTriggerHeld(false)
+
+end)
+
+Tool.Equipped:connect(function(TempMouse)
+	Equipped = true
+	UpdateGUI()
+	
+	if Module.BodyAimEnabled then
+		local WeaponPose = require(
+			ReplicatedStorage.WeaponSystem.Modules.WeaponPose
+		)
+
+		CurrentPose = WeaponPose.Equip(Character)
+
+		if CurrentPose then
+			AimConnection = RunService.RenderStepped:Connect(function()
+				if not Equipped then
+					return
+				end
+
+				if not CurrentPose then
+					return
+				end
+
+				WeaponPose.UpdateAim(
+					CurrentPose,
+					Mouse.Hit.Position
+				)
+			end)
+		end
+	end
+
+	if Module.AmmoPerClip ~= math.huge then GUI.Parent = Player.PlayerGui end
+	TempMouse.Icon = "rbxassetid://"..Module.MouseIconID
+	if IdleAnim then IdleAnim:Play(nil,nil,Module.IdleAnimationSpeed) end
+	TempMouse.KeyDown:connect(function(Key)
+		if string.lower(Key) == "r" then
+			Reload()
+		elseif string.lower(Key) == "e" then
+			if not Controller:GetReloading() and AimDown == false and Module.SniperEnabled then
+				Workspace.CurrentCamera.FieldOfView = Module.FieldOfView
+				--[[local GUI = game.Players.LocalPlayer.PlayerGui:FindFirstChild("ZoomGui") or Tool.ZoomGui:Clone()
+				GUI.Parent = game.Players.LocalPlayer.PlayerGui]]
+				GUI.Scope.Visible = true
+				game.Players.LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+				script["Mouse Sensitivity"].Disabled = false
+				AimDown = true
+				Mouse.Icon="http://www.roblox.com/asset?id=187746799"
+			else
+				Workspace.CurrentCamera.FieldOfView = 70
+				--[[local GUI = game.Players.LocalPlayer.PlayerGui:FindFirstChild("ZoomGui")
+				if GUI then GUI:Destroy() end]]
+				GUI.Scope.Visible = false
+				game.Players.LocalPlayer.CameraMode = Enum.CameraMode.Classic
+				script["Mouse Sensitivity"].Disabled = true
+				AimDown = false
+				Mouse.Icon = "rbxassetid://"..Module.MouseIconID
+			end
+		end
+	end)
+	if Module.DualEnabled and not Workspace.FilteringEnabled then
+		Handle2.CanCollide = false
+		local LeftArm = Tool.Parent:FindFirstChild("Left Arm")
+		local RightArm = Tool.Parent:FindFirstChild("Right Arm")
+		if RightArm then
+			local Grip = RightArm:WaitForChild("RightGrip",0.01)
+			if Grip then
+				Grip2 = Grip:Clone()
+				Grip2.Name = "LeftGrip"
+				Grip2.Part0 = LeftArm
+				Grip2.Part1 = Handle2
+				--Grip2.C1 = Grip2.C1:inverse()
+				Grip2.Parent = LeftArm
+			end
+		end
+	end
+end)
+
+Tool.Unequipped:connect(function()
+	Equipped = false
+	GUI.Parent = script
+	
+	if AimConnection then
+		AimConnection:Disconnect()
+		AimConnection = nil
+	end
+
+	if CurrentPose then
+		local WeaponPose = require(
+			ReplicatedStorage.WeaponSystem.Modules.WeaponPose
+		)
+
+		WeaponPose.Unequip(CurrentPose)
+		CurrentPose = nil
+	end
+
+	if IdleAnim then IdleAnim:Stop() end
+		if AimDown then
+			Workspace.CurrentCamera.FieldOfView = 70
+			--[[local GUI = game.Players.LocalPlayer.PlayerGui:FindFirstChild("ZoomGui")
+			if GUI then GUI:Destroy() end]]
+			GUI.Scope.Visible = false
+			game.Players.LocalPlayer.CameraMode = Enum.CameraMode.Classic
+			script["Mouse Sensitivity"].Disabled = true
+			AimDown = false
+			Mouse.Icon = "rbxassetid://"..Module.MouseIconID
+		end
+	if Module.DualEnabled and not Workspace.FilteringEnabled then
+		Handle2.CanCollide = true
+		if Grip2 then Grip2:Destroy() end
+	end
+end)
+Humanoid.Died:connect(function()
+	Equipped = false
+	GUI.Parent = script
+	if IdleAnim then IdleAnim:Stop() end
+		if AimDown then
+			Workspace.CurrentCamera.FieldOfView = 70
+			--[[local GUI = game.Players.LocalPlayer.PlayerGui:FindFirstChild("ZoomGui")
+			if GUI then GUI:Destroy() end]]
+			GUI.Scope.Visible = false
+			game.Players.LocalPlayer.CameraMode = Enum.CameraMode.Classic
+			script["Mouse Sensitivity"].Disabled = true
+			AimDown = false
+			Mouse.Icon = "rbxassetid://"..Module.MouseIconID
+		end
+	if Module.DualEnabled and not Workspace.FilteringEnabled then
+		Handle2.CanCollide = true
+		if Grip2 then Grip2:Destroy() end
+	end
+end)
+
+if SprintChanged then
+	SprintChanged.Event:Connect(function(IsSprinting)
+		if IsSprinting then
+			Controller:SetTriggerHeld(false)
+
+			if Controller:GetReloading() then
+				Controller:SetReloading(false)
+			end
+
+			if Controller:IsCurrentlyFiring() then
+				Controller:StopFiring()
+			end
+		end
+	end)
+end
