@@ -4,6 +4,7 @@ local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 local InflictTarget = Remotes:WaitForChild("InflictTarget")
 local WeaponState = require(WeaponSystem.Modules:WaitForChild("WeaponState"))
+local BulletEffects = require(WeaponSystem.Modules:WaitForChild("BulletEffects"))
 
 local function getEquippedWeapon(Player)
 	local Character = Player.Character
@@ -104,12 +105,17 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	end
 
 	if FlamingBullet then
-		local Debuff = TargetCharacter:FindFirstChild("IgniteScript") or script:FindFirstChild("IgniteScript")
-		if not Debuff then return end
-		Debuff = Debuff:Clone()
-		Debuff.creator.Value = Player
-		Debuff.Disabled = false
-		Debuff.Parent = TargetCharacter
+		BulletEffects.Apply("Incendiary", {
+			Player = Player,
+			Tool = Tool,
+			Module = Module,
+			TargetCharacter = TargetCharacter,
+			TargetHumanoid = TargetHumanoid,
+			TargetTorso = TargetTorso,
+			HitPart = HitPart,
+			Direction = Direction,
+			Duration = Module.FlamingBulletDuration,
+		})
 	end
 end)
 
