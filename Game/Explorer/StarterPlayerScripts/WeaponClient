@@ -10,6 +10,22 @@ local BulletVisualizer = require(
 
 local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
 
+local function getEffectTemplate(Tool, Name)
+	if not Tool then
+		return nil
+	end
+
+	local LocalScript = Tool:FindFirstChild("GunScript_Local")
+	if LocalScript then
+		local Effect = LocalScript:FindFirstChild(Name)
+		if Effect then
+			return Effect
+		end
+	end
+
+	return Tool:FindFirstChild(Name, true)
+end
+
 local function playFireSound(Tool, ShootingHandle)
 	if not Tool or not Tool:IsA("Tool") then
 		return
@@ -67,11 +83,6 @@ local function playFireEffects(Tool, ShootingHandle)
 			if Light then Light.Enabled = false end
 			if Lite then Lite.Enabled = false end
 		end)
-	else
-		task.delay(0.08, function()
-			if Bolt then Bolt.Transparency = 0 end
-			if BoltBack then BoltBack.Transparency = 1 end
-		end)
 	end
 
 	task.delay(0.08, function()
@@ -114,8 +125,23 @@ WeaponEffects.OnClientEvent:Connect(function(
 		return
 	end
 
-	-- Don't visualize our own bullet here.
+	-- Don't visualize our own bullet here; the firing client already does it locally.
 	if Shooter == Player then
+		return
+	end
+
+	if not Tool and Shooter and Shooter.Character then
+		Tool = Shooter.Character:FindFirstChildOfClass("Tool")
+	end
+
+	ShootingHandle = ShootingHandle or (Tool and Tool:FindFirstChild("Handle"))
+
+	-- LocalScript-only effect instances may not survive the client -> server -> client
+	-- RemoteEvent round trip, so resolve equivalent templates from the replicated tool.
+	MuzzleEffect = MuzzleEffect or getEffectTemplate(Tool, "MuzzleEffect")
+	HitEffect = HitEffect or getEffectTemplate(Tool, "HitEffect")
+
+	if not ShootingHandle or not EndPos or not MuzzleEffect or not HitEffect then
 		return
 	end
 
