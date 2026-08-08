@@ -4,6 +4,31 @@ local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 
 local InflictTarget = Remotes:WaitForChild("InflictTarget")
+local ShotTimes = {}
+
+local function getEquippedWeapon(Player)
+	local Character = Player.Character
+	if not Character then
+		return nil, nil
+	end
+
+	local Tool = Character:FindFirstChildOfClass("Tool")
+	if not Tool then
+		return nil, nil
+	end
+
+	local Setting = Tool:FindFirstChild("Setting")
+	if not Setting or not Setting:IsA("ModuleScript") then
+		return nil, nil
+	end
+
+	local Module = require(Setting)
+	if type(Module) ~= "table" then
+		return nil, nil
+	end
+
+	return Tool, Module
+end
 
 InflictTarget.OnServerEvent:Connect(function(
 	Player,
@@ -33,19 +58,16 @@ InflictTarget.OnServerEvent:Connect(function(
 	end
 
 	local TargetCharacter = TargetHumanoid.Parent
-
 	if not TargetCharacter or not TargetCharacter:IsA("Model") then
 		return
 	end
-	
-	local HitCharacter = HitPart:FindFirstAncestorOfClass("Model")
 
+	local HitCharacter = HitPart:FindFirstAncestorOfClass("Model")
 	if HitCharacter ~= TargetCharacter then
 		return
 	end
 
 	local HitHumanoid = HitCharacter:FindFirstChildOfClass("Humanoid")
-
 	if HitHumanoid ~= TargetHumanoid then
 		return
 	end
@@ -76,19 +98,23 @@ InflictTarget.OnServerEvent:Connect(function(
 		return
 	end
 
-	local Tool = Character:FindFirstChildOfClass("Tool")
-
+	local Tool, Module = getEquippedWeapon(Player)
 	if not Tool then
 		return
 	end
-	
-	local Setting = Tool:FindFirstChild("Setting")
 
-	if not Setting or not Setting:IsA("ModuleScript") then
+	-- The server owns the fire-rate check. Keep this independent from the
+	-- client-side controller so firing speed cannot be increased by a client.
+	local FireRate = tonumber(Module.FireRate) or 0
+	local MinInterval = math.max(FireRate, 0.03)
+	local Now = os.clock()
+	local LastShot = ShotTimes[Player] or 0
+
+	if Now - LastShot < MinInterval then
 		return
 	end
 
-	local Module = require(Setting)
+	ShotTimes[Player] = Now
 
 	local Start = (
 		ShooterTorso.CFrame * CFrame.new(0, 1.5, 0)
@@ -103,54 +129,41 @@ InflictTarget.OnServerEvent:Connect(function(
 	RaycastParams.IgnoreWater = true
 
 	local ToTarget = HitPart.Position - Start
-	local Result = workspace:Raycast(
-		Start,
-		ToTarget,
-		RaycastParams
-	)
+	if ToTarget.Magnitude <= 0 or ToTarget.Magnitude > 5000 then
+		return
+	end
+
+	-- Re-raycast from the shooter's server-known origin. The client can
+	-- suggest a target, but the server decides whether that target is actually
+	-- reachable along the supplied shot direction.
+	local Result = workspace:Raycast(Start, ToTarget, RaycastParams)
 
 	if Result then
-		local HitCharacter =
-			Result.Instance:FindFirstAncestorOfClass("Model")
-
-		if HitCharacter ~= TargetCharacter then
+		local ResultCharacter = Result.Instance:FindFirstAncestorOfClass("Model")
+		if ResultCharacter ~= TargetCharacter then
 			return
 		end
 	end
 
-	local ToHit = HitPart.Position - Start
-
-	if ToHit.Magnitude <= 0 then
-		return
-	end
-
-	local AlongShot = ToHit:Dot(Direction)
-
-	if AlongShot <= 0 then
-		return
-	end
-	
-	if AlongShot > 5000 then
+	local AlongShot = ToTarget:Dot(Direction)
+	if AlongShot <= 0 or AlongShot > 5000 then
 		return
 	end
 
 	local ClosestPoint = Start + Direction * AlongShot
-	local DistanceFromShot =
-		(HitPart.Position - ClosestPoint).Magnitude
+	local DistanceFromShot = (HitPart.Position - ClosestPoint).Magnitude
 
 	if DistanceFromShot > 8 then
 		return
 	end
 
-	-- Server calculates the final damage.
 	local Damage = tonumber(Module.BaseDamage)
-
-	if not Damage then
+	if not Damage or Damage <= 0 then
 		return
 	end
 
 	if HitPart.Name == "Head" and Module.HeadshotEnabled then
-		Damage *= Module.HeadshotDamageMultiplier
+		Damage *= tonumber(Module.HeadshotDamageMultiplier) or 1
 	end
 
 	local Knockback = tonumber(Module.Knockback) or 0
@@ -165,7 +178,6 @@ InflictTarget.OnServerEvent:Connect(function(
 	Creator.Name = "creator"
 	Creator.Value = Player
 	Creator.Parent = TargetHumanoid
-
 	game.Debris:AddItem(Creator, 5)
 
 	TargetHumanoid:TakeDamage(Damage)
@@ -179,9 +191,7 @@ InflictTarget.OnServerEvent:Connect(function(
 	end
 
 	if FlamingBullet then
-		local Debuff =
-			TargetCharacter:FindFirstChild("IgniteScript")
-
+		local Debuff = TargetCharacter:FindFirstChild("IgniteScript")
 			or script:FindFirstChild("IgniteScript")
 
 		if not Debuff then
@@ -189,9 +199,12 @@ InflictTarget.OnServerEvent:Connect(function(
 		end
 
 		Debuff = Debuff:Clone()
-
 		Debuff.creator.Value = Player
 		Debuff.Disabled = false
 		Debuff.Parent = TargetCharacter
 	end
+end)
+
+game.Players.PlayerRemoving:Connect(function(Player)
+	ShotTimes[Player] = nil
 end)
