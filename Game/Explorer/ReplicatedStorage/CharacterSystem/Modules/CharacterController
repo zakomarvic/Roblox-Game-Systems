@@ -8,13 +8,21 @@ local Player = Players.LocalPlayer
 local WALK_SPEED = 16
 local SPRINT_SPEED = 24
 
+local Singleton
+
 function CharacterController.new()
+	if Singleton then
+		return Singleton
+	end
+
 	local self = setmetatable({}, CharacterController)
 
 	self.Character = nil
 	self.Humanoid = nil
 	self.Sprinting = false
 	self.SprintChanged = Instance.new("BindableEvent")
+
+	Singleton = self
 
 	self:_setupCharacter(Player.Character or Player.CharacterAdded:Wait())
 
@@ -23,6 +31,10 @@ function CharacterController.new()
 	end)
 
 	return self
+end
+
+function CharacterController.Get()
+	return Singleton or CharacterController.new()
 end
 
 function CharacterController:_setupCharacter(Character)
@@ -59,13 +71,6 @@ end
 
 function CharacterController:GetCharacter()
 	return self.Character
-end
-
-function CharacterController:Destroy()
-	if self.SprintChanged then
-		self.SprintChanged:Destroy()
-		self.SprintChanged = nil
-	end
 end
 
 return CharacterController
