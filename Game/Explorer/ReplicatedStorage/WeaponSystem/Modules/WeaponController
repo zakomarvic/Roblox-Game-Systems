@@ -168,7 +168,6 @@ function WeaponController:RunFireCycle(ShouldContinue, FireShot, OnCycleFinished
 	end
 
 	local Settings = self.Settings
-	local ChargedShot = false
 
 	while ShouldContinue() and self:GetAmmo() > 0 do
 		local BurstCount = Settings.BurstFireEnabled and Settings.BulletPerBurst or 1
@@ -178,7 +177,10 @@ function WeaponController:RunFireCycle(ShouldContinue, FireShot, OnCycleFinished
 				break
 			end
 
-			if not FireShot() then
+			-- A nil return means the shot completed normally.
+			-- Only an explicit false from the weapon script aborts the cycle.
+			local ShotResult = FireShot()
+			if ShotResult == false then
 				self:StopFiring()
 				if OnCycleFinished then
 					OnCycleFinished()
