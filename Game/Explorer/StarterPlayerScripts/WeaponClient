@@ -1,0 +1,52 @@
+local Player = game.Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
+local Remotes = WeaponSystem:WaitForChild("Remotes")
+
+local BulletVisualizer = require(
+	WeaponSystem.Modules:WaitForChild("BulletVisualizer")
+)
+
+local WeaponEffects = ReplicatedStorage
+	:WaitForChild("WeaponSystem")
+	:WaitForChild("Remotes")
+	:WaitForChild("WeaponEffects")
+
+
+WeaponEffects.OnClientEvent:Connect(function(
+	Effect,
+	Shooter,
+	ShootingHandle,
+	MuzzleOffset,
+	EndPos,
+	MuzzleEffect,
+	HitEffect,
+	HitSound,
+	ExplosiveData,
+	BulletData,
+	VisualizeExplosion,
+	VisualizeEnabled
+)
+	if Effect ~= "Bullet" then
+		return
+	end
+
+	-- Don't visualize our own bullet here.
+	if Shooter == Player then
+		return
+	end
+
+	BulletVisualizer.Visualize(
+		ShootingHandle,
+		MuzzleOffset,
+		EndPos,
+		MuzzleEffect,
+		HitEffect,
+		HitSound,
+		ExplosiveData,
+		BulletData,
+		VisualizeExplosion,
+		VisualizeEnabled
+	)
+end)
