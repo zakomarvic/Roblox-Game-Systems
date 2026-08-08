@@ -4,7 +4,7 @@ local Players = game:GetService("Players")
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
-local WeaponState = require(script.Parent:WaitForChild("WeaponState"))
+local WeaponState = require(WeaponSystem.Modules:WaitForChild("WeaponState"))
 
 WeaponEffects.OnServerEvent:Connect(function(Player, Tool, Effect, ...)
 	if not Player or not Tool or not Tool:IsA("Tool") then
@@ -84,8 +84,6 @@ WeaponEffects.OnServerEvent:Connect(function(Player, Tool, Effect, ...)
 		return
 	end
 
-	-- The firing sound is played locally by the shooter for zero-latency weapon feel.
-	-- Replicate only the validated fire event to other clients.
 	for _, OtherPlayer in ipairs(Players:GetPlayers()) do
 		if OtherPlayer ~= Player then
 			WeaponEffects:FireClient(OtherPlayer, "Fire", Player, Tool, Tool:FindFirstChild("Handle"))
