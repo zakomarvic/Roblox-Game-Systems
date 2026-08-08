@@ -1,6 +1,3 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CharacterController = require(ReplicatedStorage.CharacterSystem.Modules.CharacterController)
-
 local WeaponPose = {}
 
 local LEFT_POSE =
@@ -12,15 +9,6 @@ local RIGHT_POSE =
 	* CFrame.Angles(math.rad(-10), math.rad(80), math.rad(0))
 
 function WeaponPose.Equip(Character, Settings)
-	-- Always prefer the CharacterController's current character. Gun scripts can
-	-- retain an older Character reference across a respawn, while the controller
-	-- is explicitly updated on CharacterAdded.
-	local Controller = CharacterController.Get()
-	local CurrentCharacter = Controller and Controller:GetCharacter()
-	if CurrentCharacter and CurrentCharacter.Parent then
-		Character = CurrentCharacter
-	end
-
 	if not Character or not Character.Parent then
 		return nil
 	end
@@ -47,18 +35,13 @@ function WeaponPose.Equip(Character, Settings)
 	local PoseData = {
 		Character = Character,
 		Humanoid = Humanoid,
-
 		Torso = Torso,
 		RootPart = RootPart,
-
 		LeftShoulder = LeftShoulder,
 		RightShoulder = RightShoulder,
-
 		DefaultLeftC0 = LeftShoulder.C0,
 		DefaultRightC0 = RightShoulder.C0,
-
 		OldAutoRotate = Humanoid.AutoRotate,
-
 		BodyAimEnabled = Settings and Settings.BodyAimEnabled ~= false or true,
 		BodyAimSpeed = Settings and Settings.BodyAimSpeed or 12,
 	}
