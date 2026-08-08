@@ -161,7 +161,8 @@ function WeaponController:StopFiring()
 end
 
 -- Runs the generic fire cycle. The weapon script supplies the actual shot.
--- The controller owns burst/automatic timing and ammo consumption.
+-- Existing weapons may consume ammo inside FireShot(), so the controller
+-- only consumes ammo when the callback did not already do so.
 function WeaponController:RunFireCycle(ShouldContinue, FireShot, OnCycleFinished)
 	if not self:IsCurrentlyFiring() then
 		return false
@@ -177,9 +178,9 @@ function WeaponController:RunFireCycle(ShouldContinue, FireShot, OnCycleFinished
 				break
 			end
 
-			-- A nil return means the shot completed normally.
-			-- Only an explicit false from the weapon script aborts the cycle.
+			local AmmoBeforeShot = self:GetAmmo()
 			local ShotResult = FireShot()
+
 			if ShotResult == false then
 				self:StopFiring()
 				if OnCycleFinished then
@@ -188,7 +189,12 @@ function WeaponController:RunFireCycle(ShouldContinue, FireShot, OnCycleFinished
 				return false
 			end
 
-			self:ConsumeAmmo(1)
+			-- Preserve compatibility with weapon callbacks that already consume
+			-- ammo while still supporting callbacks that leave ammo management
+			-- entirely to the controller.
+			if self:GetAmmo() == AmmoBeforeShot then
+				self:ConsumeAmmo(1)
+			end
 
 			if Settings.BurstFireEnabled then
 				task.wait(Settings.BurstRate or 0)
