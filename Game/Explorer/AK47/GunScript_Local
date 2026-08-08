@@ -323,41 +323,39 @@ local function Reload()
 		return
 	end
 
-	if Controller:IsEnabled()
-		and not Controller:GetReloading()
-		and (Controller:GetClips() > 0 or not Module.LimitedClipEnabled)
-		and Controller:GetAmmo() < Module.AmmoPerClip then
-
-		if not Controller:StartReload() then
-			return
-		end
-
-		if AimDown then
-			ResetAim()
-		end
-
-		UpdateGUI()
-
-		if Module.ShotgunReload then
-			for _ = 1, (Module.AmmoPerClip - Controller:GetAmmo()) do
-				if ShotgunClipinAnim then
-					ShotgunClipinAnim:Play(nil, nil, Module.ShotgunClipinAnimationSpeed)
-				end
-				Handle.ShotgunClipin:Play()
-				wait(Module.ShellClipinSpeed)
-			end
-		end
-
-		if ReloadAnim then
-			ReloadAnim:Play(nil, nil, Module.ReloadAnimationSpeed)
-		end
-
-		Handle.ReloadSound:Play()
-		WeaponEffects:FireServer(Tool, "Reload")
-		wait(Module.ReloadTime)
-		Controller:FinishReload()
-		UpdateGUI()
+	if not Controller:CanReload() then
+		return
 	end
+
+	if not Controller:StartReload() then
+		return
+	end
+
+	if AimDown then
+		ResetAim()
+	end
+
+	UpdateGUI()
+
+	if Module.ShotgunReload then
+		for _ = 1, (Module.AmmoPerClip - Controller:GetAmmo()) do
+			if ShotgunClipinAnim then
+				ShotgunClipinAnim:Play(nil, nil, Module.ShotgunClipinAnimationSpeed)
+			end
+			Handle.ShotgunClipin:Play()
+			wait(Module.ShellClipinSpeed)
+		end
+	end
+
+	if ReloadAnim then
+		ReloadAnim:Play(nil, nil, Module.ReloadAnimationSpeed)
+	end
+
+	Handle.ReloadSound:Play()
+	WeaponEffects:FireServer(Tool, "Reload")
+	wait(Module.ReloadTime)
+	Controller:FinishReload()
+	UpdateGUI()
 end
 
 Mouse.Button1Down:Connect(function()
@@ -370,10 +368,8 @@ Mouse.Button1Down:Connect(function()
 	local IsChargedShot = false
 
 	if Equipped
-		and Controller:IsEnabled()
-		and Controller:IsTriggerHeld()
-		and not Controller:GetReloading()
-		and Controller:GetAmmo() > 0
+		and Controller:CanFireNow()
+		and not (Module.SprintEnabled and CharacterControllerInstance:IsSprinting())
 		and Humanoid.Health > 0 then
 
 		if not Controller:StartFiring() then
