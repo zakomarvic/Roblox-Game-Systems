@@ -28,6 +28,7 @@ end
 WeaponEffects.OnClientEvent:Connect(function(
 	Effect,
 	Shooter,
+	Tool,
 	ShootingHandle,
 	MuzzleOffset,
 	EndPos,
@@ -42,7 +43,7 @@ WeaponEffects.OnClientEvent:Connect(function(
 	if Effect == "Fire" then
 		if Shooter and Shooter ~= Player then
 			local Character = Shooter.Character
-			local Tool = Character and Character:FindFirstChildOfClass("Tool")
+			Tool = Tool or (Character and Character:FindFirstChildOfClass("Tool"))
 
 			if Tool then
 				playFireSound(Tool, ShootingHandle or Tool:FindFirstChild("Handle"))
