@@ -9,6 +9,7 @@ local WeaponController = require(ReplicatedStorage.WeaponSystem.Modules.WeaponCo
 local WeaponFire = require(ReplicatedStorage.WeaponSystem.Modules.WeaponFire)
 local WeaponReload = require(ReplicatedStorage.WeaponSystem.Modules.WeaponReload)
 local WeaponCamera = require(ReplicatedStorage.WeaponSystem.Modules.WeaponCamera)
+local WeaponAim = require(ReplicatedStorage.WeaponSystem.Modules.WeaponAim)
 local CharacterController = require(ReplicatedStorage.CharacterSystem.Modules.CharacterController)
 local WeaponPose = require(ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 
@@ -30,10 +31,17 @@ local WeaponCameraInstance = WeaponCamera.new(Camera, Humanoid, Character, Modul
 
 Player.CharacterAdded:Connect(function(NewCharacter)
 	local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
+	Character = NewCharacter
+	Humanoid = NewHumanoid
 	WeaponCameraInstance:SetCharacter(NewCharacter, NewHumanoid)
 end)
 
 local GUI = script:WaitForChild("GunGUI")
+local AimSensitivity = script:WaitForChild("Mouse Sensitivity")
+local WeaponAimInstance = WeaponAim.new(Camera, Player, Mouse, GUI, AimSensitivity, Module, function(State)
+	WeaponCameraInstance:SetAiming(State)
+end)
+
 local IdleAnim
 local FireAnim
 local ReloadAnim
@@ -50,7 +58,6 @@ if Module.DualEnabled then
 end
 
 local Equipped = false
-local AimDown = false
 local PiercedHumanoid = {}
 
 if Module.IdleAnimationID ~= nil or Module.DualEnabled then
@@ -110,7 +117,6 @@ end
 
 RunService.RenderStepped:Connect(function(DeltaTime)
 	WeaponCameraInstance:SetEquipped(Equipped)
-	WeaponCameraInstance:SetAiming(AimDown)
 	WeaponCameraInstance:Update(DeltaTime)
 end)
 
@@ -129,7 +135,7 @@ local function Fire(ShootingHandle)
 	WeaponEffects:FireServer(Tool, "Fire")
 
 	local Start = (Humanoid.Torso.CFrame * CFrame.new(0, 1.5, 0)).Position
-	local Spread = Module.Spread * (AimDown and 1 - Module.SpreadRedution or 1)
+	local Spread = Module.Spread * (WeaponAimInstance:IsAiming() and 1 - Module.SpreadRedution or 1)
 	local Direction = (CFrame.new(Start, Mouse.Hit.Position) * CFrame.Angles(
 		math.rad(-Spread + math.random() * (Spread * 2)),
 		math.rad(-Spread + math.random() * (Spread * 2)),
@@ -190,15 +196,12 @@ end
 local function UpdateGUI()
 	local CurrentAmmo = Controller:GetAmmo()
 	local CurrentClips = Controller:GetClips()
-
 	GUI.Frame.Ammo.Fill:TweenSizeAndPosition(UDim2.new(CurrentAmmo / Module.AmmoPerClip, 0, 1, 0), UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.25, true)
 	GUI.Frame.Clips.Fill:TweenSizeAndPosition(UDim2.new(CurrentClips / Module.MaxClip, 0, 1, 0), UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.25, true)
-
 	GUI.Frame.Ammo.Current.Text = CurrentAmmo
 	GUI.Frame.Ammo.Max.Text = Module.AmmoPerClip
 	GUI.Frame.Clips.Current.Text = CurrentClips
 	GUI.Frame.Clips.Max.Text = Module.MaxClip
-
 	GUI.Frame.Ammo.Current.Visible = not Controller:GetReloading()
 	GUI.Frame.Ammo.Max.Visible = not Controller:GetReloading()
 	GUI.Frame.Ammo.Frame.Visible = not Controller:GetReloading()
@@ -212,18 +215,8 @@ local function UpdateGUI()
 	GUI.Frame.Position = Module.LimitedClipEnabled and UDim2.new(1, -260, 1, -110) or UDim2.new(1, -260, 1, -65)
 end
 
-local function SetAim(State)
-	AimDown = State
-	WeaponCameraInstance:SetAiming(State)
-end
-
 local function ResetAim()
-	Camera.FieldOfView = 70
-	GUI.Scope.Visible = false
-	Player.CameraMode = Enum.CameraMode.Classic
-	script["Mouse Sensitivity"].Disabled = true
-	SetAim(false)
-	Mouse.Icon = "rbxassetid://" .. Module.MouseIconID
+	WeaponAimInstance:Reset()
 end
 
 local Reload = WeaponReload.new({
@@ -238,7 +231,7 @@ local Reload = WeaponReload.new({
 		return Module.SprintEnabled and CharacterControllerInstance:IsSprinting()
 	end,
 	IsAiming = function()
-		return AimDown
+		return WeaponAimInstance:IsAiming()
 	end,
 	ResetAim = ResetAim,
 	UpdateGUI = UpdateGUI,
@@ -246,126 +239,66 @@ local Reload = WeaponReload.new({
 })
 
 Mouse.Button1Down:Connect(function()
-	if Module.SprintEnabled and CharacterControllerInstance:IsSprinting() then
-		return
-	end
-
+	if Module.SprintEnabled and CharacterControllerInstance:IsSprinting() then return end
 	Controller:SetTriggerHeld(true)
 	local IsChargedShot = false
-
-	if not Equipped or not Controller:CanFireNow() or Humanoid.Health <= 0 then
-		return
-	end
-	if not Controller:StartFiring() then
-		return
-	end
-
+	if not Equipped or not Controller:CanFireNow() or Humanoid.Health <= 0 then return end
+	if not Controller:StartFiring() then return end
 	Controller:SetEnabled(false)
-
 	if Module.ChargedShotEnabled then
-		if HandleToFire:FindFirstChild("ChargeSound") then
-			HandleToFire.ChargeSound:Play()
-		end
+		if HandleToFire:FindFirstChild("ChargeSound") then HandleToFire.ChargeSound:Play() end
 		wait(Module.ChargingTime)
 		IsChargedShot = true
 	end
-
 	if Module.MinigunEnabled then
-		if HandleToFire:FindFirstChild("WindUp") then
-			HandleToFire.WindUp:Play()
-		end
+		if HandleToFire:FindFirstChild("WindUp") then HandleToFire.WindUp:Play() end
 		wait(Module.DelayBeforeFiring)
 	end
-
-	Controller:RunFireCycle(
-		function()
-			return Equipped
-				and not Controller:GetReloading()
-				and not (Module.SprintEnabled and CharacterControllerInstance:IsSprinting())
-				and (Controller:IsTriggerHeld() or IsChargedShot)
-				and Controller:GetAmmo() > 0
-				and Humanoid.Health > 0
-		end,
-		function()
-			IsChargedShot = false
-			task.spawn(ShakeCamera)
-
-			for _ = 1, (Module.ShotgunEnabled and Module.BulletPerShot or 1) do
-				Fire(HandleToFire)
-			end
-
-			Controller:ConsumeAmmo(1)
-			UpdateGUI()
-
-			HandleToFire = (HandleToFire == Handle and Module.DualEnabled) and Handle2 or Handle
-		end
-	)
-
-	if HandleToFire.FireSound.Playing and HandleToFire.FireSound.Looped then
-		HandleToFire.FireSound:Stop()
-	end
-
+	Controller:RunFireCycle(function()
+		return Equipped and not Controller:GetReloading() and not (Module.SprintEnabled and CharacterControllerInstance:IsSprinting()) and (Controller:IsTriggerHeld() or IsChargedShot) and Controller:GetAmmo() > 0 and Humanoid.Health > 0
+	end, function()
+		IsChargedShot = false
+		task.spawn(ShakeCamera)
+		for _ = 1, (Module.ShotgunEnabled and Module.BulletPerShot or 1) do Fire(HandleToFire) end
+		Controller:ConsumeAmmo(1)
+		UpdateGUI()
+		HandleToFire = (HandleToFire == Handle and Module.DualEnabled) and Handle2 or Handle
+	end)
+	if HandleToFire.FireSound.Playing and HandleToFire.FireSound.Looped then HandleToFire.FireSound:Stop() end
 	if Module.MinigunEnabled then
-		if HandleToFire:FindFirstChild("WindDown") then
-			HandleToFire.WindDown:Play()
-		end
+		if HandleToFire:FindFirstChild("WindDown") then HandleToFire.WindDown:Play() end
 		wait(Module.DelayAfterFiring)
 	end
-
 	Controller:StopFiring()
 	Controller:SetEnabled(true)
-
-	if Controller:GetAmmo() <= 0 then
-		Reload:Start()
-	end
+	if Controller:GetAmmo() <= 0 then Reload:Start() end
 end)
 
-Mouse.Button1Up:Connect(function()
-	Controller:SetTriggerHeld(false)
-end)
+Mouse.Button1Up:Connect(function() Controller:SetTriggerHeld(false) end)
 
 Tool.Equipped:Connect(function(TempMouse)
 	Equipped = true
 	WeaponCameraInstance:SetEquipped(true)
+	WeaponAimInstance:Reset()
 	UpdateGUI()
-
 	if Module.BodyAimEnabled then
 		CurrentPose = WeaponPose.Equip(Character, Module)
 		if CurrentPose then
 			AimConnection = RunService.RenderStepped:Connect(function()
-				if not Equipped or not CurrentPose then
-					return
-				end
-				WeaponPose.UpdateAim(CurrentPose, Mouse.Hit.Position)
+				if Equipped and CurrentPose then WeaponPose.UpdateAim(CurrentPose, Mouse.Hit.Position) end
 			end)
 		end
 	end
-
-	if Module.AmmoPerClip ~= math.huge then
-		GUI.Parent = Player.PlayerGui
-	end
+	if Module.AmmoPerClip ~= math.huge then GUI.Parent = Player.PlayerGui end
 	TempMouse.Icon = "rbxassetid://" .. Module.MouseIconID
-	if IdleAnim then
-		IdleAnim:Play(nil, nil, Module.IdleAnimationSpeed)
-	end
-
+	if IdleAnim then IdleAnim:Play(nil, nil, Module.IdleAnimationSpeed) end
 	TempMouse.KeyDown:Connect(function(Key)
 		if string.lower(Key) == "r" then
 			Reload:Start()
 		elseif string.lower(Key) == "e" then
-			if not Controller:GetReloading() and not AimDown and Module.SniperEnabled then
-				Camera.FieldOfView = Module.FieldOfView
-				GUI.Scope.Visible = true
-				Player.CameraMode = Enum.CameraMode.LockFirstPerson
-				script["Mouse Sensitivity"].Disabled = false
-				SetAim(true)
-				Mouse.Icon = "http://www.roblox.com/asset?id=187746799"
-			else
-				ResetAim()
-			end
+			if not Controller:GetReloading() and Module.SniperEnabled then WeaponAimInstance:Toggle() end
 		end
 	end)
-
 	if Module.DualEnabled and not Workspace.FilteringEnabled then
 		Handle2.CanCollide = false
 		local LeftArm = Tool.Parent:FindFirstChild("Left Arm")
@@ -386,62 +319,36 @@ end)
 Tool.Unequipped:Connect(function()
 	Equipped = false
 	WeaponCameraInstance:SetEquipped(false)
-	SetAim(false)
+	WeaponAimInstance:Reset()
 	GUI.Parent = script
-
-	if AimConnection then
-		AimConnection:Disconnect()
-		AimConnection = nil
-	end
-	if CurrentPose then
-		WeaponPose.Unequip(CurrentPose)
-		CurrentPose = nil
-	end
-	if IdleAnim then
-		IdleAnim:Stop()
-	end
+	if AimConnection then AimConnection:Disconnect(); AimConnection = nil end
+	if CurrentPose then WeaponPose.Unequip(CurrentPose); CurrentPose = nil end
+	if IdleAnim then IdleAnim:Stop() end
 	if Module.DualEnabled and not Workspace.FilteringEnabled then
 		Handle2.CanCollide = true
-		if Grip2 then
-			Grip2:Destroy()
-			Grip2 = nil
-		end
+		if Grip2 then Grip2:Destroy(); Grip2 = nil end
 	end
 end)
 
 Humanoid.Died:Connect(function()
 	Equipped = false
 	WeaponCameraInstance:SetEquipped(false)
-	SetAim(false)
+	WeaponAimInstance:Reset()
 	GUI.Parent = script
-	if IdleAnim then
-		IdleAnim:Stop()
-	end
-	if AimConnection then
-		AimConnection:Disconnect()
-		AimConnection = nil
-	end
-	if CurrentPose then
-		WeaponPose.Unequip(CurrentPose)
-		CurrentPose = nil
-	end
+	if IdleAnim then IdleAnim:Stop() end
+	if AimConnection then AimConnection:Disconnect(); AimConnection = nil end
+	if CurrentPose then WeaponPose.Unequip(CurrentPose); CurrentPose = nil end
 	if Module.DualEnabled and not Workspace.FilteringEnabled then
 		Handle2.CanCollide = true
-		if Grip2 then
-			Grip2:Destroy()
-			Grip2 = nil
-		end
+		if Grip2 then Grip2:Destroy(); Grip2 = nil end
 	end
 end)
 
 CharacterControllerInstance.SprintChanged.Event:Connect(function(IsSprinting)
 	if IsSprinting then
 		Controller:SetTriggerHeld(false)
-		if Controller:GetReloading() then
-			Controller:SetReloading(false)
-		end
-		if Controller:IsCurrentlyFiring() then
-			Controller:StopFiring()
-		end
+		if Controller:GetReloading() then Controller:SetReloading(false) end
+		if Controller:IsCurrentlyFiring() then Controller:StopFiring() end
+		WeaponAimInstance:Reset()
 	end
 end)
