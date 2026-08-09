@@ -1,0 +1,42 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local WeaponFire = {}
+
+local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
+local Remotes = WeaponSystem:WaitForChild("Remotes")
+local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
+local BulletVisualizer = require(WeaponSystem.Modules:WaitForChild("BulletVisualizer"))
+
+function WeaponFire.VisualizeAndBroadcast(Tool, ShootingHandle, MuzzleOffset, EndPos, MuzzleEffect, HitEffect, HitSound, ExplosiveData, BulletData, VisualizeEnabled)
+	task.spawn(function()
+		BulletVisualizer.Visualize(
+			ShootingHandle,
+			MuzzleOffset,
+			EndPos,
+			MuzzleEffect,
+			HitEffect,
+			HitSound,
+			ExplosiveData,
+			BulletData,
+			false,
+			VisualizeEnabled
+		)
+	end)
+
+	WeaponEffects:FireServer(
+		Tool,
+		"Bullet",
+		ShootingHandle,
+		MuzzleOffset,
+		EndPos,
+		MuzzleEffect,
+		HitEffect,
+		HitSound,
+		ExplosiveData,
+		BulletData,
+		true,
+		VisualizeEnabled
+	)
+end
+
+return WeaponFire
