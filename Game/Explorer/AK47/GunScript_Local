@@ -257,7 +257,7 @@ local WeaponLifecycleInstance = WeaponLifecycle.new({
 			CurrentPose = WeaponPose.Equip(Character, Module)
 			if CurrentPose then
 				AimConnection = WeaponLifecycleInstance:AddConnection(RunService.RenderStepped:Connect(function()
-					if WeaponLifecycleInstance:IsEquipped() and CurrentPose then
+					if Equipped and CurrentPose then
 						WeaponPose.UpdateAim(CurrentPose, Mouse.Hit.Position)
 					end
 				end))
