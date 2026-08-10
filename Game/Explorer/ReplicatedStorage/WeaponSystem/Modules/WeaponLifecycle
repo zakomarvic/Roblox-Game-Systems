@@ -1,0 +1,89 @@
+local WeaponLifecycle = {}
+WeaponLifecycle.__index = WeaponLifecycle
+
+function WeaponLifecycle.new(dependencies)
+	local self = setmetatable({}, WeaponLifecycle)
+	self.Equipped = false
+	self.Connections = {}
+	self.Cleanups = {}
+	self.Dependencies = dependencies or {}
+	return self
+end
+
+function WeaponLifecycle:AddConnection(Connection)
+	if Connection then
+		table.insert(self.Connections, Connection)
+	end
+	return Connection
+end
+
+function WeaponLifecycle:AddCleanup(Cleanup)
+	if typeof(Cleanup) == "function" then
+		table.insert(self.Cleanups, Cleanup)
+	end
+end
+
+function WeaponLifecycle:IsEquipped()
+	return self.Equipped
+end
+
+function WeaponLifecycle:Equip()
+	self:CleanupConnections()
+	self.Equipped = true
+	local D = self.Dependencies
+	if D.Camera then D.Camera:SetEquipped(true) end
+	if D.Aim then D.Aim:Reset() end
+	if D.GUI and D.PlayerGui then D.GUI.Parent = D.PlayerGui end
+	if D.IdleAnim then D.IdleAnim:Play(nil, nil, D.IdleAnimationSpeed or 1) end
+	if D.OnEquip then D.OnEquip() end
+end
+
+function WeaponLifecycle:Unequip()
+	if not self.Equipped and not self.HasActiveState then
+		self:CleanupConnections()
+		return
+	end
+	self.Equipped = false
+	self.HasActiveState = false
+	local D = self.Dependencies
+	if D.TriggerReleased then D.TriggerReleased() end
+	if D.Camera then D.Camera:SetEquipped(false) end
+	if D.Aim then D.Aim:Reset() end
+	if D.GUI and D.Script then D.GUI.Parent = D.Script end
+	if D.IdleAnim then D.IdleAnim:Stop() end
+	self:CleanupConnections()
+	if D.OnUnequip then D.OnUnequip() end
+end
+
+function WeaponLifecycle:Died()
+	self.Equipped = false
+	self.HasActiveState = false
+	local D = self.Dependencies
+	if D.TriggerReleased then D.TriggerReleased() end
+	if D.Camera then D.Camera:SetEquipped(false) end
+	if D.Aim then D.Aim:Reset() end
+	if D.GUI and D.Script then D.GUI.Parent = D.Script end
+	if D.IdleAnim then D.IdleAnim:Stop() end
+	self:CleanupConnections()
+	if D.OnDeath then D.OnDeath() end
+end
+
+function WeaponLifecycle:CleanupConnections()
+	for _, Connection in ipairs(self.Connections) do
+		if Connection and Connection.Connected then
+			Connection:Disconnect()
+		end
+	end
+	table.clear(self.Connections)
+end
+
+function WeaponLifecycle:Destroy()
+	self:Unequip()
+	for _, Cleanup in ipairs(self.Cleanups) do
+		pcall(Cleanup)
+	end
+	table.clear(self.Cleanups)
+	table.clear(self.Dependencies)
+end
+
+return WeaponLifecycle
