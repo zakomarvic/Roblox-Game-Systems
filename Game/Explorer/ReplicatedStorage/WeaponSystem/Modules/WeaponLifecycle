@@ -35,6 +35,7 @@ function WeaponLifecycle:Equip()
 	local D = self.Dependencies
 	if D.Camera then D.Camera:SetEquipped(true) end
 	if D.Aim then D.Aim:Reset() end
+	if D.Input then D.Input:Bind() end
 	if D.GUI and D.PlayerGui then D.GUI.Parent = D.PlayerGui end
 	if D.IdleAnim then D.IdleAnim:Play(nil, nil, D.IdleAnimationSpeed or 1) end
 	if D.OnEquip then D.OnEquip(self) end
