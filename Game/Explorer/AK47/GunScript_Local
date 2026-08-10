@@ -11,6 +11,7 @@ local WeaponReload = require(ReplicatedStorage.WeaponSystem.Modules.WeaponReload
 local WeaponCamera = require(ReplicatedStorage.WeaponSystem.Modules.WeaponCamera)
 local WeaponAim = require(ReplicatedStorage.WeaponSystem.Modules.WeaponAim)
 local WeaponInput = require(ReplicatedStorage.WeaponSystem.Modules.WeaponInput)
+local WeaponLifecycle = require(ReplicatedStorage.WeaponSystem.Modules.WeaponLifecycle)
 local CharacterController = require(ReplicatedStorage.CharacterSystem.Modules.CharacterController)
 local WeaponPose = require(ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 
@@ -240,23 +241,56 @@ local WeaponInputInstance = WeaponInput.new(Mouse, {
 	end,
 })
 
-Tool.Equipped:Connect(function(TempMouse)
-	Equipped = true
-	WeaponCameraInstance:SetEquipped(true)
-	WeaponAimInstance:Reset()
-	UpdateGUI()
-	WeaponInputInstance:Bind()
-	if Module.BodyAimEnabled then
-		CurrentPose = WeaponPose.Equip(Character, Module)
-		if CurrentPose then
-			AimConnection = RunService.RenderStepped:Connect(function()
-				if Equipped and CurrentPose then WeaponPose.UpdateAim(CurrentPose, Mouse.Hit.Position) end
-			end)
+local WeaponLifecycleInstance = WeaponLifecycle.new({
+	Camera = WeaponCameraInstance,
+	Aim = WeaponAimInstance,
+	Input = WeaponInputInstance,
+	GUI = GUI,
+	Script = script,
+	PlayerGui = Player.PlayerGui,
+	IdleAnim = IdleAnim,
+	IdleAnimationSpeed = Module.IdleAnimationSpeed,
+	TriggerReleased = OnFireUp,
+	OnEquip = function()
+		UpdateGUI()
+		if Module.BodyAimEnabled then
+			CurrentPose = WeaponPose.Equip(Character, Module)
+			if CurrentPose then
+				AimConnection = WeaponLifecycleInstance:AddConnection(RunService.RenderStepped:Connect(function()
+					if WeaponLifecycleInstance:IsEquipped() and CurrentPose then
+						WeaponPose.UpdateAim(CurrentPose, Mouse.Hit.Position)
+					end
+				end))
+			end
 		end
-	end
-	if Module.AmmoPerClip ~= math.huge then GUI.Parent = Player.PlayerGui end
-	TempMouse.Icon = "rbxassetid://" .. Module.MouseIconID
-	if IdleAnim then IdleAnim:Play(nil, nil, Module.IdleAnimationSpeed) end
+		if Module.AmmoPerClip ~= math.huge then GUI.Parent = Player.PlayerGui end
+		Mouse.Icon = "rbxassetid://" .. Module.MouseIconID
+	end,
+	OnUnequip = function()
+		if CurrentPose then
+			WeaponPose.Unequip(CurrentPose)
+			CurrentPose = nil
+		end
+		if Module.DualEnabled and not Workspace.FilteringEnabled then
+			Handle2.CanCollide = true
+			if Grip2 then Grip2:Destroy(); Grip2 = nil end
+		end
+	end,
+	OnDeath = function()
+		if CurrentPose then
+			WeaponPose.Unequip(CurrentPose)
+			CurrentPose = nil
+		end
+		if Module.DualEnabled and not Workspace.FilteringEnabled then
+			Handle2.CanCollide = true
+			if Grip2 then Grip2:Destroy(); Grip2 = nil end
+		end
+	end,
+})
+
+Tool.Equipped:Connect(function()
+	Equipped = true
+	WeaponLifecycleInstance:Equip()
 	if Module.DualEnabled and not Workspace.FilteringEnabled then
 		Handle2.CanCollide = false
 		local LeftArm = Tool.Parent:FindFirstChild("Left Arm")
@@ -276,32 +310,12 @@ end)
 
 Tool.Unequipped:Connect(function()
 	Equipped = false
-	WeaponInputInstance:Unbind()
-	WeaponCameraInstance:SetEquipped(false)
-	WeaponAimInstance:Reset()
-	GUI.Parent = script
-	if AimConnection then AimConnection:Disconnect(); AimConnection = nil end
-	if CurrentPose then WeaponPose.Unequip(CurrentPose); CurrentPose = nil end
-	if IdleAnim then IdleAnim:Stop() end
-	if Module.DualEnabled and not Workspace.FilteringEnabled then
-		Handle2.CanCollide = true
-		if Grip2 then Grip2:Destroy(); Grip2 = nil end
-	end
+	WeaponLifecycleInstance:Unequip()
 end)
 
 Humanoid.Died:Connect(function()
 	Equipped = false
-	WeaponInputInstance:Unbind()
-	WeaponCameraInstance:SetEquipped(false)
-	WeaponAimInstance:Reset()
-	GUI.Parent = script
-	if IdleAnim then IdleAnim:Stop() end
-	if AimConnection then AimConnection:Disconnect(); AimConnection = nil end
-	if CurrentPose then WeaponPose.Unequip(CurrentPose); CurrentPose = nil end
-	if Module.DualEnabled and not Workspace.FilteringEnabled then
-		Handle2.CanCollide = true
-		if Grip2 then Grip2:Destroy(); Grip2 = nil end
-	end
+	WeaponLifecycleInstance:Died()
 end)
 
 CharacterControllerInstance.SprintChanged.Event:Connect(function(IsSprinting)
