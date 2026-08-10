@@ -20,6 +20,7 @@ local InflictTarget = ReplicatedStorage:WaitForChild("WeaponSystem"):WaitForChil
 local Controller = WeaponController.new(Tool, Module)
 local CurrentPose
 local AimConnection
+local WeaponFireInstance
 
 local Handle = Tool:WaitForChild("Handle")
 local Player = Players.LocalPlayer
@@ -35,12 +36,18 @@ Player.CharacterAdded:Connect(function(NewCharacter)
 	Character = NewCharacter
 	Humanoid = NewHumanoid
 	WeaponCameraInstance:SetCharacter(NewCharacter, NewHumanoid)
+	if WeaponFireInstance then
+		WeaponFireInstance:SetCharacter(NewCharacter, NewHumanoid)
+	end
 end)
 
 local GUI = script:WaitForChild("GunGUI")
 local AimSensitivity = script:WaitForChild("Mouse Sensitivity")
 local WeaponAimInstance = WeaponAim.new(Camera, Player, Mouse, GUI, AimSensitivity, Module, function(State)
 	WeaponCameraInstance:SetAiming(State)
+	if WeaponFireInstance then
+		WeaponFireInstance:SetAiming(State)
+	end
 end)
 
 local IdleAnim
@@ -59,7 +66,6 @@ if Module.DualEnabled then
 end
 
 local Equipped = false
-local PiercedHumanoid = {}
 
 if Module.IdleAnimationID ~= nil or Module.DualEnabled then
 	IdleAnim = Tool:WaitForChild("IdleAnim")
@@ -90,7 +96,7 @@ local function wait(TimeToWait)
 	end
 end
 
-local function RayCast(Start, Direction, Range, Ignore)
+local function RayCast(Start, Direction, Range, Ignore, PiercedHumanoid)
 	local Hit, EndPos = Workspace:FindPartOnRay(Ray.new(Start, Direction * Range), Ignore)
 	if Hit then
 		if (
@@ -104,9 +110,9 @@ local function RayCast(Start, Direction, Range, Ignore)
 				or Hit.Name == "Arrow"
 				or (Hit.Parent:FindFirstChild("Humanoid") and Hit.Parent.Humanoid.Health == 0)
 				or (Hit.Parent:FindFirstChild("Humanoid") and Hit.Parent:FindFirstChild("TEAM") and Hit.Parent.TEAM.Value == Hit.Parent.TEAM.Value)
-				or (Hit.Parent:FindFirstChild("Humanoid") and PiercedHumanoid[Hit.Parent.Humanoid])
+				or (Hit.Parent:FindFirstChild("Humanoid") and PiercedHumanoid and PiercedHumanoid[Hit.Parent.Humanoid])
 			) then
-			Hit, EndPos = RayCast(EndPos + Direction * 0.01, Direction, Range - (Start - EndPos).Magnitude, Ignore)
+			Hit, EndPos = RayCast(EndPos + Direction * 0.01, Direction, Range - (Start - EndPos).Magnitude, Ignore, PiercedHumanoid)
 		end
 	end
 	return Hit, EndPos
@@ -121,78 +127,18 @@ RunService.RenderStepped:Connect(function(DeltaTime)
 	WeaponCameraInstance:Update(DeltaTime)
 end)
 
-local function Fire(ShootingHandle)
-	local PierceAvailable = Module.Piercing
-	PiercedHumanoid = {}
-
-	if FireAnim then
-		FireAnim:Play(nil, nil, Module.FireAnimationSpeed)
-	end
-
-	if ShootingHandle.FireSound then
-		ShootingHandle.FireSound:Play()
-	end
-
-	WeaponEffects:FireServer(Tool, "Fire")
-
-	local Start = (Humanoid.Torso.CFrame * CFrame.new(0, 1.5, 0)).Position
-	local Spread = Module.Spread * (WeaponAimInstance:IsAiming() and 1 - Module.SpreadRedution or 1)
-	local Direction = (CFrame.new(Start, Mouse.Hit.Position) * CFrame.Angles(
-		math.rad(-Spread + math.random() * (Spread * 2)),
-		math.rad(-Spread + math.random() * (Spread * 2)),
-		0
-		)).LookVector
-
-	while PierceAvailable >= 0 do
-		local Hit, EndPos = RayCast(Start, Direction, 5000, Character)
-
-		if not Module.ExplosiveEnabled then
-			if Hit and Hit.Parent then
-				local TargetHumanoid = Hit.Parent:FindFirstChild("Humanoid")
-				local TargetTorso = Hit.Parent:FindFirstChild("Torso")
-				if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
-					InflictTarget:FireServer(TargetHumanoid, TargetTorso, Hit, Direction)
-					PiercedHumanoid[TargetHumanoid] = true
-				else
-					PierceAvailable = 0
-				end
-			end
-		else
-			local Explosion = Instance.new("Explosion")
-			Explosion.BlastRadius = Module.Radius
-			Explosion.BlastPressure = 0
-			Explosion.Position = EndPos
-			Explosion.Parent = Workspace.CurrentCamera
-			Explosion.Hit:Connect(function(HitPart)
-				if HitPart and HitPart.Parent and HitPart.Name == "Torso" then
-					local TargetHumanoid = HitPart.Parent:FindFirstChild("Humanoid")
-					local TargetTorso = HitPart.Parent:FindFirstChild("Torso")
-					if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
-						InflictTarget:FireServer(TargetHumanoid, TargetTorso, HitPart, Direction)
-					end
-				end
-			end)
-			PierceAvailable = 0
-		end
-
-		PierceAvailable = Hit and (PierceAvailable - 1) or -1
-
-		WeaponFire.VisualizeAndBroadcast(
-			Tool,
-			ShootingHandle,
-			Module.MuzzleOffset,
-			EndPos,
-			script.MuzzleEffect,
-			script.HitEffect,
-			Module.HitSoundIDs[math.random(1, #Module.HitSoundIDs)],
-			{Module.ExplosiveEnabled, Module.BlastRadius, Module.BlastPressure},
-			{Module.BulletSpeed, Module.BulletSize, Module.BulletColor, Module.BulletTransparency, Module.BulletMaterial, Module.FadeTime},
-			PierceAvailable == -1 and Module.VisualizerEnabled or false
-		)
-
-		Start = EndPos + Direction * 0.01
-	end
-end
+WeaponFireInstance = WeaponFire.new({
+	Tool = Tool,
+	Module = Module,
+	Character = Character,
+	Humanoid = Humanoid,
+	Mouse = Mouse,
+	FireAnim = FireAnim,
+	Raycast = RayCast,
+	InflictTarget = InflictTarget,
+	MuzzleEffect = script.MuzzleEffect,
+	HitEffect = script.HitEffect,
+})
 
 local function UpdateGUI()
 	local CurrentAmmo = Controller:GetAmmo()
@@ -260,7 +206,9 @@ local function OnFireDown()
 	end, function()
 		IsChargedShot = false
 		task.spawn(ShakeCamera)
-		for _ = 1, (Module.ShotgunEnabled and Module.BulletPerShot or 1) do Fire(HandleToFire) end
+		for _ = 1, (Module.ShotgunEnabled and Module.BulletPerShot or 1) do
+			WeaponFireInstance:Fire(HandleToFire)
+		end
 		Controller:ConsumeAmmo(1)
 		UpdateGUI()
 		HandleToFire = (HandleToFire == Handle and Module.DualEnabled) and Handle2 or Handle
