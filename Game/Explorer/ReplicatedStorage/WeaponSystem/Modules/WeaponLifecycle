@@ -4,6 +4,7 @@ WeaponLifecycle.__index = WeaponLifecycle
 function WeaponLifecycle.new(dependencies)
 	local self = setmetatable({}, WeaponLifecycle)
 	self.Equipped = false
+	self.HasActiveState = false
 	self.Connections = {}
 	self.Cleanups = {}
 	self.Dependencies = dependencies or {}
@@ -30,6 +31,7 @@ end
 function WeaponLifecycle:Equip()
 	self:CleanupConnections()
 	self.Equipped = true
+	self.HasActiveState = true
 	local D = self.Dependencies
 	if D.Camera then D.Camera:SetEquipped(true) end
 	if D.Aim then D.Aim:Reset() end
@@ -47,6 +49,7 @@ function WeaponLifecycle:Unequip()
 	self.HasActiveState = false
 	local D = self.Dependencies
 	if D.TriggerReleased then D.TriggerReleased() end
+	if D.Input then D.Input:Unbind() end
 	if D.Camera then D.Camera:SetEquipped(false) end
 	if D.Aim then D.Aim:Reset() end
 	if D.GUI and D.Script then D.GUI.Parent = D.Script end
@@ -60,6 +63,7 @@ function WeaponLifecycle:Died()
 	self.HasActiveState = false
 	local D = self.Dependencies
 	if D.TriggerReleased then D.TriggerReleased() end
+	if D.Input then D.Input:Unbind() end
 	if D.Camera then D.Camera:SetEquipped(false) end
 	if D.Aim then D.Aim:Reset() end
 	if D.GUI and D.Script then D.GUI.Parent = D.Script end
