@@ -1,11 +1,114 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = workspace
 
 local WeaponFire = {}
+WeaponFire.__index = WeaponFire
 
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
 local BulletVisualizer = require(WeaponSystem.Modules:WaitForChild("BulletVisualizer"))
+
+function WeaponFire.new(Config)
+	local self = setmetatable({}, WeaponFire)
+	self.Tool = Config.Tool
+	self.Module = Config.Module
+	self.Character = Config.Character
+	self.Humanoid = Config.Humanoid
+	self.Mouse = Config.Mouse
+	self.FireAnim = Config.FireAnim
+	self.Raycast = Config.Raycast
+	self.InflictTarget = Config.InflictTarget
+	self.MuzzleEffect = Config.MuzzleEffect
+	self.HitEffect = Config.HitEffect
+	self.PiercedHumanoid = {}
+	self.IsAiming = false
+	return self
+end
+
+function WeaponFire:SetCharacter(Character, Humanoid)
+	self.Character = Character
+	self.Humanoid = Humanoid
+	self.PiercedHumanoid = {}
+end
+
+function WeaponFire:SetAiming(State)
+	self.IsAiming = State == true
+end
+
+function WeaponFire:Fire(ShootingHandle)
+	local Module = self.Module
+	local PierceAvailable = Module.Piercing
+	self.PiercedHumanoid = {}
+
+	if self.FireAnim then
+		self.FireAnim:Play(nil, nil, Module.FireAnimationSpeed)
+	end
+
+	if ShootingHandle.FireSound then
+		ShootingHandle.FireSound:Play()
+	end
+
+	WeaponEffects:FireServer(self.Tool, "Fire")
+
+	local Start = (self.Humanoid.Torso.CFrame * CFrame.new(0, 1.5, 0)).Position
+	local Spread = Module.Spread * (self.IsAiming and 1 - Module.SpreadRedution or 1)
+	local Direction = (CFrame.new(Start, self.Mouse.Hit.Position) * CFrame.Angles(
+		math.rad(-Spread + math.random() * (Spread * 2)),
+		math.rad(-Spread + math.random() * (Spread * 2)),
+		0
+	)).LookVector
+
+	while PierceAvailable >= 0 do
+		local Hit, EndPos = self.Raycast(Start, Direction, 5000, self.Character, self.PiercedHumanoid)
+
+		if not Module.ExplosiveEnabled then
+			if Hit and Hit.Parent then
+				local TargetHumanoid = Hit.Parent:FindFirstChild("Humanoid")
+				local TargetTorso = Hit.Parent:FindFirstChild("Torso")
+				if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
+					self.InflictTarget:FireServer(TargetHumanoid, TargetTorso, Hit, Direction)
+					self.PiercedHumanoid[TargetHumanoid] = true
+				else
+					PierceAvailable = 0
+				end
+			end
+		else
+			local Explosion = Instance.new("Explosion")
+			Explosion.BlastRadius = Module.Radius
+			Explosion.BlastPressure = 0
+			Explosion.Position = EndPos
+			Explosion.Parent = Workspace.CurrentCamera
+			Explosion.Hit:Connect(function(HitPart)
+				if HitPart and HitPart.Parent and HitPart.Name == "Torso" then
+					local TargetHumanoid = HitPart.Parent:FindFirstChild("Humanoid")
+					local TargetTorso = HitPart.Parent:FindFirstChild("Torso")
+					if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
+						self.InflictTarget:FireServer(TargetHumanoid, TargetTorso, HitPart, Direction)
+					end
+				end
+			end)
+			PierceAvailable = 0
+		end
+
+		PierceAvailable = Hit and (PierceAvailable - 1) or -1
+
+		WeaponFire.VisualizeAndBroadcast(
+			self.Tool,
+			ShootingHandle,
+			Module.MuzzleOffset,
+			EndPos,
+			self.MuzzleEffect,
+			self.HitEffect,
+			Module.HitSoundIDs[math.random(1, #Module.HitSoundIDs)],
+			{Module.ExplosiveEnabled, Module.BlastRadius, Module.BlastPressure},
+			{Module.BulletSpeed, Module.BulletSize, Module.BulletColor, Module.BulletTransparency, Module.BulletMaterial, Module.FadeTime},
+			PierceAvailable == -1 and Module.VisualizerEnabled or false
+		)
+
+		Start = EndPos + Direction * 0.01
+	end
+end
 
 function WeaponFire.VisualizeAndBroadcast(Tool, ShootingHandle, MuzzleOffset, EndPos, MuzzleEffect, HitEffect, HitSound, ExplosiveData, BulletData, VisualizeEnabled)
 	task.spawn(function()
