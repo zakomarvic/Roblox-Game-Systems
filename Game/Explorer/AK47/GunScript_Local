@@ -10,6 +10,7 @@ local WeaponFire = require(ReplicatedStorage.WeaponSystem.Modules.WeaponFire)
 local WeaponReload = require(ReplicatedStorage.WeaponSystem.Modules.WeaponReload)
 local WeaponCamera = require(ReplicatedStorage.WeaponSystem.Modules.WeaponCamera)
 local WeaponAim = require(ReplicatedStorage.WeaponSystem.Modules.WeaponAim)
+local WeaponInput = require(ReplicatedStorage.WeaponSystem.Modules.WeaponInput)
 local CharacterController = require(ReplicatedStorage.CharacterSystem.Modules.CharacterController)
 local WeaponPose = require(ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 
@@ -238,7 +239,7 @@ local Reload = WeaponReload.new({
 	Wait = wait,
 })
 
-Mouse.Button1Down:Connect(function()
+local function OnFireDown()
 	if Module.SprintEnabled and CharacterControllerInstance:IsSprinting() then return end
 	Controller:SetTriggerHeld(true)
 	local IsChargedShot = false
@@ -272,15 +273,31 @@ Mouse.Button1Down:Connect(function()
 	Controller:StopFiring()
 	Controller:SetEnabled(true)
 	if Controller:GetAmmo() <= 0 then Reload:Start() end
-end)
+end
 
-Mouse.Button1Up:Connect(function() Controller:SetTriggerHeld(false) end)
+local function OnFireUp()
+	Controller:SetTriggerHeld(false)
+end
+
+local WeaponInputInstance = WeaponInput.new(Mouse, {
+	OnFireDown = OnFireDown,
+	OnFireUp = OnFireUp,
+	OnReload = function()
+		Reload:Start()
+	end,
+	OnAim = function()
+		if not Controller:GetReloading() and Module.SniperEnabled then
+			WeaponAimInstance:Toggle()
+		end
+	end,
+})
 
 Tool.Equipped:Connect(function(TempMouse)
 	Equipped = true
 	WeaponCameraInstance:SetEquipped(true)
 	WeaponAimInstance:Reset()
 	UpdateGUI()
+	WeaponInputInstance:Bind()
 	if Module.BodyAimEnabled then
 		CurrentPose = WeaponPose.Equip(Character, Module)
 		if CurrentPose then
@@ -292,13 +309,6 @@ Tool.Equipped:Connect(function(TempMouse)
 	if Module.AmmoPerClip ~= math.huge then GUI.Parent = Player.PlayerGui end
 	TempMouse.Icon = "rbxassetid://" .. Module.MouseIconID
 	if IdleAnim then IdleAnim:Play(nil, nil, Module.IdleAnimationSpeed) end
-	TempMouse.KeyDown:Connect(function(Key)
-		if string.lower(Key) == "r" then
-			Reload:Start()
-		elseif string.lower(Key) == "e" then
-			if not Controller:GetReloading() and Module.SniperEnabled then WeaponAimInstance:Toggle() end
-		end
-	end)
 	if Module.DualEnabled and not Workspace.FilteringEnabled then
 		Handle2.CanCollide = false
 		local LeftArm = Tool.Parent:FindFirstChild("Left Arm")
@@ -318,6 +328,7 @@ end)
 
 Tool.Unequipped:Connect(function()
 	Equipped = false
+	WeaponInputInstance:Unbind()
 	WeaponCameraInstance:SetEquipped(false)
 	WeaponAimInstance:Reset()
 	GUI.Parent = script
@@ -332,6 +343,7 @@ end)
 
 Humanoid.Died:Connect(function()
 	Equipped = false
+	WeaponInputInstance:Unbind()
 	WeaponCameraInstance:SetEquipped(false)
 	WeaponAimInstance:Reset()
 	GUI.Parent = script
