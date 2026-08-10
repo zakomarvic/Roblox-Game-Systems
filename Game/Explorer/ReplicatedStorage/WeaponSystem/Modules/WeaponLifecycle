@@ -37,7 +37,7 @@ function WeaponLifecycle:Equip()
 	if D.Aim then D.Aim:Reset() end
 	if D.GUI and D.PlayerGui then D.GUI.Parent = D.PlayerGui end
 	if D.IdleAnim then D.IdleAnim:Play(nil, nil, D.IdleAnimationSpeed or 1) end
-	if D.OnEquip then D.OnEquip() end
+	if D.OnEquip then D.OnEquip(self) end
 end
 
 function WeaponLifecycle:Unequip()
@@ -55,7 +55,7 @@ function WeaponLifecycle:Unequip()
 	if D.GUI and D.Script then D.GUI.Parent = D.Script end
 	if D.IdleAnim then D.IdleAnim:Stop() end
 	self:CleanupConnections()
-	if D.OnUnequip then D.OnUnequip() end
+	if D.OnUnequip then D.OnUnequip(self) end
 end
 
 function WeaponLifecycle:Died()
@@ -69,7 +69,7 @@ function WeaponLifecycle:Died()
 	if D.GUI and D.Script then D.GUI.Parent = D.Script end
 	if D.IdleAnim then D.IdleAnim:Stop() end
 	self:CleanupConnections()
-	if D.OnDeath then D.OnDeath() end
+	if D.OnDeath then D.OnDeath(self) end
 end
 
 function WeaponLifecycle:CleanupConnections()
