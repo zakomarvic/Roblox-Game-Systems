@@ -1,3 +1,5 @@
+local RunService = game:GetService("RunService")
+
 local WeaponPose = {}
 
 local LEFT_POSE =
@@ -31,12 +33,37 @@ function WeaponPose.Equip(Character, Settings)
 		OldAutoRotate = Humanoid.AutoRotate,
 		BodyAimEnabled = Settings and Settings.BodyAimEnabled ~= false or true,
 		BodyAimSpeed = Settings and Settings.BodyAimSpeed or 12,
+		AimConnection = nil,
 	}
 
 	LeftShoulder.C0 = LEFT_POSE
 	RightShoulder.C0 = RIGHT_POSE
 	Humanoid.AutoRotate = false
 	return PoseData
+end
+
+function WeaponPose.BindAim(PoseData, AimSource)
+	if not PoseData or not AimSource then return nil end
+	WeaponPose.UnbindAim(PoseData)
+	PoseData.AimConnection = RunService.RenderStepped:Connect(function(DeltaTime)
+		if not PoseData.Character or not PoseData.Character.Parent then return end
+		local AimPosition
+		if typeof(AimSource) == "function" then
+			AimPosition = AimSource()
+		elseif typeof(AimSource) == "Instance" then
+			AimPosition = AimSource.Hit.Position
+		end
+		if AimPosition then WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime) end
+	end)
+	return PoseData.AimConnection
+end
+
+function WeaponPose.UnbindAim(PoseData)
+	if not PoseData then return end
+	if PoseData.AimConnection and PoseData.AimConnection.Connected then
+		PoseData.AimConnection:Disconnect()
+	end
+	PoseData.AimConnection = nil
 end
 
 function WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime)
@@ -65,6 +92,7 @@ end
 
 function WeaponPose.Unequip(PoseData)
 	if not PoseData then return end
+	WeaponPose.UnbindAim(PoseData)
 	if PoseData.LeftShoulder and PoseData.LeftShoulder.Parent then PoseData.LeftShoulder.C0 = PoseData.DefaultLeftC0 end
 	if PoseData.RightShoulder and PoseData.RightShoulder.Parent then PoseData.RightShoulder.C0 = PoseData.DefaultRightC0 end
 	if PoseData.Humanoid and PoseData.Humanoid.Parent then PoseData.Humanoid.AutoRotate = PoseData.OldAutoRotate end
