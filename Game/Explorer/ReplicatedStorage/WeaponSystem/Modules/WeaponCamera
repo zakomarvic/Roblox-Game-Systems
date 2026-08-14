@@ -1,3 +1,5 @@
+local RunService = game:GetService("RunService")
+
 local WeaponCamera = {}
 WeaponCamera.__index = WeaponCamera
 
@@ -18,6 +20,7 @@ function WeaponCamera.new(Camera, Humanoid, Character, Settings)
 	self.CurrentSwayY = 0
 	self.CurrentStrafeTilt = 0
 	self.WalkBobTime = 0
+	self.UpdateConnection = nil
 
 	return self
 end
@@ -35,6 +38,8 @@ function WeaponCamera:SetCharacter(Character, Humanoid)
 	self.CurrentSwayX = 0
 	self.CurrentSwayY = 0
 	self.CurrentStrafeTilt = 0
+	self.RecoilPitch = 0
+	self.RecoilYaw = 0
 end
 
 function WeaponCamera:SetEquipped(State)
@@ -63,6 +68,23 @@ function WeaponCamera:AddRecoil()
 
 	self.RecoilPitch += Up
 	self.RecoilYaw += (math.random() * 2 - 1) * Side
+end
+
+function WeaponCamera:Start()
+	if self.UpdateConnection then
+		return
+	end
+
+	self.UpdateConnection = RunService.RenderStepped:Connect(function(DeltaTime)
+		self:Update(DeltaTime)
+	end)
+end
+
+function WeaponCamera:Stop()
+	if self.UpdateConnection then
+		self.UpdateConnection:Disconnect()
+		self.UpdateConnection = nil
+	end
 end
 
 function WeaponCamera:Update(DeltaTime)
@@ -168,6 +190,7 @@ function WeaponCamera:Update(DeltaTime)
 end
 
 function WeaponCamera:Destroy()
+	self:Stop()
 	self.Equipped = false
 	self.Humanoid = nil
 	self.Character = nil
