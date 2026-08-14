@@ -23,7 +23,6 @@ local InflictTarget = ReplicatedStorage:WaitForChild("WeaponSystem"):WaitForChil
 
 local Controller = WeaponController.new(Tool, Module)
 local CurrentPose
-local AimConnection
 local WeaponFireInstance
 local Grip2
 
@@ -62,8 +61,6 @@ if Module.DualEnabled then
 	Handle2 = Tool:WaitForChild("Handle2", 2)
 	if Handle2 == nil then error('"Dual" setting is enabled but "Handle2" is missing!') end
 end
-
-local Equipped = false
 
 if Module.IdleAnimationID ~= nil or Module.DualEnabled then
 	IdleAnim = Tool:WaitForChild("IdleAnim")
@@ -107,31 +104,24 @@ local WeaponInputInstance = WeaponInput.new(Mouse,{OnFireDown=function() FireCyc
 
 local WeaponLifecycleInstance
 WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,GUI=GUI,Script=script,PlayerGui=Player.PlayerGui,IdleAnim=IdleAnim,IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=function() FireCycle:FireUp() end,
-	OnEquip=function(Lifecycle)
-		Equipped=true
+	OnEquip=function()
 		FireCycle:SetEquipped(true)
 		WeaponGUIInstance:Update()
 		if Module.BodyAimEnabled then
 			CurrentPose=WeaponPose.Equip(Character,Module)
-			if CurrentPose then
-				AimConnection=Lifecycle:AddConnection(RunService.RenderStepped:Connect(function()
-					if Equipped and CurrentPose then WeaponPose.UpdateAim(CurrentPose,Mouse.Hit.Position) end
-				end))
-			end
+			if CurrentPose then WeaponPose.BindAim(CurrentPose, Mouse) end
 		end
 		if Module.DualEnabled then Grip2=WeaponPose.CreateDualGrip(Tool,Character,Handle2,Workspace.FilteringEnabled) end
 		WeaponGUIInstance:Show()
 		Mouse.Icon="rbxassetid://"..Module.MouseIconID
 	end,
 	OnUnequip=function()
-		Equipped=false
 		FireCycle:SetEquipped(false)
 		if CurrentPose then WeaponPose.Unequip(CurrentPose); CurrentPose=nil end
 		WeaponPose.DestroyDualGrip(Grip2,Handle2,Workspace.FilteringEnabled)
 		Grip2=nil
 	end,
 	OnDeath=function()
-		Equipped=false
 		FireCycle:SetEquipped(false)
 		if CurrentPose then WeaponPose.Unequip(CurrentPose); CurrentPose=nil end
 		WeaponPose.DestroyDualGrip(Grip2,Handle2,Workspace.FilteringEnabled)
