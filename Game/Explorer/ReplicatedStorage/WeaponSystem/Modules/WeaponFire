@@ -23,6 +23,7 @@ function WeaponFire.new(Config)
 	self.HitEffect = Config.HitEffect
 	self.PiercedHumanoid = {}
 	self.IsAiming = false
+	self.FlashToken = 0
 	return self
 end
 
@@ -36,10 +37,32 @@ function WeaponFire:SetAiming(State)
 	self.IsAiming = State == true
 end
 
+function WeaponFire:ShowLocalMuzzleFlash()
+	local Flash = self.Tool and self.Tool:FindFirstChild("Flash")
+	local FlashGui = Flash and Flash:FindFirstChild("Light")
+	local FlashImage = FlashGui and FlashGui:FindFirstChild("Light")
+
+	if not FlashImage or not FlashImage:IsA("ImageLabel") then
+		return
+	end
+
+	self.FlashToken += 1
+	local Token = self.FlashToken
+	FlashImage.Visible = true
+
+	task.delay(0.05, function()
+		if self.FlashToken == Token and FlashImage.Parent then
+			FlashImage.Visible = false
+		end
+	end)
+end
+
 function WeaponFire:Fire(ShootingHandle)
 	local Module = self.Module
 	local PierceAvailable = Module.Piercing
 	self.PiercedHumanoid = {}
+
+	self:ShowLocalMuzzleFlash()
 
 	if self.FireAnim then
 		self.FireAnim:Play(nil, nil, Module.FireAnimationSpeed)
