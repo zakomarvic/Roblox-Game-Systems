@@ -41,6 +41,10 @@ function WeaponAnimation:Get(Name)
 	return self.Tracks[Name]
 end
 
+function WeaponAnimation:GetAll()
+	return self.Tracks
+end
+
 function WeaponAnimation:StopAll()
 	for _, Track in pairs(self.Tracks) do
 		if Track then Track:Stop() end
