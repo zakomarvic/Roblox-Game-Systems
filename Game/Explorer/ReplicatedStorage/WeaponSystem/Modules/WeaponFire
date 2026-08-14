@@ -41,6 +41,7 @@ function WeaponFire:ShowLocalMuzzleFlash()
 	local Flash = self.Tool and self.Tool:FindFirstChild("Flash")
 	local FlashGui = Flash and Flash:FindFirstChild("Light")
 	local FlashImage = FlashGui and FlashGui:FindFirstChild("Light")
+	local FlashLight = Flash and Flash:FindFirstChild("lite")
 
 	if not FlashImage or not FlashImage:IsA("ImageLabel") then
 		return
@@ -50,6 +51,10 @@ function WeaponFire:ShowLocalMuzzleFlash()
 	if Billboard and Billboard:IsA("BillboardGui") then
 		Billboard.Adornee = Flash
 		Billboard.Enabled = true
+	end
+
+	if FlashLight and FlashLight:IsA("PointLight") then
+		FlashLight.Enabled = true
 	end
 
 	self.FlashToken += 1
@@ -64,6 +69,9 @@ function WeaponFire:ShowLocalMuzzleFlash()
 		FlashImage.Visible = false
 		if Billboard and Billboard.Parent and Billboard:IsA("BillboardGui") then
 			Billboard.Enabled = false
+		end
+		if FlashLight and FlashLight.Parent and FlashLight:IsA("PointLight") then
+			FlashLight.Enabled = false
 		end
 	end)
 end
