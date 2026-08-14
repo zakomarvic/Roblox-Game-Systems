@@ -17,11 +17,9 @@ local WeaponRaycast = require(ReplicatedStorage.WeaponSystem.Modules.WeaponRayca
 local WeaponFireCycle = require(ReplicatedStorage.WeaponSystem.Modules.WeaponFireCycle)
 local WeaponAnimation = require(ReplicatedStorage.WeaponSystem.Modules.WeaponAnimation)
 local WeaponCharacter = require(ReplicatedStorage.WeaponSystem.Modules.WeaponCharacter)
+local WeaponRemotes = require(ReplicatedStorage.WeaponSystem.Modules.WeaponRemotes)
 local CharacterController = require(ReplicatedStorage.CharacterSystem.Modules.CharacterController)
 local WeaponPose = require(ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
-
-local WeaponEffects = ReplicatedStorage:WaitForChild("WeaponSystem"):WaitForChild("Remotes"):WaitForChild("WeaponEffects")
-local InflictTarget = ReplicatedStorage:WaitForChild("WeaponSystem"):WaitForChild("Remotes"):WaitForChild("InflictTarget")
 
 local Controller = WeaponController.new(Tool, Module)
 local CurrentPose
@@ -64,10 +62,10 @@ local function wait(TimeToWait)
 end
 
 WeaponCameraInstance:Start()
-WeaponFireInstance = WeaponFire.new({Tool=Tool, Module=Module, Character=Character, Humanoid=Humanoid, Mouse=Mouse, FireAnim=WeaponAnimationInstance:Get("FireAnim"), Raycast=WeaponRaycast.Cast, InflictTarget=InflictTarget, MuzzleEffect=script.MuzzleEffect, HitEffect=script.HitEffect})
+WeaponFireInstance = WeaponFire.new({Tool=Tool, Module=Module, Character=Character, Humanoid=Humanoid, Mouse=Mouse, FireAnim=WeaponAnimationInstance:Get("FireAnim"), Raycast=WeaponRaycast.Cast, InflictTarget=WeaponRemotes.InflictTarget, MuzzleEffect=script.MuzzleEffect, HitEffect=script.HitEffect})
 WeaponCharacterInstance = WeaponCharacter.new({Character=Character, Humanoid=Humanoid, Camera=WeaponCameraInstance, Fire=WeaponFireInstance, Animation=WeaponAnimationInstance})
 
-local Reload = WeaponReload.new({Tool=Tool, Module=Module, Controller=Controller, Handle=Handle, ReloadAnim=WeaponAnimationInstance:Get("ReloadAnim"), ShotgunClipinAnim=WeaponAnimationInstance:Get("ShotgunClipinAnim"), WeaponEffects=WeaponEffects, IsSprinting=function() return Module.SprintEnabled and CharacterControllerInstance:IsSprinting() end, IsAiming=function() return WeaponAimInstance:IsAiming() end, ResetAim=function() WeaponAimInstance:Reset() end, UpdateGUI=function() WeaponGUIInstance:Update() end, Wait=wait})
+local Reload = WeaponReload.new({Tool=Tool, Module=Module, Controller=Controller, Handle=Handle, ReloadAnim=WeaponAnimationInstance:Get("ReloadAnim"), ShotgunClipinAnim=WeaponAnimationInstance:Get("ShotgunClipinAnim"), WeaponEffects=WeaponRemotes.WeaponEffects, IsSprinting=function() return Module.SprintEnabled and CharacterControllerInstance:IsSprinting() end, IsAiming=function() return WeaponAimInstance:IsAiming() end, ResetAim=function() WeaponAimInstance:Reset() end, UpdateGUI=function() WeaponGUIInstance:Update() end, Wait=wait})
 local FireCycle = WeaponFireCycle.new({Controller=Controller, Module=Module, CharacterController=CharacterControllerInstance, Aim=WeaponAimInstance, Humanoid=Humanoid, WeaponFire=WeaponFireInstance, GUI=WeaponGUIInstance, Reload=Reload, Handle=Handle, Handle2=Handle2, Wait=wait, OnRecoil=function() WeaponCameraInstance:AddRecoil() end})
 WeaponCharacterInstance.FireCycle = FireCycle
 
