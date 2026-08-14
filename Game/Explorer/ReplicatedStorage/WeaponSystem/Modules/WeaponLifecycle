@@ -33,7 +33,10 @@ function WeaponLifecycle:Equip()
 	self.Equipped = true
 	self.HasActiveState = true
 	local D = self.Dependencies
-	if D.Camera then D.Camera:SetEquipped(true) end
+	if D.Camera then
+		D.Camera:SetEquipped(true)
+		D.Camera:Start()
+	end
 	if D.Aim then D.Aim:Reset() end
 	if D.Input then D.Input:Bind() end
 	if D.GUI and D.PlayerGui then D.GUI.Parent = D.PlayerGui end
@@ -51,7 +54,10 @@ function WeaponLifecycle:Unequip()
 	local D = self.Dependencies
 	if D.TriggerReleased then D.TriggerReleased() end
 	if D.Input then D.Input:Unbind() end
-	if D.Camera then D.Camera:SetEquipped(false) end
+	if D.Camera then
+		D.Camera:SetEquipped(false)
+		D.Camera:Stop()
+	end
 	if D.Aim then D.Aim:Reset() end
 	if D.GUI and D.Script then D.GUI.Parent = D.Script end
 	if D.IdleAnim then D.IdleAnim:Stop() end
@@ -65,7 +71,10 @@ function WeaponLifecycle:Died()
 	local D = self.Dependencies
 	if D.TriggerReleased then D.TriggerReleased() end
 	if D.Input then D.Input:Unbind() end
-	if D.Camera then D.Camera:SetEquipped(false) end
+	if D.Camera then
+		D.Camera:SetEquipped(false)
+		D.Camera:Stop()
+	end
 	if D.Aim then D.Aim:Reset() end
 	if D.GUI and D.Script then D.GUI.Parent = D.Script end
 	if D.IdleAnim then D.IdleAnim:Stop() end
