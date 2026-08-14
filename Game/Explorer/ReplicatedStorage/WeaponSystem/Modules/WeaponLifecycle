@@ -42,11 +42,13 @@ function WeaponLifecycle:Equip()
 	if D.GUI and D.PlayerGui then D.GUI.Parent = D.PlayerGui end
 	if D.IdleAnim then D.IdleAnim:Play(nil, nil, D.IdleAnimationSpeed or 1) end
 	if D.SprintChanged and D.OnSprint then
-		self:AddConnection(D.SprintChanged:Connect(function(IsSprinting)
+		local SprintEvent = D.SprintChanged
+		local Connection = SprintEvent.Event:Connect(function(IsSprinting)
 			if self.Equipped then
 				D.OnSprint(IsSprinting)
 			end
-		end))
+		end)
+		self:AddConnection(Connection)
 	end
 	if D.OnEquip then D.OnEquip(self) end
 end
