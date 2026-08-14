@@ -102,10 +102,7 @@ local function RayCast(Start, Direction, Range, Ignore, PiercedHumanoid)
 end
 
 local function ShakeCamera() WeaponCameraInstance:AddRecoil() end
-RunService.RenderStepped:Connect(function(DeltaTime)
-	WeaponCameraInstance:SetEquipped(Equipped)
-	WeaponCameraInstance:Update(DeltaTime)
-end)
+WeaponCameraInstance:Start()
 
 WeaponFireInstance = WeaponFire.new({Tool=Tool, Module=Module, Character=Character, Humanoid=Humanoid, Mouse=Mouse, FireAnim=FireAnim, Raycast=RayCast, InflictTarget=InflictTarget, MuzzleEffect=script.MuzzleEffect, HitEffect=script.HitEffect})
 
