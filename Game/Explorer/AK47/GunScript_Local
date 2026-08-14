@@ -14,6 +14,7 @@ local WeaponInput = require(ReplicatedStorage.WeaponSystem.Modules.WeaponInput)
 local WeaponLifecycle = require(ReplicatedStorage.WeaponSystem.Modules.WeaponLifecycle)
 local WeaponGUI = require(ReplicatedStorage.WeaponSystem.Modules.WeaponGUI)
 local WeaponRaycast = require(ReplicatedStorage.WeaponSystem.Modules.WeaponRaycast)
+local WeaponFireCycle = require(ReplicatedStorage.WeaponSystem.Modules.WeaponFireCycle)
 local CharacterController = require(ReplicatedStorage.CharacterSystem.Modules.CharacterController)
 local WeaponPose = require(ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 
@@ -58,7 +59,6 @@ local ReloadAnim
 local ShotgunClipinAnim
 local Grip2
 local Handle2
-local HandleToFire = Handle
 
 if Module.DualEnabled then
 	Handle2 = Tool:WaitForChild("Handle2", 2)
@@ -94,7 +94,6 @@ local function wait(TimeToWait)
 	end
 end
 
-local function ShakeCamera() WeaponCameraInstance:AddRecoil() end
 WeaponCameraInstance:Start()
 
 WeaponFireInstance = WeaponFire.new({Tool=Tool, Module=Module, Character=Character, Humanoid=Humanoid, Mouse=Mouse, FireAnim=FireAnim, Raycast=WeaponRaycast.Cast, InflictTarget=InflictTarget, MuzzleEffect=script.MuzzleEffect, HitEffect=script.HitEffect})
@@ -102,36 +101,27 @@ WeaponFireInstance = WeaponFire.new({Tool=Tool, Module=Module, Character=Charact
 local function ResetAim() WeaponAimInstance:Reset() end
 local Reload = WeaponReload.new({Tool=Tool, Module=Module, Controller=Controller, Handle=Handle, ReloadAnim=ReloadAnim, ShotgunClipinAnim=ShotgunClipinAnim, WeaponEffects=WeaponEffects, IsSprinting=function() return Module.SprintEnabled and CharacterControllerInstance:IsSprinting() end, IsAiming=function() return WeaponAimInstance:IsAiming() end, ResetAim=ResetAim, UpdateGUI=function() WeaponGUIInstance:Update() end, Wait=wait})
 
+local FireCycle = WeaponFireCycle.new({Controller=Controller, Module=Module, CharacterController=CharacterControllerInstance, Aim=WeaponAimInstance, Humanoid=Humanoid, WeaponFire=WeaponFireInstance, GUI=WeaponGUIInstance, Reload=Reload, Handle=Handle, Handle2=Handle2, Wait=wait, OnRecoil=function() WeaponCameraInstance:AddRecoil() end})
+
+Player.CharacterAdded:Connect(function(NewCharacter)
+	FireCycle:SetHumanoid(NewCharacter:WaitForChild("Humanoid"))
+end)
+
 local function OnFireDown()
-	if Module.SprintEnabled and CharacterControllerInstance:IsSprinting() then return end
-	Controller:SetTriggerHeld(true)
-	local IsChargedShot = false
-	if not Equipped or not Controller:CanFireNow() or Humanoid.Health <= 0 then return end
-	if not Controller:StartFiring() then return end
-	Controller:SetEnabled(false)
-	if Module.ChargedShotEnabled then if HandleToFire:FindFirstChild("ChargeSound") then HandleToFire.ChargeSound:Play() end; wait(Module.ChargingTime); IsChargedShot=true end
-	if Module.MinigunEnabled then if HandleToFire:FindFirstChild("WindUp") then HandleToFire.WindUp:Play() end; wait(Module.DelayBeforeFiring) end
-	Controller:RunFireCycle(function() return Equipped and not Controller:GetReloading() and not (Module.SprintEnabled and CharacterControllerInstance:IsSprinting()) and (Controller:IsTriggerHeld() or IsChargedShot) and Controller:GetAmmo() > 0 and Humanoid.Health > 0 end, function()
-		IsChargedShot=false
-		task.spawn(ShakeCamera)
-		for _=1,(Module.ShotgunEnabled and Module.BulletPerShot or 1) do WeaponFireInstance:Fire(HandleToFire) end
-		Controller:ConsumeAmmo(1)
-		WeaponGUIInstance:Update()
-		HandleToFire=(HandleToFire==Handle and Module.DualEnabled) and Handle2 or Handle
-	end)
-	if HandleToFire.FireSound.Playing and HandleToFire.FireSound.Looped then HandleToFire.FireSound:Stop() end
-	if Module.MinigunEnabled then if HandleToFire:FindFirstChild("WindDown") then HandleToFire.WindDown:Play() end; wait(Module.DelayAfterFiring) end
-	Controller:StopFiring()
-	Controller:SetEnabled(true)
-	if Controller:GetAmmo() <= 0 then Reload:Start() end
+	FireCycle:FireDown()
 end
 
-local function OnFireUp() Controller:SetTriggerHeld(false) end
+local function OnFireUp()
+	FireCycle:FireUp()
+end
+
 local WeaponInputInstance = WeaponInput.new(Mouse,{OnFireDown=OnFireDown,OnFireUp=OnFireUp,OnReload=function() Reload:Start() end,OnAim=function() if not Controller:GetReloading() and Module.SniperEnabled then WeaponAimInstance:Toggle() end end})
 
 local WeaponLifecycleInstance
 WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,GUI=GUI,Script=script,PlayerGui=Player.PlayerGui,IdleAnim=IdleAnim,IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=OnFireUp,
 	OnEquip=function(Lifecycle)
+		Equipped=true
+		FireCycle:SetEquipped(true)
 		WeaponGUIInstance:Update()
 		if Module.BodyAimEnabled then
 			CurrentPose=WeaponPose.Equip(Character,Module)
@@ -145,17 +135,20 @@ WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=W
 		Mouse.Icon="rbxassetid://"..Module.MouseIconID
 	end,
 	OnUnequip=function()
+		Equipped=false
+		FireCycle:SetEquipped(false)
 		if CurrentPose then WeaponPose.Unequip(CurrentPose); CurrentPose=nil end
 		if Module.DualEnabled and not Workspace.FilteringEnabled then Handle2.CanCollide=true; if Grip2 then Grip2:Destroy(); Grip2=nil end end
 	end,
 	OnDeath=function()
+		Equipped=false
+		FireCycle:SetEquipped(false)
 		if CurrentPose then WeaponPose.Unequip(CurrentPose); CurrentPose=nil end
 		if Module.DualEnabled and not Workspace.FilteringEnabled then Handle2.CanCollide=true; if Grip2 then Grip2:Destroy(); Grip2=nil end end
 	end,
 })
 
 Tool.Equipped:Connect(function()
-	Equipped=true
 	WeaponLifecycleInstance:Equip()
 	if Module.DualEnabled and not Workspace.FilteringEnabled then
 		Handle2.CanCollide=false
@@ -164,8 +157,8 @@ Tool.Equipped:Connect(function()
 		if RightArm then local Grip=RightArm:WaitForChild("RightGrip",0.01); if Grip then Grip2=Grip:Clone(); Grip2.Name="LeftGrip"; Grip2.Part0=LeftArm; Grip2.Part1=Handle2; Grip2.Parent=LeftArm end end
 	end
 end)
-Tool.Unequipped:Connect(function() Equipped=false; WeaponLifecycleInstance:Unequip() end)
-Humanoid.Died:Connect(function() Equipped=false; WeaponLifecycleInstance:Died() end)
+Tool.Unequipped:Connect(function() WeaponLifecycleInstance:Unequip() end)
+Humanoid.Died:Connect(function() WeaponLifecycleInstance:Died() end)
 CharacterControllerInstance.SprintChanged.Event:Connect(function(IsSprinting)
 	if IsSprinting then Controller:SetTriggerHeld(false); if Controller:GetReloading() then Controller:SetReloading(false) end; if Controller:IsCurrentlyFiring() then Controller:StopFiring() end; WeaponAimInstance:Reset() end
 end)
