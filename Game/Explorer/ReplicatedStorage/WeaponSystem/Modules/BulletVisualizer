@@ -15,22 +15,26 @@ function BulletVisualizer.Visualize(
 	VisualizeExplosion,
 	VisualizeEnabled
 )
-	
-	if not Handle then
+	if not Handle or not MuzzleEffect or not HitEffect then
 		return
 	end
 
-	local LaserAttachment = Handle:WaitForChild("wow")
+	local LaserAttachment = Handle:FindFirstChild("wow")
+	if not LaserAttachment then
+		return
+	end
+
 	local MuzzlePos = LaserAttachment.WorldPosition
 	local Distance = (MuzzlePos - EndPos).Magnitude / 2
 
-	-- Muzzle effect
 	local Muzzle = Instance.new("Part")
 	Muzzle.Name = "Bullet"
 	Muzzle.Size = Vector3.new(0.01, 0.01, 0.01)
 	Muzzle.Transparency = 1
 	Muzzle.Anchored = false
 	Muzzle.CanCollide = false
+	Muzzle.CanQuery = false
+	Muzzle.CanTouch = false
 	Muzzle.TopSurface = Enum.SurfaceType.SmoothNoOutlines
 	Muzzle.BottomSurface = Enum.SurfaceType.SmoothNoOutlines
 
@@ -40,29 +44,22 @@ function BulletVisualizer.Visualize(
 	local Weld = Instance.new("Weld")
 	Weld.Part0 = Handle
 	Weld.Part1 = Muzzle
-	Weld.C0 = CFrame.new(
-		MuzzleOffset.X,
-		MuzzleOffset.Y,
-		MuzzleOffset.Z
-	)
+	Weld.C0 = CFrame.new(MuzzleOffset.X, MuzzleOffset.Y, MuzzleOffset.Z)
 	Weld.Parent = Muzzle
 
-	Muzzle.Position = MuzzlePos
+	Muzzle.CFrame = Handle.CFrame * CFrame.new(MuzzleOffset.X, MuzzleOffset.Y, MuzzleOffset.Z)
 	Muzzle.Parent = workspace.CurrentCamera
+	MuzzleParticle:Emit(5)
+	Debris:AddItem(Muzzle, 2)
 
-	task.spawn(function()
-		MuzzleParticle:Emit(5)
-	end)
-
-	Debris:AddItem(Muzzle, 10)
-
-	-- Hit effect
 	local HitPart = Instance.new("Part")
 	HitPart.Name = "Bullet"
 	HitPart.Size = Vector3.new(0.01, 0.01, 0.01)
 	HitPart.Transparency = 1
 	HitPart.Anchored = true
 	HitPart.CanCollide = false
+	HitPart.CanQuery = false
+	HitPart.CanTouch = false
 	HitPart.TopSurface = Enum.SurfaceType.SmoothNoOutlines
 	HitPart.BottomSurface = Enum.SurfaceType.SmoothNoOutlines
 
@@ -82,9 +79,8 @@ function BulletVisualizer.Visualize(
 		Sound:Play()
 	end)
 
-	Debris:AddItem(HitPart, 10)
+	Debris:AddItem(HitPart, 2)
 
-	-- Explosion
 	if ExplosiveData[1] and VisualizeExplosion then
 		local Explosion = Instance.new("Explosion")
 		Explosion.BlastRadius = ExplosiveData[2]
@@ -93,7 +89,6 @@ function BulletVisualizer.Visualize(
 		Explosion.Parent = workspace.CurrentCamera
 	end
 
-	-- Bullet / tracer
 	if VisualizeEnabled then
 		local Bullet = Instance.new("Part")
 		Bullet.Name = "Bullet"
@@ -103,6 +98,8 @@ function BulletVisualizer.Visualize(
 		Bullet.Material = BulletData[5]
 		Bullet.Anchored = true
 		Bullet.CanCollide = false
+		Bullet.CanQuery = false
+		Bullet.CanTouch = false
 		Bullet.TopSurface = Enum.SurfaceType.SmoothNoOutlines
 		Bullet.BottomSurface = Enum.SurfaceType.SmoothNoOutlines
 
@@ -114,47 +111,23 @@ function BulletVisualizer.Visualize(
 
 		Bullet.CFrame = CFrame.new(MuzzlePos, EndPos)
 		Bullet.Parent = workspace.CurrentCamera
-
 		Debris:AddItem(Bullet, 10)
 
 		if BulletData[1] ~= math.huge then
 			for i = 0, Distance, BulletData[1] do
 				if i ~= 0 then
-					Bullet.CFrame =
-						Bullet.CFrame * CFrame.new(0, 0, -BulletData[1])
+					Bullet.CFrame = Bullet.CFrame * CFrame.new(0, 0, -BulletData[1])
 				end
-
 				if (Bullet.Position - EndPos).Magnitude < BulletData[2].Z then
-					Mesh.Scale = Vector3.new(
-						BulletData[2].X,
-						BulletData[2].Y,
-						(Bullet.Position - EndPos).Magnitude
-					) * 5
-
-					Mesh.Offset = Vector3.new(
-						0,
-						0,
-						-Mesh.Scale.Z / 10
-					)
+					Mesh.Scale = Vector3.new(BulletData[2].X, BulletData[2].Y, (Bullet.Position - EndPos).Magnitude) * 5
+					Mesh.Offset = Vector3.new(0, 0, -Mesh.Scale.Z / 10)
 				end
-
 				RunService.Stepped:Wait()
 			end
 		else
-			Mesh.Scale = Vector3.new(
-				BulletData[2].X,
-				BulletData[2].Y,
-				(Bullet.Position - EndPos).Magnitude
-			) * 5
-
-			Mesh.Offset = Vector3.new(
-				0,
-				0,
-				-Mesh.Scale.Z / 10
-			)
-
+			Mesh.Scale = Vector3.new(BulletData[2].X, BulletData[2].Y, (Bullet.Position - EndPos).Magnitude) * 5
+			Mesh.Offset = Vector3.new(0, 0, -Mesh.Scale.Z / 10)
 			local Time = RunService.Heartbeat:Wait()
-
 			while Bullet.Transparency < 1 do
 				Bullet.Transparency += Time / BulletData[6]
 				Time = RunService.Heartbeat:Wait()
