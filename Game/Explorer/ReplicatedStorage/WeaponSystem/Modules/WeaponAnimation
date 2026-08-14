@@ -1,0 +1,50 @@
+local WeaponAnimation = {}
+WeaponAnimation.__index = WeaponAnimation
+
+function WeaponAnimation.new(Config)
+	local self = setmetatable({}, WeaponAnimation)
+	self.Tool = Config.Tool
+	self.Humanoid = Config.Humanoid
+	self.Module = Config.Module
+	self.Tracks = {}
+	self:_load()
+	return self
+end
+
+function WeaponAnimation:_load()
+	local Module = self.Module
+	local Humanoid = self.Humanoid
+	if not Humanoid then return end
+
+	local function load(Name, Enabled)
+		if not Enabled then return nil end
+		local Animation = self.Tool:WaitForChild(Name)
+		local Track = Humanoid:LoadAnimation(Animation)
+		self.Tracks[Name] = Track
+		return Track
+	end
+
+	load("IdleAnim", Module.IdleAnimationID ~= nil or Module.DualEnabled)
+	load("FireAnim", Module.FireAnimationID ~= nil)
+	load("ReloadAnim", Module.ReloadAnimationID ~= nil)
+	load("ShotgunClipinAnim", Module.ShotgunClipinAnimationID ~= nil)
+end
+
+function WeaponAnimation:SetHumanoid(Humanoid)
+	self:StopAll()
+	self.Humanoid = Humanoid
+	self.Tracks = {}
+	self:_load()
+end
+
+function WeaponAnimation:Get(Name)
+	return self.Tracks[Name]
+end
+
+function WeaponAnimation:StopAll()
+	for _, Track in pairs(self.Tracks) do
+		if Track then Track:Stop() end
+	end
+end
+
+return WeaponAnimation
