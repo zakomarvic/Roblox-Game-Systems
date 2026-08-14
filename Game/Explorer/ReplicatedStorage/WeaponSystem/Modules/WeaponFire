@@ -46,13 +46,24 @@ function WeaponFire:ShowLocalMuzzleFlash()
 		return
 	end
 
+	local Billboard = FlashImage.Parent
+	if Billboard and Billboard:IsA("BillboardGui") then
+		Billboard.Adornee = Flash
+		Billboard.Enabled = true
+	end
+
 	self.FlashToken += 1
 	local Token = self.FlashToken
 	FlashImage.Visible = true
 
 	task.delay(0.05, function()
-		if self.FlashToken == Token and FlashImage.Parent then
-			FlashImage.Visible = false
+		if self.FlashToken ~= Token or not FlashImage.Parent then
+			return
+		end
+
+		FlashImage.Visible = false
+		if Billboard and Billboard.Parent and Billboard:IsA("BillboardGui") then
+			Billboard.Enabled = false
 		end
 	end)
 end
