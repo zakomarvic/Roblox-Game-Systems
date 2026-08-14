@@ -13,6 +13,7 @@ local WeaponAim = require(ReplicatedStorage.WeaponSystem.Modules.WeaponAim)
 local WeaponInput = require(ReplicatedStorage.WeaponSystem.Modules.WeaponInput)
 local WeaponLifecycle = require(ReplicatedStorage.WeaponSystem.Modules.WeaponLifecycle)
 local WeaponGUI = require(ReplicatedStorage.WeaponSystem.Modules.WeaponGUI)
+local WeaponRaycast = require(ReplicatedStorage.WeaponSystem.Modules.WeaponRaycast)
 local CharacterController = require(ReplicatedStorage.CharacterSystem.Modules.CharacterController)
 local WeaponPose = require(ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 
@@ -93,20 +94,10 @@ local function wait(TimeToWait)
 	end
 end
 
-local function RayCast(Start, Direction, Range, Ignore, PiercedHumanoid)
-	local Hit, EndPos = Workspace:FindPartOnRay(Ray.new(Start, Direction * Range), Ignore)
-	if Hit then
-		if (Hit.Transparency > 0.75 or Hit.Name == "Handle" or Hit.Name == "Effect" or Hit.Name == "Bullet" or Hit.Name == "Laser" or string.lower(Hit.Name) == "water" or Hit.Name == "Rail" or Hit.Name == "Arrow" or (Hit.Parent:FindFirstChild("Humanoid") and Hit.Parent.Humanoid.Health == 0) or (Hit.Parent:FindFirstChild("Humanoid") and Hit.Parent:FindFirstChild("TEAM") and Hit.Parent.TEAM.Value == Hit.Parent.TEAM.Value) or (Hit.Parent:FindFirstChild("Humanoid") and PiercedHumanoid and PiercedHumanoid[Hit.Parent.Humanoid])) then
-			Hit, EndPos = RayCast(EndPos + Direction * 0.01, Direction, Range - (Start - EndPos).Magnitude, Ignore, PiercedHumanoid)
-		end
-	end
-	return Hit, EndPos
-end
-
 local function ShakeCamera() WeaponCameraInstance:AddRecoil() end
 WeaponCameraInstance:Start()
 
-WeaponFireInstance = WeaponFire.new({Tool=Tool, Module=Module, Character=Character, Humanoid=Humanoid, Mouse=Mouse, FireAnim=FireAnim, Raycast=RayCast, InflictTarget=InflictTarget, MuzzleEffect=script.MuzzleEffect, HitEffect=script.HitEffect})
+WeaponFireInstance = WeaponFire.new({Tool=Tool, Module=Module, Character=Character, Humanoid=Humanoid, Mouse=Mouse, FireAnim=FireAnim, Raycast=WeaponRaycast.Cast, InflictTarget=InflictTarget, MuzzleEffect=script.MuzzleEffect, HitEffect=script.HitEffect})
 
 local function ResetAim() WeaponAimInstance:Reset() end
 local Reload = WeaponReload.new({Tool=Tool, Module=Module, Controller=Controller, Handle=Handle, ReloadAnim=ReloadAnim, ShotgunClipinAnim=ShotgunClipinAnim, WeaponEffects=WeaponEffects, IsSprinting=function() return Module.SprintEnabled and CharacterControllerInstance:IsSprinting() end, IsAiming=function() return WeaponAimInstance:IsAiming() end, ResetAim=ResetAim, UpdateGUI=function() WeaponGUIInstance:Update() end, Wait=wait})
