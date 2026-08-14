@@ -9,28 +9,15 @@ local RIGHT_POSE =
 	* CFrame.Angles(math.rad(-10), math.rad(80), math.rad(0))
 
 function WeaponPose.Equip(Character, Settings)
-	if not Character or not Character.Parent then
-		return nil
-	end
-
+	if not Character or not Character.Parent then return nil end
 	local Torso = Character:FindFirstChild("Torso")
-	if not Torso then
-		return nil
-	end
-
+	if not Torso then return nil end
 	local LeftShoulder = Torso:FindFirstChild("Left Shoulder")
 	local RightShoulder = Torso:FindFirstChild("Right Shoulder")
-
-	if not LeftShoulder or not RightShoulder then
-		return nil
-	end
-
+	if not LeftShoulder or not RightShoulder then return nil end
 	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
 	local RootPart = Character:FindFirstChild("HumanoidRootPart")
-
-	if not Humanoid or Humanoid.Health <= 0 then
-		return nil
-	end
+	if not Humanoid or Humanoid.Health <= 0 then return nil end
 
 	local PoseData = {
 		Character = Character,
@@ -49,91 +36,59 @@ function WeaponPose.Equip(Character, Settings)
 	LeftShoulder.C0 = LEFT_POSE
 	RightShoulder.C0 = RIGHT_POSE
 	Humanoid.AutoRotate = false
-
 	return PoseData
 end
 
 function WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime)
-	if not PoseData or not PoseData.RootPart or not PoseData.RootPart.Parent then
-		return
-	end
-
-	if not PoseData.BodyAimEnabled then
-		return
-	end
-
-	if typeof(AimPosition) ~= "Vector3" then
-		return
-	end
-
+	if not PoseData or not PoseData.RootPart or not PoseData.RootPart.Parent then return end
+	if not PoseData.BodyAimEnabled then return end
+	if typeof(AimPosition) ~= "Vector3" then return end
 	local RootPart = PoseData.RootPart
 	local RootPosition = RootPart.Position
-
-	local Direction = Vector3.new(
-		AimPosition.X - RootPosition.X,
-		0,
-		AimPosition.Z - RootPosition.Z
-	)
-
-	if Direction.Magnitude <= 0.001 then
-		return
-	end
-
+	local Direction = Vector3.new(AimPosition.X - RootPosition.X, 0, AimPosition.Z - RootPosition.Z)
+	if Direction.Magnitude <= 0.001 then return end
 	Direction = Direction.Unit
-
-	local TargetCFrame = CFrame.lookAt(
-		RootPosition,
-		RootPosition + Direction
-	)
-
+	local TargetCFrame = CFrame.lookAt(RootPosition, RootPosition + Direction)
 	local Speed = PoseData.BodyAimSpeed or 12
-	local Alpha
-
-	if DeltaTime then
-		Alpha = math.clamp(DeltaTime * Speed, 0, 1)
-	else
-		Alpha = 0.2
-	end
-
+	local Alpha = DeltaTime and math.clamp(DeltaTime * Speed, 0, 1) or 0.2
 	RootPart.CFrame = RootPart.CFrame:Lerp(TargetCFrame, Alpha)
 end
 
 function WeaponPose.SetBodyAimEnabled(PoseData, Enabled)
-	if not PoseData then
-		return
-	end
-
-	PoseData.BodyAimEnabled = Enabled == true
+	if PoseData then PoseData.BodyAimEnabled = Enabled == true end
 end
 
 function WeaponPose.SetBodyAimSpeed(PoseData, Speed)
-	if not PoseData then
-		return
-	end
-
-	if typeof(Speed) ~= "number" then
-		return
-	end
-
+	if not PoseData or typeof(Speed) ~= "number" then return end
 	PoseData.BodyAimSpeed = math.max(0, Speed)
 end
 
 function WeaponPose.Unequip(PoseData)
-	if not PoseData then
-		return
-	end
+	if not PoseData then return end
+	if PoseData.LeftShoulder and PoseData.LeftShoulder.Parent then PoseData.LeftShoulder.C0 = PoseData.DefaultLeftC0 end
+	if PoseData.RightShoulder and PoseData.RightShoulder.Parent then PoseData.RightShoulder.C0 = PoseData.DefaultRightC0 end
+	if PoseData.Humanoid and PoseData.Humanoid.Parent then PoseData.Humanoid.AutoRotate = PoseData.OldAutoRotate end
+end
 
-	if PoseData.LeftShoulder and PoseData.LeftShoulder.Parent then
-		PoseData.LeftShoulder.C0 = PoseData.DefaultLeftC0
-	end
+function WeaponPose.CreateDualGrip(Tool, Character, Handle2, FilteringEnabled)
+	if FilteringEnabled or not Character or not Handle2 then return nil end
+	local LeftArm = Character:FindFirstChild("Left Arm")
+	local RightArm = Character:FindFirstChild("Right Arm")
+	if not LeftArm or not RightArm then return nil end
+	Handle2.CanCollide = false
+	local Grip = RightArm:FindFirstChild("RightGrip")
+	if not Grip then return nil end
+	local Grip2 = Grip:Clone()
+	Grip2.Name = "LeftGrip"
+	Grip2.Part0 = LeftArm
+	Grip2.Part1 = Handle2
+	Grip2.Parent = LeftArm
+	return Grip2
+end
 
-	if PoseData.RightShoulder and PoseData.RightShoulder.Parent then
-		PoseData.RightShoulder.C0 = PoseData.DefaultRightC0
-	end
-
-	if PoseData.Humanoid and PoseData.Humanoid.Parent then
-		PoseData.Humanoid.AutoRotate = PoseData.OldAutoRotate
-	end
+function WeaponPose.DestroyDualGrip(Grip2, Handle2, FilteringEnabled)
+	if Handle2 and Handle2.Parent and not FilteringEnabled then Handle2.CanCollide = true end
+	if Grip2 then Grip2:Destroy() end
 end
 
 return WeaponPose
