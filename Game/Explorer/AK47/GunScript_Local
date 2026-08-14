@@ -25,9 +25,10 @@ local WeaponPose = require(ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
 local Camera = Workspace.CurrentCamera
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
 local CharacterControllerInstance = CharacterController.Get()
 local Bootstrap = WeaponBootstrap.new({Tool=Tool,Module=Module,ReplicatedStorage=ReplicatedStorage,CharacterController=CharacterControllerInstance,Player=Player,Mouse=Mouse,Camera=Camera,Workspace=Workspace,Script=script,RunService=RunService})
-local Character, Humanoid = Bootstrap:WaitForCharacter()
 local Controller = WeaponController.new(Tool,Module)
 local Handle = Bootstrap:WaitForHandle()
 local Handle2 = Bootstrap:GetHandle2()
