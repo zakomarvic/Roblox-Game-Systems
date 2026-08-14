@@ -13,6 +13,7 @@ function WeaponBootstrap.new(Config)
 	self.Workspace = Config.Workspace
 	self.Script = Config.Script
 	self.RunService = Config.RunService
+	self.Connections = {}
 	return self
 end
 
@@ -53,6 +54,39 @@ function WeaponBootstrap:Wait(TimeToWait)
 	else
 		self.RunService.Heartbeat:Wait()
 	end
+end
+
+function WeaponBootstrap:AddConnection(Connection)
+	if Connection then table.insert(self.Connections, Connection) end
+	return Connection
+end
+
+function WeaponBootstrap:BindTool(Lifecycle)
+	self:AddConnection(self.Tool.Equipped:Connect(function() Lifecycle:Equip() end))
+	self:AddConnection(self.Tool.Unequipped:Connect(function() Lifecycle:Unequip() end))
+end
+
+function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
+	local function BindDeath(Humanoid)
+		self:AddConnection(Humanoid.Died:Connect(function() Lifecycle:Died() end))
+	end
+
+	local Character, Humanoid = self:WaitForCharacter()
+	if OnCharacter then OnCharacter(Character, Humanoid) end
+	BindDeath(Humanoid)
+
+	self:AddConnection(self.Player.CharacterAdded:Connect(function(NewCharacter)
+		local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
+		if OnCharacter then OnCharacter(NewCharacter, NewHumanoid) end
+		BindDeath(NewHumanoid)
+	end))
+end
+
+function WeaponBootstrap:Destroy()
+	for _, Connection in ipairs(self.Connections) do
+		if Connection and Connection.Connected then Connection:Disconnect() end
+	end
+	table.clear(self.Connections)
 end
 
 return WeaponBootstrap
