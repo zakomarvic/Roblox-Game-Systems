@@ -33,7 +33,8 @@ local Controller = WeaponController.new(Tool,Module)
 local Handle = Bootstrap:WaitForHandle()
 local Handle2 = Bootstrap:GetHandle2()
 local GUI,AimSensitivity = Bootstrap:GetGUI()
-local WeaponEffects,InflictTarget = WeaponRemotes.Get()
+local WeaponEffects = WeaponRemotes.WeaponEffects
+local InflictTarget = WeaponRemotes.InflictTarget
 local WeaponCameraInstance = WeaponCamera.new(Camera,Humanoid,Character,Module)
 local WeaponAnimationInstance = WeaponAnimation.new({Tool=Tool,Humanoid=Humanoid,Module=Module})
 local WeaponGUIInstance = WeaponGUI.new(GUI,Module,Controller)
