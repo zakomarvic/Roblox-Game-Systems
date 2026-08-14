@@ -12,6 +12,7 @@ local WeaponCamera = require(ReplicatedStorage.WeaponSystem.Modules.WeaponCamera
 local WeaponAim = require(ReplicatedStorage.WeaponSystem.Modules.WeaponAim)
 local WeaponInput = require(ReplicatedStorage.WeaponSystem.Modules.WeaponInput)
 local WeaponLifecycle = require(ReplicatedStorage.WeaponSystem.Modules.WeaponLifecycle)
+local WeaponGUI = require(ReplicatedStorage.WeaponSystem.Modules.WeaponGUI)
 local CharacterController = require(ReplicatedStorage.CharacterSystem.Modules.CharacterController)
 local WeaponPose = require(ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 
@@ -44,6 +45,7 @@ end)
 
 local GUI = script:WaitForChild("GunGUI")
 local AimSensitivity = script:WaitForChild("Mouse Sensitivity")
+local WeaponGUIInstance = WeaponGUI.new(GUI, Module, Controller)
 local WeaponAimInstance = WeaponAim.new(Camera, Player, Mouse, GUI, AimSensitivity, Module, function(State)
 	WeaponCameraInstance:SetAiming(State)
 	if WeaponFireInstance then WeaponFireInstance:SetAiming(State) end
@@ -106,30 +108,8 @@ WeaponCameraInstance:Start()
 
 WeaponFireInstance = WeaponFire.new({Tool=Tool, Module=Module, Character=Character, Humanoid=Humanoid, Mouse=Mouse, FireAnim=FireAnim, Raycast=RayCast, InflictTarget=InflictTarget, MuzzleEffect=script.MuzzleEffect, HitEffect=script.HitEffect})
 
-local function UpdateGUI()
-	local CurrentAmmo = Controller:GetAmmo()
-	local CurrentClips = Controller:GetClips()
-	GUI.Frame.Ammo.Fill:TweenSizeAndPosition(UDim2.new(CurrentAmmo / Module.AmmoPerClip, 0, 1, 0), UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.25, true)
-	GUI.Frame.Clips.Fill:TweenSizeAndPosition(UDim2.new(CurrentClips / Module.MaxClip, 0, 1, 0), UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.25, true)
-	GUI.Frame.Ammo.Current.Text = CurrentAmmo
-	GUI.Frame.Ammo.Max.Text = Module.AmmoPerClip
-	GUI.Frame.Clips.Current.Text = CurrentClips
-	GUI.Frame.Clips.Max.Text = Module.MaxClip
-	GUI.Frame.Ammo.Current.Visible = not Controller:GetReloading()
-	GUI.Frame.Ammo.Max.Visible = not Controller:GetReloading()
-	GUI.Frame.Ammo.Frame.Visible = not Controller:GetReloading()
-	GUI.Frame.Ammo.Reloading.Visible = Controller:GetReloading()
-	GUI.Frame.Clips.Current.Visible = CurrentClips > 0
-	GUI.Frame.Clips.Max.Visible = CurrentClips > 0
-	GUI.Frame.Clips.Frame.Visible = CurrentClips > 0
-	GUI.Frame.Clips.NoMoreClip.Visible = CurrentClips <= 0
-	GUI.Frame.Clips.Visible = Module.LimitedClipEnabled
-	GUI.Frame.Size = Module.LimitedClipEnabled and UDim2.new(0, 250, 0, 100) or UDim2.new(0, 250, 0, 55)
-	GUI.Frame.Position = Module.LimitedClipEnabled and UDim2.new(1, -260, 1, -110) or UDim2.new(1, -260, 1, -65)
-end
-
 local function ResetAim() WeaponAimInstance:Reset() end
-local Reload = WeaponReload.new({Tool=Tool, Module=Module, Controller=Controller, Handle=Handle, ReloadAnim=ReloadAnim, ShotgunClipinAnim=ShotgunClipinAnim, WeaponEffects=WeaponEffects, IsSprinting=function() return Module.SprintEnabled and CharacterControllerInstance:IsSprinting() end, IsAiming=function() return WeaponAimInstance:IsAiming() end, ResetAim=ResetAim, UpdateGUI=UpdateGUI, Wait=wait})
+local Reload = WeaponReload.new({Tool=Tool, Module=Module, Controller=Controller, Handle=Handle, ReloadAnim=ReloadAnim, ShotgunClipinAnim=ShotgunClipinAnim, WeaponEffects=WeaponEffects, IsSprinting=function() return Module.SprintEnabled and CharacterControllerInstance:IsSprinting() end, IsAiming=function() return WeaponAimInstance:IsAiming() end, ResetAim=ResetAim, UpdateGUI=function() WeaponGUIInstance:Update() end, Wait=wait})
 
 local function OnFireDown()
 	if Module.SprintEnabled and CharacterControllerInstance:IsSprinting() then return end
@@ -145,7 +125,7 @@ local function OnFireDown()
 		task.spawn(ShakeCamera)
 		for _=1,(Module.ShotgunEnabled and Module.BulletPerShot or 1) do WeaponFireInstance:Fire(HandleToFire) end
 		Controller:ConsumeAmmo(1)
-		UpdateGUI()
+		WeaponGUIInstance:Update()
 		HandleToFire=(HandleToFire==Handle and Module.DualEnabled) and Handle2 or Handle
 	end)
 	if HandleToFire.FireSound.Playing and HandleToFire.FireSound.Looped then HandleToFire.FireSound:Stop() end
@@ -161,7 +141,7 @@ local WeaponInputInstance = WeaponInput.new(Mouse,{OnFireDown=OnFireDown,OnFireU
 local WeaponLifecycleInstance
 WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,GUI=GUI,Script=script,PlayerGui=Player.PlayerGui,IdleAnim=IdleAnim,IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=OnFireUp,
 	OnEquip=function(Lifecycle)
-		UpdateGUI()
+		WeaponGUIInstance:Update()
 		if Module.BodyAimEnabled then
 			CurrentPose=WeaponPose.Equip(Character,Module)
 			if CurrentPose then
@@ -170,7 +150,7 @@ WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=W
 				end))
 			end
 		end
-		if Module.AmmoPerClip ~= math.huge then GUI.Parent=Player.PlayerGui end
+		WeaponGUIInstance:Show()
 		Mouse.Icon="rbxassetid://"..Module.MouseIconID
 	end,
 	OnUnequip=function()
