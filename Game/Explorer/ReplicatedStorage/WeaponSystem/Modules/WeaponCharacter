@@ -1,0 +1,41 @@
+local WeaponCharacter = {}
+WeaponCharacter.__index = WeaponCharacter
+
+function WeaponCharacter.new(Config)
+	local self = setmetatable({}, WeaponCharacter)
+	self.Character = Config.Character
+	self.Humanoid = Config.Humanoid
+	self.Camera = Config.Camera
+	self.Fire = Config.Fire
+	self.FireCycle = Config.FireCycle
+	self.Animation = Config.Animation
+	return self
+end
+
+function WeaponCharacter:SetCharacter(Character, Humanoid)
+	self.Character = Character
+	self.Humanoid = Humanoid
+
+	if self.Camera then
+		self.Camera:SetCharacter(Character, Humanoid)
+	end
+	if self.Fire then
+		self.Fire:SetCharacter(Character, Humanoid)
+	end
+	if self.FireCycle then
+		self.FireCycle:SetHumanoid(Humanoid)
+	end
+	if self.Animation then
+		self.Animation:SetHumanoid(Humanoid)
+	end
+end
+
+function WeaponCharacter:GetCharacter()
+	return self.Character
+end
+
+function WeaponCharacter:GetHumanoid()
+	return self.Humanoid
+end
+
+return WeaponCharacter
