@@ -103,7 +103,14 @@ end)
 local WeaponInputInstance = WeaponInput.new(Mouse,{OnFireDown=function() FireCycle:FireDown() end,OnFireUp=function() FireCycle:FireUp() end,OnReload=function() Reload:Start() end,OnAim=function() if not Controller:GetReloading() and Module.SniperEnabled then WeaponAimInstance:Toggle() end end})
 
 local WeaponLifecycleInstance
-WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,GUI=GUI,Script=script,PlayerGui=Player.PlayerGui,IdleAnim=IdleAnim,IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=function() FireCycle:FireUp() end,
+WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,GUI=GUI,Script=script,PlayerGui=Player.PlayerGui,IdleAnim=IdleAnim,IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=function() FireCycle:FireUp() end,SprintChanged=CharacterControllerInstance.SprintChanged,OnSprint=function(IsSprinting)
+	if IsSprinting then
+		Controller:SetTriggerHeld(false)
+		if Controller:GetReloading() then Controller:SetReloading(false) end
+		if Controller:IsCurrentlyFiring() then Controller:StopFiring() end
+		WeaponAimInstance:Reset()
+	end
+end,
 	OnEquip=function()
 		FireCycle:SetEquipped(true)
 		WeaponGUIInstance:Update()
@@ -132,6 +139,3 @@ WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=W
 Tool.Equipped:Connect(function() WeaponLifecycleInstance:Equip() end)
 Tool.Unequipped:Connect(function() WeaponLifecycleInstance:Unequip() end)
 Humanoid.Died:Connect(function() WeaponLifecycleInstance:Died() end)
-CharacterControllerInstance.SprintChanged.Event:Connect(function(IsSprinting)
-	if IsSprinting then Controller:SetTriggerHeld(false); if Controller:GetReloading() then Controller:SetReloading(false) end; if Controller:IsCurrentlyFiring() then Controller:StopFiring() end; WeaponAimInstance:Reset() end
-end)
