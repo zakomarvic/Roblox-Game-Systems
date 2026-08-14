@@ -25,6 +25,7 @@ local Controller = WeaponController.new(Tool, Module)
 local CurrentPose
 local AimConnection
 local WeaponFireInstance
+local Grip2
 
 local Handle = Tool:WaitForChild("Handle")
 local Player = Players.LocalPlayer
@@ -40,9 +41,7 @@ Player.CharacterAdded:Connect(function(NewCharacter)
 	Character = NewCharacter
 	Humanoid = NewHumanoid
 	WeaponCameraInstance:SetCharacter(NewCharacter, NewHumanoid)
-	if WeaponFireInstance then
-		WeaponFireInstance:SetCharacter(NewCharacter, NewHumanoid)
-	end
+	if WeaponFireInstance then WeaponFireInstance:SetCharacter(NewCharacter, NewHumanoid) end
 end)
 
 local GUI = script:WaitForChild("GunGUI")
@@ -57,7 +56,6 @@ local IdleAnim
 local FireAnim
 local ReloadAnim
 local ShotgunClipinAnim
-local Grip2
 local Handle2
 
 if Module.DualEnabled then
@@ -95,30 +93,20 @@ local function wait(TimeToWait)
 end
 
 WeaponCameraInstance:Start()
-
 WeaponFireInstance = WeaponFire.new({Tool=Tool, Module=Module, Character=Character, Humanoid=Humanoid, Mouse=Mouse, FireAnim=FireAnim, Raycast=WeaponRaycast.Cast, InflictTarget=InflictTarget, MuzzleEffect=script.MuzzleEffect, HitEffect=script.HitEffect})
 
 local function ResetAim() WeaponAimInstance:Reset() end
 local Reload = WeaponReload.new({Tool=Tool, Module=Module, Controller=Controller, Handle=Handle, ReloadAnim=ReloadAnim, ShotgunClipinAnim=ShotgunClipinAnim, WeaponEffects=WeaponEffects, IsSprinting=function() return Module.SprintEnabled and CharacterControllerInstance:IsSprinting() end, IsAiming=function() return WeaponAimInstance:IsAiming() end, ResetAim=ResetAim, UpdateGUI=function() WeaponGUIInstance:Update() end, Wait=wait})
-
 local FireCycle = WeaponFireCycle.new({Controller=Controller, Module=Module, CharacterController=CharacterControllerInstance, Aim=WeaponAimInstance, Humanoid=Humanoid, WeaponFire=WeaponFireInstance, GUI=WeaponGUIInstance, Reload=Reload, Handle=Handle, Handle2=Handle2, Wait=wait, OnRecoil=function() WeaponCameraInstance:AddRecoil() end})
 
 Player.CharacterAdded:Connect(function(NewCharacter)
 	FireCycle:SetHumanoid(NewCharacter:WaitForChild("Humanoid"))
 end)
 
-local function OnFireDown()
-	FireCycle:FireDown()
-end
-
-local function OnFireUp()
-	FireCycle:FireUp()
-end
-
-local WeaponInputInstance = WeaponInput.new(Mouse,{OnFireDown=OnFireDown,OnFireUp=OnFireUp,OnReload=function() Reload:Start() end,OnAim=function() if not Controller:GetReloading() and Module.SniperEnabled then WeaponAimInstance:Toggle() end end})
+local WeaponInputInstance = WeaponInput.new(Mouse,{OnFireDown=function() FireCycle:FireDown() end,OnFireUp=function() FireCycle:FireUp() end,OnReload=function() Reload:Start() end,OnAim=function() if not Controller:GetReloading() and Module.SniperEnabled then WeaponAimInstance:Toggle() end end})
 
 local WeaponLifecycleInstance
-WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,GUI=GUI,Script=script,PlayerGui=Player.PlayerGui,IdleAnim=IdleAnim,IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=OnFireUp,
+WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,GUI=GUI,Script=script,PlayerGui=Player.PlayerGui,IdleAnim=IdleAnim,IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=function() FireCycle:FireUp() end,
 	OnEquip=function(Lifecycle)
 		Equipped=true
 		FireCycle:SetEquipped(true)
@@ -131,6 +119,7 @@ WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=W
 				end))
 			end
 		end
+		if Module.DualEnabled then Grip2=WeaponPose.CreateDualGrip(Tool,Character,Handle2,Workspace.FilteringEnabled) end
 		WeaponGUIInstance:Show()
 		Mouse.Icon="rbxassetid://"..Module.MouseIconID
 	end,
@@ -138,25 +127,19 @@ WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=W
 		Equipped=false
 		FireCycle:SetEquipped(false)
 		if CurrentPose then WeaponPose.Unequip(CurrentPose); CurrentPose=nil end
-		if Module.DualEnabled and not Workspace.FilteringEnabled then Handle2.CanCollide=true; if Grip2 then Grip2:Destroy(); Grip2=nil end end
+		WeaponPose.DestroyDualGrip(Grip2,Handle2,Workspace.FilteringEnabled)
+		Grip2=nil
 	end,
 	OnDeath=function()
 		Equipped=false
 		FireCycle:SetEquipped(false)
 		if CurrentPose then WeaponPose.Unequip(CurrentPose); CurrentPose=nil end
-		if Module.DualEnabled and not Workspace.FilteringEnabled then Handle2.CanCollide=true; if Grip2 then Grip2:Destroy(); Grip2=nil end end
+		WeaponPose.DestroyDualGrip(Grip2,Handle2,Workspace.FilteringEnabled)
+		Grip2=nil
 	end,
 })
 
-Tool.Equipped:Connect(function()
-	WeaponLifecycleInstance:Equip()
-	if Module.DualEnabled and not Workspace.FilteringEnabled then
-		Handle2.CanCollide=false
-		local LeftArm=Tool.Parent:FindFirstChild("Left Arm")
-		local RightArm=Tool.Parent:FindFirstChild("Right Arm")
-		if RightArm then local Grip=RightArm:WaitForChild("RightGrip",0.01); if Grip then Grip2=Grip:Clone(); Grip2.Name="LeftGrip"; Grip2.Part0=LeftArm; Grip2.Part1=Handle2; Grip2.Parent=LeftArm end end
-	end
-end)
+Tool.Equipped:Connect(function() WeaponLifecycleInstance:Equip() end)
 Tool.Unequipped:Connect(function() WeaponLifecycleInstance:Unequip() end)
 Humanoid.Died:Connect(function() WeaponLifecycleInstance:Died() end)
 CharacterControllerInstance.SprintChanged.Event:Connect(function(IsSprinting)
