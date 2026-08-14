@@ -39,7 +39,7 @@ end
 
 function WeaponFire:ShowLocalMuzzleFlash()
 	local Flash = self.Tool and self.Tool:FindFirstChild("Flash")
-	local FlashGui = Flash and Flash:FindFirstChild("Light")
+	local FlashGui = Flash and Flash:FindFirstChild("LightBG")
 	local FlashImage = FlashGui and FlashGui:FindFirstChild("Light")
 	local FlashLight = Flash and Flash:FindFirstChild("lite")
 
