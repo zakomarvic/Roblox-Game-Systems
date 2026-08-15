@@ -9,10 +9,18 @@ function WeaponCharacter.new(Config)
 	self.Fire = Config.Fire
 	self.FireCycle = Config.FireCycle
 	self.Animation = Config.Animation
+	self.Tool = Config.Tool
+	self.Module = Config.Module
+	self.Handle2 = Config.Handle2
+	self.Mouse = Config.Mouse
+	self.Workspace = Config.Workspace or workspace
+	self.CurrentPose = nil
+	self.Grip2 = nil
 	return self
 end
 
 function WeaponCharacter:SetCharacter(Character, Humanoid)
+	self:ClearPose()
 	self.Character = Character
 	self.Humanoid = Humanoid
 
@@ -28,6 +36,29 @@ function WeaponCharacter:SetCharacter(Character, Humanoid)
 	if self.Animation then
 		self.Animation:SetHumanoid(Humanoid)
 	end
+end
+
+function WeaponCharacter:EquipPose()
+	if not self.Module.BodyAimEnabled then return end
+	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
+	self:ClearPose()
+	self.CurrentPose = WeaponPose.Equip(self.Character, self.Module)
+	if self.CurrentPose then
+		WeaponPose.BindAim(self.CurrentPose, self.Mouse)
+	end
+	if self.Module.DualEnabled then
+		self.Grip2 = WeaponPose.CreateDualGrip(self.Tool, self.Character, self.Handle2, self.Workspace.FilteringEnabled)
+	end
+end
+
+function WeaponCharacter:ClearPose()
+	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
+	if self.CurrentPose then
+		WeaponPose.Unequip(self.CurrentPose)
+		self.CurrentPose = nil
+	end
+	WeaponPose.DestroyDualGrip(self.Grip2, self.Handle2, self.Workspace.FilteringEnabled)
+	self.Grip2 = nil
 end
 
 function WeaponCharacter:GetCharacter()
