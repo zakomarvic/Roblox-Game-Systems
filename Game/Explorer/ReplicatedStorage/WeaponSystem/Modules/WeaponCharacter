@@ -16,13 +16,16 @@ function WeaponCharacter.new(Config)
 	self.Workspace = Config.Workspace or workspace
 	self.CurrentPose = nil
 	self.Grip2 = nil
+	self.PoseRequested = false
 	return self
 end
 
 function WeaponCharacter:SetCharacter(Character, Humanoid)
+	local PoseRequested = self.PoseRequested
 	self:ClearPose()
 	self.Character = Character
 	self.Humanoid = Humanoid
+	self.PoseRequested = PoseRequested
 
 	if self.Camera then
 		self.Camera:SetCharacter(Character, Humanoid)
@@ -36,12 +39,25 @@ function WeaponCharacter:SetCharacter(Character, Humanoid)
 	if self.Animation then
 		self.Animation:SetHumanoid(Humanoid)
 	end
+
+	-- CharacterAdded can race with Tool.Equipped after a respawn. If the
+	-- pose was already requested, re-apply it to the new character after
+	-- the character references have been updated.
+	if PoseRequested then
+		task.defer(function()
+			if self.PoseRequested and self.Character == Character and self.Humanoid == Humanoid then
+				self:EquipPose()
+			end
+		end)
+	end
 end
 
 function WeaponCharacter:EquipPose()
 	if not self.Module.BodyAimEnabled then return end
 	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
+	self.PoseRequested = true
 	self:ClearPose()
+	self.PoseRequested = true
 
 	local Character = self.Character
 	if not Character or not Character.Parent then return end
@@ -67,6 +83,7 @@ end
 
 function WeaponCharacter:ClearPose()
 	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
+	self.PoseRequested = false
 	if self.CurrentPose then
 		WeaponPose.Unequip(self.CurrentPose)
 		self.CurrentPose = nil
