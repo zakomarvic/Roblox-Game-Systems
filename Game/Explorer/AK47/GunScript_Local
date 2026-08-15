@@ -52,15 +52,6 @@ WeaponCharacterInstance.FireCycle=FireCycle
 
 local WeaponInputInstance = WeaponInput.new(Mouse,{OnFireDown=function() FireCycle:FireDown() end,OnFireUp=function() FireCycle:FireUp() end,OnReload=function() Reload:Start() end,OnAim=function() if not Controller:GetReloading() and Module.SniperEnabled then WeaponAimInstance:Toggle() end end})
 local WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,GUI=GUI,Script=script,PlayerGui=Player.PlayerGui,IdleAnim=WeaponAnimationInstance:Get("IdleAnim"),IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=function() FireCycle:FireUp() end,SprintChanged=CharacterControllerInstance.SprintChanged,OnSprint=function(IsSprinting) if IsSprinting then Controller:SetTriggerHeld(false);if Controller:GetReloading() then Controller:SetReloading(false) end;if Controller:IsCurrentlyFiring() then Controller:StopFiring() end;WeaponAimInstance:Reset() end end,OnEquip=function()
-	local EquippedCharacter=Player.Character
-	local EquippedHumanoid=EquippedCharacter and EquippedCharacter:FindFirstChildOfClass("Humanoid")
-	if EquippedCharacter and EquippedHumanoid and EquippedHumanoid.Health>0 then
-		if EquippedCharacter~=Character or EquippedHumanoid~=Humanoid then
-			Character=EquippedCharacter
-			Humanoid=EquippedHumanoid
-			WeaponCharacterInstance:SetCharacter(Character,Humanoid)
-		end
-	end
 	FireCycle:SetEquipped(true)
 	WeaponGUIInstance:Update()
 	WeaponCharacterInstance:EquipPose()
@@ -69,8 +60,6 @@ local WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance
 end,OnUnequip=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose() end,OnDeath=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose() end})
 
 Bootstrap:BindCharacter(WeaponLifecycleInstance,function(NewCharacter,NewHumanoid)
-	Character=NewCharacter
-	Humanoid=NewHumanoid
-	WeaponCharacterInstance:SetCharacter(Character,Humanoid)
+	WeaponCharacterInstance:SetCharacter(NewCharacter,NewHumanoid)
 end)
 Bootstrap:BindTool(WeaponLifecycleInstance)
