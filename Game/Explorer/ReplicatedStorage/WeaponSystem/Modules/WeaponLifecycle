@@ -12,16 +12,12 @@ function WeaponLifecycle.new(dependencies)
 end
 
 function WeaponLifecycle:AddConnection(Connection)
-	if Connection then
-		table.insert(self.Connections, Connection)
-	end
+	if Connection then table.insert(self.Connections, Connection) end
 	return Connection
 end
 
 function WeaponLifecycle:AddCleanup(Cleanup)
-	if typeof(Cleanup) == "function" then
-		table.insert(self.Cleanups, Cleanup)
-	end
+	if typeof(Cleanup) == "function" then table.insert(self.Cleanups, Cleanup) end
 end
 
 function WeaponLifecycle:IsEquipped()
@@ -33,20 +29,14 @@ function WeaponLifecycle:Equip()
 	self.Equipped = true
 	self.HasActiveState = true
 	local D = self.Dependencies
-	if D.Camera then
-		D.Camera:SetEquipped(true)
-		D.Camera:Start()
-	end
+	if D.Camera then D.Camera:SetEquipped(true); D.Camera:Start() end
 	if D.Aim then D.Aim:Reset() end
 	if D.Input then D.Input:Bind() end
-	if D.GUI and D.PlayerGui then D.GUI.Parent = D.PlayerGui end
+	if D.GUI and D.GUI.Show then D.GUI:Show(D.PlayerGui) end
 	if D.IdleAnim then D.IdleAnim:Play(nil, nil, D.IdleAnimationSpeed or 1) end
 	if D.SprintChanged and D.OnSprint then
-		local SprintEvent = D.SprintChanged
-		local Connection = SprintEvent.Event:Connect(function(IsSprinting)
-			if self.Equipped then
-				D.OnSprint(IsSprinting)
-			end
+		local Connection = D.SprintChanged.Event:Connect(function(IsSprinting)
+			if self.Equipped then D.OnSprint(IsSprinting) end
 		end)
 		self:AddConnection(Connection)
 	end
@@ -54,21 +44,15 @@ function WeaponLifecycle:Equip()
 end
 
 function WeaponLifecycle:Unequip()
-	if not self.Equipped and not self.HasActiveState then
-		self:CleanupConnections()
-		return
-	end
+	if not self.Equipped and not self.HasActiveState then self:CleanupConnections(); return end
 	self.Equipped = false
 	self.HasActiveState = false
 	local D = self.Dependencies
 	if D.TriggerReleased then D.TriggerReleased() end
 	if D.Input then D.Input:Unbind() end
-	if D.Camera then
-		D.Camera:SetEquipped(false)
-		D.Camera:Stop()
-	end
+	if D.Camera then D.Camera:SetEquipped(false); D.Camera:Stop() end
 	if D.Aim then D.Aim:Reset() end
-	if D.GUI and D.Script then D.GUI.Parent = D.Script end
+	if D.GUI and D.GUI.Hide then D.GUI:Hide() end
 	if D.IdleAnim then D.IdleAnim:Stop() end
 	self:CleanupConnections()
 	if D.OnUnequip then D.OnUnequip(self) end
@@ -80,12 +64,9 @@ function WeaponLifecycle:Died()
 	local D = self.Dependencies
 	if D.TriggerReleased then D.TriggerReleased() end
 	if D.Input then D.Input:Unbind() end
-	if D.Camera then
-		D.Camera:SetEquipped(false)
-		D.Camera:Stop()
-	end
+	if D.Camera then D.Camera:SetEquipped(false); D.Camera:Stop() end
 	if D.Aim then D.Aim:Reset() end
-	if D.GUI and D.Script then D.GUI.Parent = D.Script end
+	if D.GUI and D.GUI.Hide then D.GUI:Hide() end
 	if D.IdleAnim then D.IdleAnim:Stop() end
 	self:CleanupConnections()
 	if D.OnDeath then D.OnDeath(self) end
@@ -93,18 +74,14 @@ end
 
 function WeaponLifecycle:CleanupConnections()
 	for _, Connection in ipairs(self.Connections) do
-		if Connection and Connection.Connected then
-			Connection:Disconnect()
-		end
+		if Connection and Connection.Connected then Connection:Disconnect() end
 	end
 	table.clear(self.Connections)
 end
 
 function WeaponLifecycle:Destroy()
 	self:Unequip()
-	for _, Cleanup in ipairs(self.Cleanups) do
-		pcall(Cleanup)
-	end
+	for _, Cleanup in ipairs(self.Cleanups) do pcall(Cleanup) end
 	table.clear(self.Cleanups)
 	table.clear(self.Dependencies)
 end
