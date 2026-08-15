@@ -19,7 +19,6 @@ local WeaponAnimation = require(ReplicatedStorage.WeaponSystem.Modules.WeaponAni
 local WeaponCharacter = require(ReplicatedStorage.WeaponSystem.Modules.WeaponCharacter)
 local WeaponBootstrap = require(ReplicatedStorage.WeaponSystem.Modules.WeaponBootstrap)
 local CharacterController = require(ReplicatedStorage.CharacterSystem.Modules.CharacterController)
-local WeaponPose = require(ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 
 local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
@@ -37,8 +36,6 @@ local WeaponAnimationInstance = WeaponAnimation.new({Tool=Tool,Humanoid=Humanoid
 local WeaponGUIInstance = WeaponGUI.new(GUI,Module,Controller)
 local WeaponFireInstance
 local WeaponCharacterInstance
-local CurrentPose
-local Grip2
 
 local WeaponAimInstance = WeaponAim.new(Camera,Player,Mouse,GUI,AimSensitivity,Module,function(State)
 	WeaponCameraInstance:SetAiming(State)
@@ -47,7 +44,7 @@ end)
 
 WeaponCameraInstance:Start()
 WeaponFireInstance = WeaponFire.new({Tool=Tool,Module=Module,Character=Character,Humanoid=Humanoid,Mouse=Mouse,FireAnim=WeaponAnimationInstance:Get("FireAnim"),Raycast=WeaponRaycast.Cast,InflictTarget=InflictTarget,MuzzleEffect=script.MuzzleEffect,HitEffect=script.HitEffect})
-WeaponCharacterInstance = WeaponCharacter.new({Character=Character,Humanoid=Humanoid,Camera=WeaponCameraInstance,Fire=WeaponFireInstance,Animation=WeaponAnimationInstance})
+WeaponCharacterInstance = WeaponCharacter.new({Character=Character,Humanoid=Humanoid,Camera=WeaponCameraInstance,Fire=WeaponFireInstance,Animation=WeaponAnimationInstance,Tool=Tool,Module=Module,Handle2=Handle2,Mouse=Mouse,Workspace=Workspace})
 
 local Reload = WeaponReload.new({Tool=Tool,Module=Module,Controller=Controller,Handle=Handle,ReloadAnim=WeaponAnimationInstance:Get("ReloadAnim"),ShotgunClipinAnim=WeaponAnimationInstance:Get("ShotgunClipinAnim"),WeaponEffects=WeaponEffects,IsSprinting=function() return Module.SprintEnabled and CharacterControllerInstance:IsSprinting() end,IsAiming=function() return WeaponAimInstance:IsAiming() end,ResetAim=function() WeaponAimInstance:Reset() end,UpdateGUI=function() WeaponGUIInstance:Update() end,Wait=function(Time) Bootstrap:Wait(Time) end})
 local FireCycle = WeaponFireCycle.new({Controller=Controller,Module=Module,CharacterController=CharacterControllerInstance,Aim=WeaponAimInstance,Humanoid=Humanoid,WeaponFire=WeaponFireInstance,GUI=WeaponGUIInstance,Reload=Reload,Handle=Handle,Handle2=Handle2,Wait=function(Time) Bootstrap:Wait(Time) end,OnRecoil=function() WeaponCameraInstance:AddRecoil() end})
@@ -59,12 +56,6 @@ local WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance
 	local EquippedHumanoid=EquippedCharacter and EquippedCharacter:FindFirstChildOfClass("Humanoid")
 	if EquippedCharacter and EquippedHumanoid and EquippedHumanoid.Health>0 then
 		if EquippedCharacter~=Character or EquippedHumanoid~=Humanoid then
-			if CurrentPose then
-				WeaponPose.Unequip(CurrentPose)
-				CurrentPose=nil
-			end
-			WeaponPose.DestroyDualGrip(Grip2,Handle2,Workspace.FilteringEnabled)
-			Grip2=nil
 			Character=EquippedCharacter
 			Humanoid=EquippedHumanoid
 			WeaponCharacterInstance:SetCharacter(Character,Humanoid)
@@ -73,22 +64,12 @@ local WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance
 	end
 	FireCycle:SetEquipped(true)
 	WeaponGUIInstance:Update()
-	if Module.BodyAimEnabled then
-		CurrentPose=WeaponPose.Equip(Character,Module)
-		if CurrentPose then WeaponPose.BindAim(CurrentPose,Mouse) end
-	end
-	if Module.DualEnabled then Grip2=WeaponPose.CreateDualGrip(Tool,Character,Handle2,Workspace.FilteringEnabled) end
+	WeaponCharacterInstance:EquipPose()
 	WeaponGUIInstance:Show()
 	Mouse.Icon="rbxassetid://"..Module.MouseIconID
-end,OnUnequip=function() FireCycle:SetEquipped(false);if CurrentPose then WeaponPose.Unequip(CurrentPose);CurrentPose=nil end;WeaponPose.DestroyDualGrip(Grip2,Handle2,Workspace.FilteringEnabled);Grip2=nil end,OnDeath=function() FireCycle:SetEquipped(false);if CurrentPose then WeaponPose.Unequip(CurrentPose);CurrentPose=nil end;WeaponPose.DestroyDualGrip(Grip2,Handle2,Workspace.FilteringEnabled);Grip2=nil end})
+end,OnUnequip=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose() end,OnDeath=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose() end})
 
 Bootstrap:BindCharacter(WeaponLifecycleInstance,function(NewCharacter,NewHumanoid)
-	if CurrentPose then
-		WeaponPose.Unequip(CurrentPose)
-		CurrentPose=nil
-	end
-	WeaponPose.DestroyDualGrip(Grip2,Handle2,Workspace.FilteringEnabled)
-	Grip2=nil
 	Character=NewCharacter
 	Humanoid=NewHumanoid
 	WeaponCharacterInstance:SetCharacter(Character,Humanoid)
