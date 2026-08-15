@@ -80,12 +80,14 @@ function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 		if OnCharacter then OnCharacter(NewCharacter, NewHumanoid) end
 		BindDeath(NewHumanoid)
 
-		-- Roblox can keep the Tool equipped across a respawn without
-		-- producing another Tool.Equipped event. Re-run the lifecycle once
-		-- the new character exists so pose/input/camera state is rebuilt.
-		if self.Tool.Parent == NewCharacter then
+		-- Roblox can keep the Tool parented to the new character across a
+		-- respawn without producing another Tool.Equipped event. Only rebuild
+		-- the lifecycle if the Tool is actually still equipped AND the lifecycle
+		-- hasn't already processed an equip event. This prevents rapid
+		-- equip/unequip input around death from running the equip path twice.
+		if self.Tool.Parent == NewCharacter and not Lifecycle:IsEquipped() then
 			self.RunService.Heartbeat:Wait()
-			if self.Tool.Parent == NewCharacter then
+			if self.Tool.Parent == NewCharacter and not Lifecycle:IsEquipped() then
 				Lifecycle:Equip()
 			end
 		end
