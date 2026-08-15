@@ -57,6 +57,12 @@ local WeaponInputInstance = WeaponInput.new(Mouse,{OnFireDown=function() FireCyc
 local WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,GUI=GUI,Script=script,PlayerGui=Player.PlayerGui,IdleAnim=WeaponAnimationInstance:Get("IdleAnim"),IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=function() FireCycle:FireUp() end,SprintChanged=CharacterControllerInstance.SprintChanged,OnSprint=function(IsSprinting) if IsSprinting then Controller:SetTriggerHeld(false);if Controller:GetReloading() then Controller:SetReloading(false) end;if Controller:IsCurrentlyFiring() then Controller:StopFiring() end;WeaponAimInstance:Reset() end end,OnEquip=function() FireCycle:SetEquipped(true);WeaponGUIInstance:Update();if Module.BodyAimEnabled then CurrentPose=WeaponPose.Equip(Character,Module);if CurrentPose then WeaponPose.BindAim(CurrentPose,Mouse) end end;if Module.DualEnabled then Grip2=WeaponPose.CreateDualGrip(Tool,Character,Handle2,Workspace.FilteringEnabled) end;WeaponGUIInstance:Show();Mouse.Icon="rbxassetid://"..Module.MouseIconID end,OnUnequip=function() FireCycle:SetEquipped(false);if CurrentPose then WeaponPose.Unequip(CurrentPose);CurrentPose=nil end;WeaponPose.DestroyDualGrip(Grip2,Handle2,Workspace.FilteringEnabled);Grip2=nil end,OnDeath=function() FireCycle:SetEquipped(false);if CurrentPose then WeaponPose.Unequip(CurrentPose);CurrentPose=nil end;WeaponPose.DestroyDualGrip(Grip2,Handle2,Workspace.FilteringEnabled);Grip2=nil end})
 
 Bootstrap:BindCharacter(WeaponLifecycleInstance,function(NewCharacter,NewHumanoid)
+	if CurrentPose then
+		WeaponPose.Unequip(CurrentPose)
+		CurrentPose=nil
+	end
+	WeaponPose.DestroyDualGrip(Grip2,Handle2,Workspace.FilteringEnabled)
+	Grip2=nil
 	Character=NewCharacter
 	Humanoid=NewHumanoid
 	WeaponCharacterInstance:SetCharacter(Character,Humanoid)
