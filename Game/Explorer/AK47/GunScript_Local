@@ -44,7 +44,7 @@ end)
 
 WeaponCameraInstance:Start()
 WeaponFireInstance = WeaponFire.new({Tool=Tool,Module=Module,Character=Character,Humanoid=Humanoid,Mouse=Mouse,FireAnim=WeaponAnimationInstance:Get("FireAnim"),Raycast=WeaponRaycast.Cast,InflictTarget=InflictTarget,MuzzleEffect=script.MuzzleEffect,HitEffect=script.HitEffect})
-WeaponCharacterInstance = WeaponCharacter.new({Character=Character,Humanoid=Humanoid,Camera=WeaponCameraInstance,Fire=WeaponFireInstance,Animation=WeaponAnimationInstance,Tool=Tool,Module=Module,Handle2=Handle2,Mouse=Mouse,Workspace=Workspace})
+WeaponCharacterInstance = WeaponCharacter.new({Character=Character,Humanoid=Humanoid,Player=Player,Camera=WeaponCameraInstance,Fire=WeaponFireInstance,Animation=WeaponAnimationInstance,Tool=Tool,Module=Module,Handle2=Handle2,Mouse=Mouse,Workspace=Workspace})
 
 local Reload = WeaponReload.new({Tool=Tool,Module=Module,Controller=Controller,Handle=Handle,ReloadAnim=WeaponAnimationInstance:Get("ReloadAnim"),ShotgunClipinAnim=WeaponAnimationInstance:Get("ShotgunClipinAnim"),WeaponEffects=WeaponEffects,IsSprinting=function() return Module.SprintEnabled and CharacterControllerInstance:IsSprinting() end,IsAiming=function() return WeaponAimInstance:IsAiming() end,ResetAim=function() WeaponAimInstance:Reset() end,UpdateGUI=function() WeaponGUIInstance:Update() end,Wait=function(Time) Bootstrap:Wait(Time) end})
 local FireCycle = WeaponFireCycle.new({Controller=Controller,Module=Module,CharacterController=CharacterControllerInstance,Aim=WeaponAimInstance,Humanoid=Humanoid,WeaponFire=WeaponFireInstance,GUI=WeaponGUIInstance,Reload=Reload,Handle=Handle,Handle2=Handle2,Wait=function(Time) Bootstrap:Wait(Time) end,OnRecoil=function() WeaponCameraInstance:AddRecoil() end})
