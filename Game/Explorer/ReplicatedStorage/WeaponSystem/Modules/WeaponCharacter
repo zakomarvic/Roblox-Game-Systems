@@ -14,6 +14,7 @@ function WeaponCharacter.new(Config)
 	self.Handle2 = Config.Handle2
 	self.Mouse = Config.Mouse
 	self.Workspace = Config.Workspace or workspace
+	self.IsEquipped = Config.IsEquipped
 	self.CurrentPose = nil
 	self.Grip2 = nil
 	self.PoseRequested = false
@@ -22,35 +23,21 @@ function WeaponCharacter.new(Config)
 end
 
 function WeaponCharacter:SetCharacter(Character, Humanoid)
-	local PoseRequested = self.PoseRequested
+	local WasEquipped = self.IsEquipped and self.IsEquipped() or self.PoseRequested
 	self:ClearPose()
 	self.Character = Character
 	self.Humanoid = Humanoid
-	self.PoseRequested = PoseRequested
+	self.PoseRequested = WasEquipped
 
-	if self.Camera then
-		self.Camera:SetCharacter(Character, Humanoid)
-	end
-	if self.Fire then
-		self.Fire:SetCharacter(Character, Humanoid)
-	end
-	if self.FireCycle then
-		self.FireCycle:SetHumanoid(Humanoid)
-	end
-	if self.Animation then
-		self.Animation:SetHumanoid(Humanoid)
-	end
+	if self.Camera then self.Camera:SetCharacter(Character, Humanoid) end
+	if self.Fire then self.Fire:SetCharacter(Character, Humanoid) end
+	if self.FireCycle then self.FireCycle:SetHumanoid(Humanoid) end
+	if self.Animation then self.Animation:SetHumanoid(Humanoid) end
 
-	-- CharacterAdded can race with Tool.Equipped after a respawn. Capture
-	-- the current pose generation so a later unequip can invalidate this
-	-- deferred re-application.
-	if PoseRequested then
+	if WasEquipped then
 		local Generation = self.PoseGeneration
 		task.defer(function()
-			if self.PoseRequested
-				and self.PoseGeneration == Generation
-				and self.Character == Character
-				and self.Humanoid == Humanoid then
+			if self.PoseRequested and self.PoseGeneration == Generation and self.Character == Character and self.Humanoid == Humanoid and self.IsEquipped and self.IsEquipped() then
 				self:EquipPose()
 			end
 		end)
@@ -72,28 +59,18 @@ function WeaponCharacter:EquipPose()
 	local Humanoid = self.Humanoid or Character:FindFirstChildOfClass("Humanoid")
 	if not Humanoid or Humanoid.Health <= 0 then return end
 
-	-- After respawn, Tool.Equipped can fire before the R6 shoulder joints
-	-- have finished appearing. Wait for the exact parts the pose needs.
 	local Torso = Character:WaitForChild("Torso", 2)
-	if self.PoseGeneration ~= Generation or not self.PoseRequested or self.Character ~= Character or self.Humanoid ~= Humanoid then
-		return
-	end
+	if self.PoseGeneration ~= Generation or not self.PoseRequested or self.Character ~= Character or self.Humanoid ~= Humanoid then return end
 	if not Torso then return end
-
 	local LeftShoulder = Torso:WaitForChild("Left Shoulder", 2)
-	if self.PoseGeneration ~= Generation or not self.PoseRequested or self.Character ~= Character or self.Humanoid ~= Humanoid then
-		return
-	end
+	if self.PoseGeneration ~= Generation or not self.PoseRequested or self.Character ~= Character or self.Humanoid ~= Humanoid then return end
 	local RightShoulder = Torso:WaitForChild("Right Shoulder", 2)
-	if self.PoseGeneration ~= Generation or not self.PoseRequested or self.Character ~= Character or self.Humanoid ~= Humanoid then
-		return
-	end
+	if self.PoseGeneration ~= Generation or not self.PoseRequested or self.Character ~= Character or self.Humanoid ~= Humanoid then return end
 	if not LeftShoulder or not RightShoulder then return end
+	if self.IsEquipped and not self.IsEquipped() then self.PoseRequested = false return end
 
 	self.CurrentPose = WeaponPose.Equip(Character, self.Module)
-	if self.CurrentPose then
-		WeaponPose.BindAim(self.CurrentPose, self.Mouse)
-	end
+	if self.CurrentPose then WeaponPose.BindAim(self.CurrentPose, self.Mouse) end
 	if self.Module.DualEnabled then
 		self.Grip2 = WeaponPose.CreateDualGrip(self.Tool, Character, self.Handle2, self.Workspace.FilteringEnabled)
 	end
@@ -111,12 +88,7 @@ function WeaponCharacter:ClearPose()
 	self.Grip2 = nil
 end
 
-function WeaponCharacter:GetCharacter()
-	return self.Character
-end
-
-function WeaponCharacter:GetHumanoid()
-	return self.Humanoid
-end
+function WeaponCharacter:GetCharacter() return self.Character end
+function WeaponCharacter:GetHumanoid() return self.Humanoid end
 
 return WeaponCharacter
