@@ -47,12 +47,13 @@ end
 function WeaponCharacter:EquipPose()
 	if not self.Module.BodyAimEnabled then return end
 	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
+
+	-- Clear the previous pose first. ClearPose intentionally advances the
+	-- generation so every older deferred pose becomes stale.
+	self:ClearPose()
 	self.PoseGeneration += 1
 	local Generation = self.PoseGeneration
 	self.PoseRequested = true
-	self:ClearPose()
-	self.PoseRequested = true
-	self.PoseGeneration = Generation
 
 	local Character = self.Character
 	if not Character or not Character.Parent then return end
