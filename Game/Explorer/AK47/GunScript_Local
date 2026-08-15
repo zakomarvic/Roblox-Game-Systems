@@ -66,7 +66,7 @@ local WeaponLifecycleInstance = WeaponLifecycle.new({Camera=WeaponCameraInstance
 	WeaponCharacterInstance:EquipPose()
 	WeaponGUIInstance:Show()
 	Mouse.Icon="rbxassetid://"..Module.MouseIconID
-end,OnUnequip=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose() end,OnDeath=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose() end})
+end,OnUnequip=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose();WeaponGUIInstance:Hide() end,OnDeath=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose();WeaponGUIInstance:Hide() end})
 
 Bootstrap:BindCharacter(WeaponLifecycleInstance,function(NewCharacter,NewHumanoid)
 	Character=NewCharacter
