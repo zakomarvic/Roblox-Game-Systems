@@ -16,8 +16,23 @@ function WeaponGUI:Update()
 	local CurrentAmmo = Controller:GetAmmo()
 	local CurrentClips = Controller:GetClips()
 
-	GUI.Frame.Ammo.Fill:TweenSizeAndPosition(UDim2.new(CurrentAmmo / Module.AmmoPerClip, 0, 1, 0), UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.25, true)
-	GUI.Frame.Clips.Fill:TweenSizeAndPosition(UDim2.new(CurrentClips / Module.MaxClip, 0, 1, 0), UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.25, true)
+	GUI.Frame.Ammo.Fill:TweenSizeAndPosition(
+		UDim2.new(CurrentAmmo / Module.AmmoPerClip, 0, 1, 0),
+		UDim2.new(0, 0, 0, 0),
+		Enum.EasingDirection.Out,
+		Enum.EasingStyle.Quint,
+		0.25,
+		true
+	)
+	GUI.Frame.Clips.Fill:TweenSizeAndPosition(
+		UDim2.new(CurrentClips / Module.MaxClip, 0, 1, 0),
+		UDim2.new(0, 0, 0, 0),
+		Enum.EasingDirection.Out,
+		Enum.EasingStyle.Quint,
+		0.25,
+		true
+	)
+
 	GUI.Frame.Ammo.Current.Text = CurrentAmmo
 	GUI.Frame.Ammo.Max.Text = Module.AmmoPerClip
 	GUI.Frame.Clips.Current.Text = CurrentClips
@@ -35,13 +50,17 @@ function WeaponGUI:Update()
 	GUI.Frame.Clips.Frame.Visible = HasClips
 	GUI.Frame.Clips.NoMoreClip.Visible = not HasClips
 	GUI.Frame.Clips.Visible = Module.LimitedClipEnabled
-	GUI.Frame.Size = Module.LimitedClipEnabled and UDim2.new(0, 250, 0, 100) or UDim2.new(0, 250, 0, 55)
-	GUI.Frame.Position = Module.LimitedClipEnabled and UDim2.new(1, -260, 1, -110) or UDim2.new(1, -260, 1, -65)
+	GUI.Frame.Size = Module.LimitedClipEnabled
+		and UDim2.new(0, 250, 0, 100)
+		or UDim2.new(0, 250, 0, 55)
+	GUI.Frame.Position = Module.LimitedClipEnabled
+		and UDim2.new(1, -260, 1, -110)
+		or UDim2.new(1, -260, 1, -65)
 end
 
-function WeaponGUI:Show(PlayerGui)
+function WeaponGUI:Show()
 	if self.Module.AmmoPerClip ~= math.huge then
-		self.GUI.Parent = PlayerGui or game:GetService("Players").LocalPlayer.PlayerGui
+		self.GUI.Parent = game:GetService("Players").LocalPlayer.PlayerGui
 	end
 end
 
