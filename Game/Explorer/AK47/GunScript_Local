@@ -18,7 +18,6 @@ local WeaponFireCycle = require(ReplicatedStorage.WeaponSystem.Modules.WeaponFir
 local WeaponAnimation = require(ReplicatedStorage.WeaponSystem.Modules.WeaponAnimation)
 local WeaponCharacter = require(ReplicatedStorage.WeaponSystem.Modules.WeaponCharacter)
 local WeaponBootstrap = require(ReplicatedStorage.WeaponSystem.Modules.WeaponBootstrap)
-local WeaponRemotes = require(ReplicatedStorage.WeaponSystem.Modules.WeaponRemotes)
 local CharacterController = require(ReplicatedStorage.CharacterSystem.Modules.CharacterController)
 local WeaponPose = require(ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 
@@ -32,8 +31,7 @@ local Controller = WeaponController.new(Tool,Module)
 local Handle = Bootstrap:WaitForHandle()
 local Handle2 = Bootstrap:GetHandle2()
 local GUI,AimSensitivity = Bootstrap:GetGUI()
-local WeaponEffects = WeaponRemotes.WeaponEffects
-local InflictTarget = WeaponRemotes.InflictTarget
+local WeaponEffects,InflictTarget = Bootstrap:GetRemotes()
 local WeaponCameraInstance = WeaponCamera.new(Camera,Humanoid,Character,Module)
 local WeaponAnimationInstance = WeaponAnimation.new({Tool=Tool,Humanoid=Humanoid,Module=Module})
 local WeaponGUIInstance = WeaponGUI.new(GUI,Module,Controller)
