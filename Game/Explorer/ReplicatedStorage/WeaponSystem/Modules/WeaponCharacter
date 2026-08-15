@@ -5,7 +5,6 @@ function WeaponCharacter.new(Config)
 	local self = setmetatable({}, WeaponCharacter)
 	self.Character = Config.Character
 	self.Humanoid = Config.Humanoid
-	self.Player = Config.Player
 	self.Camera = Config.Camera
 	self.Fire = Config.Fire
 	self.FireCycle = Config.FireCycle
@@ -44,17 +43,13 @@ function WeaponCharacter:EquipPose()
 	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 	self:ClearPose()
 
-	-- Always resolve the character that owns the tool right now. This prevents
-	-- a stale pre-death character/humanoid from blocking pose creation.
-	local Character = self.Player and self.Player.Character or self.Character
+	local Character = self.Character
 	if not Character or not Character.Parent then return end
-	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+	local Humanoid = self.Humanoid or Character:FindFirstChildOfClass("Humanoid")
 	if not Humanoid or Humanoid.Health <= 0 then return end
 
-	if Character ~= self.Character or Humanoid ~= self.Humanoid then
-		self:SetCharacter(Character, Humanoid)
-	end
-
+	-- After respawn, Tool.Equipped can fire before the R6 shoulder joints
+	-- have finished appearing. Wait for the exact parts the pose needs.
 	local Torso = Character:WaitForChild("Torso", 2)
 	if not Torso then return end
 	local LeftShoulder = Torso:WaitForChild("Left Shoulder", 2)
