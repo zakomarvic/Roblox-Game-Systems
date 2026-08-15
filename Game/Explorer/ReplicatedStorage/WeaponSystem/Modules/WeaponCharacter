@@ -42,12 +42,26 @@ function WeaponCharacter:EquipPose()
 	if not self.Module.BodyAimEnabled then return end
 	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 	self:ClearPose()
-	self.CurrentPose = WeaponPose.Equip(self.Character, self.Module)
+
+	local Character = self.Character
+	if not Character or not Character.Parent then return end
+	local Humanoid = self.Humanoid or Character:FindFirstChildOfClass("Humanoid")
+	if not Humanoid or Humanoid.Health <= 0 then return end
+
+	-- After respawn, Tool.Equipped can fire before the R6 shoulder joints
+	-- have finished appearing. Wait for the exact parts the pose needs.
+	local Torso = Character:WaitForChild("Torso", 2)
+	if not Torso then return end
+	local LeftShoulder = Torso:WaitForChild("Left Shoulder", 2)
+	local RightShoulder = Torso:WaitForChild("Right Shoulder", 2)
+	if not LeftShoulder or not RightShoulder then return end
+
+	self.CurrentPose = WeaponPose.Equip(Character, self.Module)
 	if self.CurrentPose then
 		WeaponPose.BindAim(self.CurrentPose, self.Mouse)
 	end
 	if self.Module.DualEnabled then
-		self.Grip2 = WeaponPose.CreateDualGrip(self.Tool, self.Character, self.Handle2, self.Workspace.FilteringEnabled)
+		self.Grip2 = WeaponPose.CreateDualGrip(self.Tool, Character, self.Handle2, self.Workspace.FilteringEnabled)
 	end
 end
 
