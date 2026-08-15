@@ -17,6 +17,7 @@ function WeaponCharacter.new(Config)
 	self.CurrentPose = nil
 	self.Grip2 = nil
 	self.PoseRequested = false
+	self.PoseGeneration = 0
 	return self
 end
 
@@ -40,12 +41,16 @@ function WeaponCharacter:SetCharacter(Character, Humanoid)
 		self.Animation:SetHumanoid(Humanoid)
 	end
 
-	-- CharacterAdded can race with Tool.Equipped after a respawn. If the
-	-- pose was already requested, re-apply it to the new character after
-	-- the character references have been updated.
+	-- CharacterAdded can race with Tool.Equipped after a respawn. Capture
+	-- the current pose generation so a later unequip can invalidate this
+	-- deferred re-application.
 	if PoseRequested then
+		local Generation = self.PoseGeneration
 		task.defer(function()
-			if self.PoseRequested and self.Character == Character and self.Humanoid == Humanoid then
+			if self.PoseRequested
+				and self.PoseGeneration == Generation
+				and self.Character == Character
+				and self.Humanoid == Humanoid then
 				self:EquipPose()
 			end
 		end)
@@ -55,9 +60,12 @@ end
 function WeaponCharacter:EquipPose()
 	if not self.Module.BodyAimEnabled then return end
 	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
+	self.PoseGeneration += 1
+	local Generation = self.PoseGeneration
 	self.PoseRequested = true
 	self:ClearPose()
 	self.PoseRequested = true
+	self.PoseGeneration = Generation
 
 	local Character = self.Character
 	if not Character or not Character.Parent then return end
@@ -67,9 +75,19 @@ function WeaponCharacter:EquipPose()
 	-- After respawn, Tool.Equipped can fire before the R6 shoulder joints
 	-- have finished appearing. Wait for the exact parts the pose needs.
 	local Torso = Character:WaitForChild("Torso", 2)
+	if self.PoseGeneration ~= Generation or not self.PoseRequested or self.Character ~= Character or self.Humanoid ~= Humanoid then
+		return
+	end
 	if not Torso then return end
+
 	local LeftShoulder = Torso:WaitForChild("Left Shoulder", 2)
+	if self.PoseGeneration ~= Generation or not self.PoseRequested or self.Character ~= Character or self.Humanoid ~= Humanoid then
+		return
+	end
 	local RightShoulder = Torso:WaitForChild("Right Shoulder", 2)
+	if self.PoseGeneration ~= Generation or not self.PoseRequested or self.Character ~= Character or self.Humanoid ~= Humanoid then
+		return
+	end
 	if not LeftShoulder or not RightShoulder then return end
 
 	self.CurrentPose = WeaponPose.Equip(Character, self.Module)
@@ -82,8 +100,9 @@ function WeaponCharacter:EquipPose()
 end
 
 function WeaponCharacter:ClearPose()
-	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
+	self.PoseGeneration += 1
 	self.PoseRequested = false
+	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 	if self.CurrentPose then
 		WeaponPose.Unequip(self.CurrentPose)
 		self.CurrentPose = nil
