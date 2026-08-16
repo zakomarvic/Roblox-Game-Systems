@@ -20,7 +20,7 @@ function WeaponPose.Equip(Character, Settings)
 	local RootPart = Character:FindFirstChild("HumanoidRootPart")
 	if not Humanoid or Humanoid.Health <= 0 then return nil end
 
-	Debug(Character, string.format("Equip Humanoid=%s Health=%.1f LeftC0=%s RightC0=%s", Humanoid:GetDebugId(), Humanoid.Health, tostring(LeftShoulder.C0), tostring(RightShoulder.C0)))
+	Debug(Character, string.format("Equip Humanoid=%s Health=%.1f LeftC0=%s RightC0=%s", Humanoid.Name, Humanoid.Health, tostring(LeftShoulder.C0), tostring(RightShoulder.C0)))
 
 	local PoseData = {
 		Character = Character,
