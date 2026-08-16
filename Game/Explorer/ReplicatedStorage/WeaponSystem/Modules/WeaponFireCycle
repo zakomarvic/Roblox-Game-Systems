@@ -73,17 +73,27 @@ function WeaponFireCycle:FireDown()
 		self.Wait(Module.DelayBeforeFiring)
 	end
 
-	Controller:RunFireCycle(
-		function()
-			return self.Equipped
-				and not Controller:GetReloading()
-				and not (Module.SprintEnabled and self.CharacterController:IsSprinting())
-				and (Controller:IsTriggerHeld() or IsChargedShot)
-				and Controller:GetAmmo() > 0
-				and Humanoid
-				and Humanoid.Health > 0
-		end,
-		function()
+	while self.Equipped
+		and not Controller:GetReloading()
+		and not (Module.SprintEnabled and self.CharacterController:IsSprinting())
+		and (Controller:IsTriggerHeld() or IsChargedShot)
+		and Controller:GetAmmo() > 0
+		and Humanoid
+		and Humanoid.Health > 0 do
+
+		local BurstCount = Module.BurstFireEnabled and Module.BulletPerBurst or 1
+
+		for _ = 1, BurstCount do
+			if not self.Equipped
+				or Controller:GetReloading()
+				or (Module.SprintEnabled and self.CharacterController:IsSprinting())
+				or not (Controller:IsTriggerHeld() or IsChargedShot)
+				or Controller:GetAmmo() <= 0
+				or not Humanoid
+				or Humanoid.Health <= 0 then
+				break
+			end
+
 			IsChargedShot = false
 
 			if self.OnRecoil then
@@ -105,8 +115,21 @@ function WeaponFireCycle:FireDown()
 			else
 				self.HandleToFire = self.Handle
 			end
+
+			if Module.BurstFireEnabled then
+				self.Wait(Module.BurstRate or 0)
+			end
 		end
-	)
+
+		if not Module.Auto then
+			break
+		end
+
+		self.Wait(Module.FireRate or 0)
+	end
+
+	Controller:StopFiring()
+	Controller:SetEnabled(true)
 
 	if self.FireEffects then
 		self.FireEffects.StopLoopedSound(self.HandleToFire, "FireSound")
@@ -118,9 +141,6 @@ function WeaponFireCycle:FireDown()
 		end
 		self.Wait(Module.DelayAfterFiring)
 	end
-
-	Controller:StopFiring()
-	Controller:SetEnabled(true)
 
 	if Controller:GetAmmo() <= 0 and self.Reload then
 		self.Reload:Start()
