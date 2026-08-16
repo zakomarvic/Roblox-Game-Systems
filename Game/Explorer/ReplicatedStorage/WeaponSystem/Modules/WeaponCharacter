@@ -23,17 +23,25 @@ function WeaponCharacter.new(Config)
 end
 
 function WeaponCharacter:SetCharacter(Character, Humanoid)
-	-- Character changes are never allowed to infer an equip operation.
-	-- The lifecycle owns equip state; a real Tool.Equipped event is the only
-	-- thing that should request a new pose after respawn.
+	local WasEquipped = self.IsEquipped and self.IsEquipped() or self.PoseRequested
 	self:ClearPose()
 	self.Character = Character
 	self.Humanoid = Humanoid
+	self.PoseRequested = WasEquipped
 
 	if self.Camera then self.Camera:SetCharacter(Character, Humanoid) end
 	if self.Fire then self.Fire:SetCharacter(Character, Humanoid) end
 	if self.FireCycle then self.FireCycle:SetHumanoid(Humanoid) end
 	if self.Animation then self.Animation:SetHumanoid(Humanoid) end
+
+	if WasEquipped then
+		local Generation = self.PoseGeneration
+		task.defer(function()
+			if self.PoseRequested and self.PoseGeneration == Generation and self.Character == Character and self.Humanoid == Humanoid and self.IsEquipped and self.IsEquipped() then
+				self:EquipPose()
+			end
+		end)
+	end
 end
 
 function WeaponCharacter:EquipPose()
