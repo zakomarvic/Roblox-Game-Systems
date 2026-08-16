@@ -89,6 +89,27 @@ function CharacterController:ApplyRagdollImpulse(Direction, Force)
 	RagdollRemote:FireServer("Impulse", Direction.Unit, Force)
 end
 
+function CharacterController:Knockdown(Direction, Force, Duration)
+	if not self.Character then
+		return
+	end
+
+	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then
+		return
+	end
+
+	Force = tonumber(Force)
+	if not Force or Force <= 0 then
+		return
+	end
+
+	if Duration ~= nil and (typeof(Duration) ~= "number" or Duration <= 0) then
+		Duration = nil
+	end
+
+	RagdollRemote:FireServer("Knockdown", Direction.Unit, Force, Duration)
+end
+
 function CharacterController:IsRagdolled()
 	return self.Ragdolled
 end
