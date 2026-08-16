@@ -49,7 +49,10 @@ local function scheduleRecovery(Character, Duration)
 
 		if Ragdoll:IsRagdolled() then
 			Ragdoll:Recover()
-			Remote:FireClient(Players:GetPlayerFromCharacter(Character), false)
+			local Player = Players:GetPlayerFromCharacter(Character)
+			if Player then
+				Remote:FireClient(Player, false)
+			end
 		end
 	end)
 end
@@ -102,15 +105,7 @@ Players.PlayerRemoving:Connect(function(Player)
 	end
 end)
 
-Remote.OnServerEvent:Connect(function(Player, Enabled, Duration)
-	if typeof(Enabled) ~= "boolean" then
-		return
-	end
-
-	if Duration ~= nil and (typeof(Duration) ~= "number" or Duration <= 0 or Duration > 60) then
-		return
-	end
-
+Remote.OnServerEvent:Connect(function(Player, Action, Value, Extra)
 	local Character = Player.Character
 	if not Character then
 		return
@@ -123,13 +118,39 @@ Remote.OnServerEvent:Connect(function(Player, Enabled, Duration)
 
 	local Ragdoll = getRagdoll(Character)
 
-	if Enabled then
-		Ragdoll:SetRagdolled(true)
-		Remote:FireClient(Player, true)
-		scheduleRecovery(Character, Duration)
-	else
-		cancelTimer(Character)
-		Ragdoll:SetRagdolled(false)
-		Remote:FireClient(Player, false)
+	if typeof(Action) == "boolean" then
+		local Duration = Value
+		if Duration ~= nil and (typeof(Duration) ~= "number" or Duration <= 0 or Duration > 60) then
+			return
+		end
+
+		if Action then
+			Ragdoll:SetRagdolled(true)
+			Remote:FireClient(Player, true)
+			scheduleRecovery(Character, Duration)
+		else
+			cancelTimer(Character)
+			Ragdoll:SetRagdolled(false)
+			Remote:FireClient(Player, false)
+		end
+		return
+	end
+
+	if Action == "Impulse" then
+		local Direction = Value
+		local Force = Extra
+
+		if not Ragdoll:IsRagdolled() then
+			return
+		end
+		if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then
+			return
+		end
+		if typeof(Force) ~= "number" or Force <= 0 then
+			return
+		end
+
+		Force = math.clamp(Force, 0, 100)
+		Ragdoll:ApplyImpulse(Direction, Force)
 	end
 end)
