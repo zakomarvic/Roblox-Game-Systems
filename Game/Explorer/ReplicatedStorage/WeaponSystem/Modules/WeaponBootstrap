@@ -120,14 +120,25 @@ function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 
 	self:AddConnection(self.Player.CharacterAdded:Connect(function(NewCharacter)
 		local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
+
+		-- A respawn always starts with a clean weapon state. Do not let a Tool
+		-- that survived the character swap remain equipped or trigger an
+		-- implicit pose rebuild before the new character is ready.
 		self:SetLifecycleBlocked(Lifecycle, true)
 		self:SetBackpackEnabled(false)
+		NewHumanoid:UnequipTools()
+		if self.Tool.Parent == NewCharacter then
+			self.Tool.Parent = self.Player.Backpack
+		end
+
 		if OnCharacter then OnCharacter(NewCharacter, NewHumanoid) end
 		BindDeath(NewHumanoid)
 
 		if NewHumanoid.Health > 0 then
 			self.RunService.Heartbeat:Wait()
 			if NewHumanoid.Health > 0 and NewHumanoid.Parent == NewCharacter then
+				-- Only now is the lifecycle allowed to observe a fresh Tool.Equipped
+			-- event. No automatic Equip() is performed here.
 				self:SetLifecycleBlocked(Lifecycle, false)
 				self:SetBackpackEnabled(true)
 			end
