@@ -1,4 +1,5 @@
 local WeaponFireEffects = {}
+local FlashTokens = setmetatable({}, {__mode = "k"})
 
 local function playFireSound(Tool, ShootingHandle)
 	if not Tool or not Tool:IsA("Tool") then
@@ -82,9 +83,12 @@ function WeaponFireEffects.ShowMuzzleFlash(Tool)
 		FlashLight.Enabled = true
 	end
 
+	local Token = (FlashTokens[Tool] or 0) + 1
+	FlashTokens[Tool] = Token
 	FlashImage.Visible = true
+
 	task.delay(0.05, function()
-		if not FlashImage.Parent then return end
+		if FlashTokens[Tool] ~= Token or not FlashImage.Parent then return end
 		FlashImage.Visible = false
 		if Billboard and Billboard.Parent and Billboard:IsA("BillboardGui") then
 			Billboard.Enabled = false
