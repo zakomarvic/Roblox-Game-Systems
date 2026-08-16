@@ -11,6 +11,7 @@ function WeaponReload.new(Options)
 	self.GetReloadAnim = Options.GetReloadAnim
 	self.GetShotgunClipinAnim = Options.GetShotgunClipinAnim
 	self.ReloadEffects = Options.ReloadEffects
+	self.WeaponEffects = Options.WeaponEffects
 	self.IsSprinting = Options.IsSprinting
 	self.IsAiming = Options.IsAiming
 	self.ResetAim = Options.ResetAim
