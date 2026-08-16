@@ -7,6 +7,9 @@ local Remotes = WeaponSystem:WaitForChild("Remotes")
 local BulletVisualizer = require(
 	WeaponSystem.Modules:WaitForChild("BulletVisualizer")
 )
+local WeaponFireEffects = require(
+	WeaponSystem.Modules:WaitForChild("WeaponFireEffects")
+)
 
 local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
 
@@ -15,80 +18,7 @@ local function getEffectTemplate(Tool, Name)
 		return nil
 	end
 
-	local LocalScript = Tool:FindFirstChild("GunScript_Local")
-	if LocalScript then
-		local Effect = LocalScript:FindFirstChild(Name)
-		if Effect then
-			return Effect
-		end
-	end
-
 	return Tool:FindFirstChild(Name, true)
-end
-
-local function playFireSound(Tool, ShootingHandle)
-	if not Tool or not Tool:IsA("Tool") then
-		return
-	end
-
-	if not ShootingHandle or not ShootingHandle:IsA("BasePart") then
-		return
-	end
-
-	local FireSound = ShootingHandle:FindFirstChild("FireSound") or ShootingHandle:FindFirstChild("shoot")
-	if FireSound and FireSound:IsA("Sound") then
-		FireSound:Play()
-	end
-end
-
-local function playFireEffects(Tool, ShootingHandle)
-	if not Tool or not Tool:IsA("Tool") then
-		return
-	end
-
-	local Handle = ShootingHandle or Tool:FindFirstChild("Handle")
-	if not Handle or not Handle:IsA("BasePart") then
-		return
-	end
-
-	local Bolt = Tool:FindFirstChild("Bolt")
-	local BoltBack = Tool:FindFirstChild("BoltBack")
-	local Shell = Tool:FindFirstChild("shell")
-	local Flash = Tool:FindFirstChild("Flash")
-
-	if Bolt then Bolt.Transparency = 1 end
-	if BoltBack then BoltBack.Transparency = 0 end
-
-	if Shell then
-		local Casing = Shell:Clone()
-		Casing.Parent = workspace
-		Casing.Transparency = 0
-		Casing:BreakJoints()
-		Casing.Position = Shell.Position
-
-		task.delay(2, function()
-			if Casing and Casing.Parent then
-				Casing:Destroy()
-			end
-		end)
-	end
-
-	if Flash then
-		local Light = Flash:FindFirstChild("Light")
-		local Lite = Flash:FindFirstChild("lite")
-		if Light then Light.Enabled = true end
-		if Lite then Lite.Enabled = true end
-
-		task.delay(0.08, function()
-			if Light then Light.Enabled = false end
-			if Lite then Lite.Enabled = false end
-		end)
-	end
-
-	task.delay(0.08, function()
-		if Bolt then Bolt.Transparency = 0 end
-		if BoltBack then BoltBack.Transparency = 1 end
-	end)
 end
 
 WeaponEffects.OnClientEvent:Connect(function(
@@ -112,9 +42,7 @@ WeaponEffects.OnClientEvent:Connect(function(
 			Tool = Tool or (Character and Character:FindFirstChildOfClass("Tool"))
 
 			if Tool then
-				local Handle = ShootingHandle or Tool:FindFirstChild("Handle")
-				playFireSound(Tool, Handle)
-				playFireEffects(Tool, Handle)
+				WeaponFireEffects.Play(Tool, ShootingHandle)
 			end
 		end
 
@@ -136,8 +64,6 @@ WeaponEffects.OnClientEvent:Connect(function(
 
 	ShootingHandle = ShootingHandle or (Tool and Tool:FindFirstChild("Handle"))
 
-	-- LocalScript-only effect instances may not survive the client -> server -> client
-	-- RemoteEvent round trip, so resolve equivalent templates from the replicated tool.
 	MuzzleEffect = MuzzleEffect or getEffectTemplate(Tool, "MuzzleEffect")
 	HitEffect = HitEffect or getEffectTemplate(Tool, "HitEffect")
 
