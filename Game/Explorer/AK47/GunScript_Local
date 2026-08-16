@@ -50,22 +50,29 @@ local FireCycle = WeaponFireCycle.new({Controller=Controller,Module=Module,Chara
 WeaponCharacterInstance.FireCycle=FireCycle
 
 local WeaponInputInstance = WeaponInput.new(Mouse,{OnFireDown=function() FireCycle:FireDown() end,OnFireUp=function() FireCycle:FireUp() end,OnReload=function() Reload:Start() end,OnAim=function() if not Controller:GetReloading() and Module.SniperEnabled then WeaponAimInstance:Toggle() end end})
+
+local function RefreshCharacterReferences(NewCharacter, NewHumanoid)
+	Character = NewCharacter
+	Humanoid = NewHumanoid
+
+	WeaponCharacterInstance:SetCharacter(Character, Humanoid)
+	WeaponFireInstance.FireAnim = WeaponAnimationInstance:Get("FireAnim")
+	Reload.ReloadAnim = WeaponAnimationInstance:Get("ReloadAnim")
+	Reload.ShotgunClipinAnim = WeaponAnimationInstance:Get("ShotgunClipinAnim")
+	FireCycle:SetHumanoid(Humanoid)
+	return WeaponAnimationInstance:Get("IdleAnim")
+end
+
 local WeaponLifecycleInstance = WeaponLifecycle.new({Controller=Controller,Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,GUI=GUI,Script=script,PlayerGui=Player.PlayerGui,IdleAnim=WeaponAnimationInstance:Get("IdleAnim"),IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=function() FireCycle:FireUp() end,SprintChanged=CharacterControllerInstance.SprintChanged,OnSprint=function(IsSprinting) if IsSprinting then Controller:SetTriggerHeld(false);if Controller:GetReloading() then Controller:SetReloading(false) end;if Controller:IsCurrentlyFiring() then Controller:StopFiring() end;WeaponAimInstance:Reset() end end,OnEquip=function(Lifecycle)
 	local EquippedCharacter=Player.Character
 	local EquippedHumanoid=EquippedCharacter and EquippedCharacter:FindFirstChildOfClass("Humanoid")
 	if EquippedCharacter and EquippedHumanoid and EquippedHumanoid.Health>0 then
 		if EquippedCharacter~=Character or EquippedHumanoid~=Humanoid then
-			Character=EquippedCharacter
-			Humanoid=EquippedHumanoid
-			WeaponCharacterInstance:SetCharacter(Character,Humanoid)
+			RefreshCharacterReferences(EquippedCharacter, EquippedHumanoid)
 		end
 	end
 
-	WeaponFireInstance.FireAnim=WeaponAnimationInstance:Get("FireAnim")
-	Reload.ReloadAnim=WeaponAnimationInstance:Get("ReloadAnim")
-	Reload.ShotgunClipinAnim=WeaponAnimationInstance:Get("ShotgunClipinAnim")
 	Lifecycle:SetDependency("IdleAnim",WeaponAnimationInstance:Get("IdleAnim"))
-
 	print("[GunScript] Refreshed weapon animation tracks for", Character and Character.Name or "nil", "Idle", WeaponAnimationInstance:Get("IdleAnim"))
 
 	FireCycle:SetEquipped(true)
@@ -77,14 +84,8 @@ end,OnUnequip=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:Cl
 WeaponCharacterInstance.IsEquipped=function() return WeaponLifecycleInstance:IsEquipped() end
 
 Bootstrap:BindCharacter(WeaponLifecycleInstance,function(NewCharacter,NewHumanoid)
-	Character=NewCharacter
-	Humanoid=NewHumanoid
-	WeaponCharacterInstance:SetCharacter(Character,Humanoid)
-	WeaponFireInstance.FireAnim=WeaponAnimationInstance:Get("FireAnim")
-	Reload.ReloadAnim=WeaponAnimationInstance:Get("ReloadAnim")
-	Reload.ShotgunClipinAnim=WeaponAnimationInstance:Get("ShotgunClipinAnim")
+	RefreshCharacterReferences(NewCharacter, NewHumanoid)
 	WeaponLifecycleInstance:SetDependency("IdleAnim",WeaponAnimationInstance:Get("IdleAnim"))
-	FireCycle:SetHumanoid(NewHumanoid)
 	print("[GunScript] Respawn animation tracks refreshed for", NewCharacter.Name, "Idle", WeaponAnimationInstance:Get("IdleAnim"))
 end)
 Bootstrap:BindTool(WeaponLifecycleInstance)
