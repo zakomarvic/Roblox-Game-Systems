@@ -21,6 +21,10 @@ function WeaponAnimation:_load()
 		local Animation = self.Tool:WaitForChild(Name)
 		local Track = Humanoid:LoadAnimation(Animation)
 		self.Tracks[Name] = Track
+		print(string.format("[WeaponAnimation] Loaded %s on Humanoid=%s Priority=%s", Name, Humanoid:GetDebugId(), tostring(Track.Priority)))
+		Track.Stopped:Connect(function()
+			print(string.format("[WeaponAnimation] Stopped %s on Humanoid=%s", Name, Humanoid:GetDebugId()))
+		end)
 		return Track
 	end
 
@@ -31,6 +35,7 @@ function WeaponAnimation:_load()
 end
 
 function WeaponAnimation:SetHumanoid(Humanoid)
+	print(string.format("[WeaponAnimation] SetHumanoid old=%s new=%s", self.Humanoid and self.Humanoid:GetDebugId() or "nil", Humanoid and Humanoid:GetDebugId() or "nil"))
 	self:StopAll()
 	self.Humanoid = Humanoid
 	self.Tracks = {}
@@ -46,8 +51,11 @@ function WeaponAnimation:GetAll()
 end
 
 function WeaponAnimation:StopAll()
-	for _, Track in pairs(self.Tracks) do
-		if Track then Track:Stop() end
+	for Name, Track in pairs(self.Tracks) do
+		if Track then
+			print(string.format("[WeaponAnimation] StopAll %s", Name))
+			Track:Stop()
+		end
 	end
 end
 
