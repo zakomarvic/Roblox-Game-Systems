@@ -1,6 +1,11 @@
 local WeaponAnimation = {}
 WeaponAnimation.__index = WeaponAnimation
 
+local function HumanoidLabel(Humanoid)
+	if not Humanoid then return "nil" end
+	return Humanoid.Name .. "@" .. (Humanoid.Parent and Humanoid.Parent.Name or "no-parent")
+end
+
 function WeaponAnimation.new(Config)
 	local self = setmetatable({}, WeaponAnimation)
 	self.Tool = Config.Tool
@@ -21,9 +26,9 @@ function WeaponAnimation:_load()
 		local Animation = self.Tool:WaitForChild(Name)
 		local Track = Humanoid:LoadAnimation(Animation)
 		self.Tracks[Name] = Track
-		print(string.format("[WeaponAnimation] Loaded %s on Humanoid=%s Priority=%s", Name, Humanoid:GetDebugId(), tostring(Track.Priority)))
+		print(string.format("[WeaponAnimation] Loaded %s on %s Priority=%s", Name, HumanoidLabel(Humanoid), tostring(Track.Priority)))
 		Track.Stopped:Connect(function()
-			print(string.format("[WeaponAnimation] Stopped %s on Humanoid=%s", Name, Humanoid:GetDebugId()))
+			print(string.format("[WeaponAnimation] Stopped %s on %s", Name, HumanoidLabel(Humanoid)))
 		end)
 		return Track
 	end
@@ -35,7 +40,7 @@ function WeaponAnimation:_load()
 end
 
 function WeaponAnimation:SetHumanoid(Humanoid)
-	print(string.format("[WeaponAnimation] SetHumanoid old=%s new=%s", self.Humanoid and self.Humanoid:GetDebugId() or "nil", Humanoid and Humanoid:GetDebugId() or "nil"))
+	print(string.format("[WeaponAnimation] SetHumanoid old=%s new=%s", HumanoidLabel(self.Humanoid), HumanoidLabel(Humanoid)))
 	self:StopAll()
 	self.Humanoid = Humanoid
 	self.Tracks = {}
