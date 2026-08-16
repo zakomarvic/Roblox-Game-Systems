@@ -75,16 +75,17 @@ end
 function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 	local function BindDeath(Humanoid)
 		self:AddConnection(Humanoid.Died:Connect(function()
-			Lifecycle:SetBlocked(true)
-			Lifecycle:Died()
+			Lifecycle:Block()
 			Humanoid:UnequipTools()
 			self:SetBackpackEnabled(false)
 		end))
 	end
 
 	local Character, Humanoid = self:WaitForCharacter()
-	Lifecycle:SetBlocked(Humanoid.Health <= 0)
-	if Humanoid.Health > 0 then
+	if Humanoid.Health <= 0 then
+		Lifecycle:Block()
+	else
+		Lifecycle:Unblock()
 		self:SetBackpackEnabled(true)
 	end
 	if OnCharacter then OnCharacter(Character, Humanoid) end
@@ -92,7 +93,7 @@ function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 
 	self:AddConnection(self.Player.CharacterAdded:Connect(function(NewCharacter)
 		local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
-		Lifecycle:SetBlocked(true)
+		Lifecycle:Block()
 		self:SetBackpackEnabled(false)
 		if OnCharacter then OnCharacter(NewCharacter, NewHumanoid) end
 		BindDeath(NewHumanoid)
@@ -100,7 +101,7 @@ function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 		if NewHumanoid.Health > 0 then
 			self.RunService.Heartbeat:Wait()
 			if NewHumanoid.Health > 0 and NewHumanoid.Parent == NewCharacter then
-				Lifecycle:SetBlocked(false)
+				Lifecycle:Unblock()
 				self:SetBackpackEnabled(true)
 			end
 		end
