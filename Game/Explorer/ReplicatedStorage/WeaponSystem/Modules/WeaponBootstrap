@@ -34,31 +34,6 @@ function WeaponBootstrap:WaitForCharacter()
 	return Character, Humanoid
 end
 
-function WeaponBootstrap:WaitForCharacterReady(Character, Humanoid)
-	local Backpack = self.Player:WaitForChild("Backpack")
-	local Torso = Character:WaitForChild("Torso", 5)
-	local RootPart = Character:WaitForChild("HumanoidRootPart", 5)
-	local LeftShoulder = Torso and Torso:WaitForChild("Left Shoulder", 5)
-	local RightShoulder = Torso and Torso:WaitForChild("Right Shoulder", 5)
-
-	if not Torso or not RootPart or not LeftShoulder or not RightShoulder then
-		return false
-	end
-
-	-- Give Roblox one additional simulation step to finish character/joint
-	-- replication before the Backpack is made usable again.
-	self.RunService.Heartbeat:Wait()
-	self.RunService.Heartbeat:Wait()
-
-	return Humanoid.Parent == Character
-		and Humanoid.Health > 0
-		and Character.Parent ~= nil
-		and Backpack.Parent == self.Player
-		and Torso.Parent == Character
-		and LeftShoulder.Parent == Torso
-		and RightShoulder.Parent == Torso
-end
-
 function WeaponBootstrap:GetGUI()
 	return self.Script:WaitForChild("GunGUI"), self.Script:WaitForChild("Mouse Sensitivity")
 end
@@ -121,6 +96,33 @@ function WeaponBootstrap:SetBackpackEnabled(Enabled)
 	end)
 end
 
+function WeaponBootstrap:WaitForCharacterReady(Character, Humanoid)
+	local Deadline = os.clock() + 5
+	local function Ready()
+		if not Character or not Character.Parent then return false end
+		if not Humanoid or Humanoid.Parent ~= Character or Humanoid.Health <= 0 then return false end
+		if not Character:FindFirstChild("HumanoidRootPart") then return false end
+		local Torso = Character:FindFirstChild("Torso")
+		if not Torso then return false end
+		if not Torso:FindFirstChild("Left Shoulder") then return false end
+		if not Torso:FindFirstChild("Right Shoulder") then return false end
+		if self.Player.Character ~= Character then return false end
+		return true
+	end
+
+	while os.clock() < Deadline do
+		if Ready() then
+			-- Let the character joints/animation system settle before exposing
+			-- the Tool to the player.
+			self.RunService.Heartbeat:Wait()
+			if Ready() then return true end
+		else
+			self.RunService.Heartbeat:Wait()
+		end
+	end
+	return Ready()
+end
+
 function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 	local function BindDeath(Humanoid)
 		self:AddConnection(Humanoid.Died:Connect(function()
@@ -136,11 +138,10 @@ function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 	local Character, Humanoid = self:WaitForCharacter()
 	self:SetLifecycleBlocked(Lifecycle, true)
 	self:SetBackpackEnabled(false)
-	Humanoid:UnequipTools()
+	if OnCharacter then OnCharacter(Character, Humanoid) end
+	BindDeath(Humanoid)
 
 	if self:WaitForCharacterReady(Character, Humanoid) then
-		if OnCharacter then OnCharacter(Character, Humanoid) end
-		BindDeath(Humanoid)
 		self:SetLifecycleBlocked(Lifecycle, false)
 		self:SetBackpackEnabled(true)
 	end
@@ -148,8 +149,6 @@ function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 	self:AddConnection(self.Player.CharacterAdded:Connect(function(NewCharacter)
 		local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
 
-		-- Never expose the Backpack or weapon lifecycle until the new R6
-		-- character, root, torso, and both shoulder joints are ready.
 		self:SetLifecycleBlocked(Lifecycle, true)
 		self:SetBackpackEnabled(false)
 		NewHumanoid:UnequipTools()
@@ -157,14 +156,17 @@ function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 			self.Tool.Parent = self.Player.Backpack
 		end
 
-		if self:WaitForCharacterReady(NewCharacter, NewHumanoid) then
-			if OnCharacter then OnCharacter(NewCharacter, NewHumanoid) end
-			BindDeath(NewHumanoid)
+		if OnCharacter then OnCharacter(NewCharacter, NewHumanoid) end
+		BindDeath(NewHumanoid)
 
-			-- The character is now fully usable. A fresh Tool.Equipped event is
-			-- required to enter the equipped state and create the weapon pose.
-			self:SetLifecycleBlocked(Lifecycle, false)
-			self:SetBackpackEnabled(true)
+		if self:WaitForCharacterReady(NewCharacter, NewHumanoid) then
+			-- Recheck the character immediately before exposing the Backpack.
+			-- If another character replacement happened during the wait, this
+			-- callback must not unlock the old lifecycle state.
+			if self.Player.Character == NewCharacter and NewHumanoid.Parent == NewCharacter and NewHumanoid.Health > 0 then
+				self:SetLifecycleBlocked(Lifecycle, false)
+				self:SetBackpackEnabled(true)
+			end
 		end
 	end))
 end
