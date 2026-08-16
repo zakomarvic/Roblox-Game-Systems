@@ -18,6 +18,7 @@ local WeaponFireCycle = require(ReplicatedStorage.WeaponSystem.Modules.WeaponFir
 local WeaponAnimation = require(ReplicatedStorage.WeaponSystem.Modules.WeaponAnimation)
 local WeaponCharacter = require(ReplicatedStorage.WeaponSystem.Modules.WeaponCharacter)
 local WeaponBootstrap = require(ReplicatedStorage.WeaponSystem.Modules.WeaponBootstrap)
+local WeaponFireEffects = require(ReplicatedStorage.WeaponSystem.Modules.WeaponFireEffects)
 local CharacterController = require(ReplicatedStorage.CharacterSystem.Modules.CharacterController)
 
 local Player = Players.LocalPlayer
@@ -46,7 +47,7 @@ WeaponFireInstance = WeaponFire.new({Tool=Tool,Module=Setting,Character=Characte
 WeaponCharacterInstance = WeaponCharacter.new({Character=Character,Humanoid=Humanoid,Tool=Tool,Module=Setting,Handle2=Handle2,Mouse=Mouse,Workspace=Workspace})
 
 local Reload = WeaponReload.new({Tool=Tool,Module=Setting,Controller=Controller,Handle=Handle,GetReloadAnim=function() return WeaponAnimationInstance:Get("ReloadAnim") end,GetShotgunClipinAnim=function() return WeaponAnimationInstance:Get("ShotgunClipinAnim") end,WeaponEffects=WeaponEffects,IsSprinting=function() return Setting.SprintEnabled and CharacterControllerInstance:IsSprinting() end,IsAiming=function() return WeaponAimInstance:IsAiming() end,ResetAim=function() WeaponAimInstance:Reset() end,UpdateGUI=function() WeaponGUIInstance:Update() end,Wait=function(Time) Bootstrap:Wait(Time) end})
-local FireCycle = WeaponFireCycle.new({Controller=Controller,Module=Setting,CharacterController=CharacterControllerInstance,Aim=WeaponAimInstance,Humanoid=Humanoid,WeaponFire=WeaponFireInstance,GUI=WeaponGUIInstance,Reload=Reload,Handle=Handle,Handle2=Handle2,Wait=function(Time) Bootstrap:Wait(Time) end,OnRecoil=function() WeaponCameraInstance:AddRecoil() end})
+local FireCycle = WeaponFireCycle.new({Controller=Controller,Module=Setting,CharacterController=CharacterControllerInstance,Aim=WeaponAimInstance,Humanoid=Humanoid,WeaponFire=WeaponFireInstance,FireEffects=WeaponFireEffects,GUI=WeaponGUIInstance,Reload=Reload,Handle=Handle,Handle2=Handle2,Wait=function(Time) Bootstrap:Wait(Time) end,OnRecoil=function() WeaponCameraInstance:AddRecoil() end})
 WeaponCharacterInstance.FireCycle=FireCycle
 
 local WeaponInputInstance = WeaponInput.new(Mouse,{OnFireDown=function() FireCycle:FireDown() end,OnFireUp=function() FireCycle:FireUp() end,OnReload=function() Reload:Start() end,OnAim=function() if not Controller:GetReloading() and Setting.SniperEnabled then WeaponAimInstance:Toggle() end end})
