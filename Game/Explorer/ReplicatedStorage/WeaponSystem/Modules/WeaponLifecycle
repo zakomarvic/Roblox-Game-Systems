@@ -29,25 +29,20 @@ function WeaponLifecycle:IsEquipped()
 	return self.Equipped
 end
 
-function WeaponLifecycle:SetBlocked(Blocked)
-	self.Blocked = Blocked == true
-	if self.Blocked and (self.Equipped or self.HasActiveState) then
-		self:Unequip()
-	end
-end
-
 function WeaponLifecycle:IsBlocked()
 	return self.Blocked
 end
 
 function WeaponLifecycle:Equip()
 	if self.Blocked then
-		return
+		return false
 	end
+
 	self:CleanupConnections()
 	self.Equipped = true
 	self.HasActiveState = true
 	local D = self.Dependencies
+	if D.Controller then D.Controller:SetEnabled(true) end
 	if D.Camera then
 		D.Camera:SetEquipped(true)
 		D.Camera:Start()
@@ -66,6 +61,7 @@ function WeaponLifecycle:Equip()
 		self:AddConnection(Connection)
 	end
 	if D.OnEquip then D.OnEquip(self) end
+	return true
 end
 
 function WeaponLifecycle:Unequip()
@@ -85,24 +81,29 @@ function WeaponLifecycle:Unequip()
 	if D.Aim then D.Aim:Reset() end
 	if D.GUI and D.Script then D.GUI.Parent = D.Script end
 	if D.IdleAnim then D.IdleAnim:Stop() end
+	if D.Controller and not self.Blocked then D.Controller:SetEnabled(true) end
 	self:CleanupConnections()
 	if D.OnUnequip then D.OnUnequip(self) end
 end
 
-function WeaponLifecycle:Died()
-	self.Equipped = false
-	self.HasActiveState = false
-	local D = self.Dependencies
-	if D.TriggerReleased then D.TriggerReleased() end
-	if D.Input then D.Input:Unbind() end
-	if D.Camera then
-		D.Camera:SetEquipped(false)
-		D.Camera:Stop()
+function WeaponLifecycle:Block()
+	self.Blocked = true
+	if self.Equipped or self.HasActiveState then
+		self:Unequip()
 	end
-	if D.Aim then D.Aim:Reset() end
-	if D.GUI and D.Script then D.GUI.Parent = D.Script end
-	if D.IdleAnim then D.IdleAnim:Stop() end
-	self:CleanupConnections()
+	local D = self.Dependencies
+	if D.Controller then D.Controller:SetEnabled(false) end
+end
+
+function WeaponLifecycle:Unblock()
+	self.Blocked = false
+	local D = self.Dependencies
+	if D.Controller then D.Controller:SetEnabled(true) end
+end
+
+function WeaponLifecycle:Died()
+	self:Block()
+	local D = self.Dependencies
 	if D.OnDeath then D.OnDeath(self) end
 end
 
