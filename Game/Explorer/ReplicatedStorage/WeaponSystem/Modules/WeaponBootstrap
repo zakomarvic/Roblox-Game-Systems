@@ -6,14 +6,9 @@ function WeaponBootstrap.new(Config)
 	self.Tool = Config.Tool
 	self.Module = Config.Module
 	self.ReplicatedStorage = Config.ReplicatedStorage
-	self.CharacterController = Config.CharacterController
 	self.Player = Config.Player
-	self.Mouse = Config.Mouse
-	self.Camera = Config.Camera
-	self.Workspace = Config.Workspace
 	self.Script = Config.Script
 	self.RunService = Config.RunService
-	self.Connections = {}
 	return self
 end
 
@@ -54,103 +49,6 @@ function WeaponBootstrap:Wait(TimeToWait)
 	else
 		self.RunService.Heartbeat:Wait()
 	end
-end
-
-function WeaponBootstrap:AddConnection(Connection)
-	if Connection then table.insert(self.Connections, Connection) end
-	return Connection
-end
-
-function WeaponBootstrap:SetLifecycleBlocked(Lifecycle, Blocked)
-	if Blocked then
-		if typeof(Lifecycle.Block) == "function" then
-			Lifecycle:Block()
-		elseif typeof(Lifecycle.SetBlocked) == "function" then
-			Lifecycle:SetBlocked(true)
-		else
-			Lifecycle.Blocked = true
-		end
-	else
-		if typeof(Lifecycle.Unblock) == "function" then
-			Lifecycle:Unblock()
-		elseif typeof(Lifecycle.SetBlocked) == "function" then
-			Lifecycle:SetBlocked(false)
-		else
-			Lifecycle.Blocked = false
-		end
-	end
-end
-
-function WeaponBootstrap:BindTool(Lifecycle)
-	self:AddConnection(self.Tool.Equipped:Connect(function()
-		Lifecycle:Equip()
-	end))
-	self:AddConnection(self.Tool.Unequipped:Connect(function()
-		Lifecycle:Unequip()
-	end))
-end
-
-function WeaponBootstrap:SetBackpackEnabled(Enabled)
-	pcall(function()
-		game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, Enabled)
-	end)
-end
-
-function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
-	local function BindDeath(Humanoid)
-		self:AddConnection(Humanoid.Died:Connect(function()
-			self:SetLifecycleBlocked(Lifecycle, true)
-			if typeof(Lifecycle.Died) == "function" then
-				Lifecycle:Died()
-			end
-			Humanoid:UnequipTools()
-			self:SetBackpackEnabled(false)
-		end))
-	end
-
-	local Character, Humanoid = self:WaitForCharacter()
-	if Humanoid.Health <= 0 then
-		self:SetLifecycleBlocked(Lifecycle, true)
-	else
-		self:SetLifecycleBlocked(Lifecycle, false)
-		self:SetBackpackEnabled(true)
-	end
-	if OnCharacter then OnCharacter(Character, Humanoid) end
-	BindDeath(Humanoid)
-
-	self:AddConnection(self.Player.CharacterAdded:Connect(function(NewCharacter)
-		local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
-
-		-- A respawn always starts with a clean weapon state. Do not let a Tool
-		-- that survived the character swap remain equipped or trigger an
-		-- implicit pose rebuild before the new character is ready.
-		self:SetLifecycleBlocked(Lifecycle, true)
-		self:SetBackpackEnabled(false)
-		NewHumanoid:UnequipTools()
-		if self.Tool.Parent == NewCharacter then
-			self.Tool.Parent = self.Player.Backpack
-		end
-
-		if OnCharacter then OnCharacter(NewCharacter, NewHumanoid) end
-		BindDeath(NewHumanoid)
-
-		if NewHumanoid.Health > 0 then
-			self.RunService.Heartbeat:Wait()
-			if NewHumanoid.Health > 0 and NewHumanoid.Parent == NewCharacter then
-				-- Only now is the lifecycle allowed to observe a fresh Tool.Equipped
-				-- event. No automatic Equip() is performed here.
-				self:SetLifecycleBlocked(Lifecycle, false)
-				self:SetBackpackEnabled(true)
-			end
-		end
-	end))
-end
-
-function WeaponBootstrap:Destroy()
-	for _, Connection in ipairs(self.Connections) do
-		if Connection and Connection.Connected then Connection:Disconnect() end
-	end
-	table.clear(self.Connections)
 end
 
 return WeaponBootstrap

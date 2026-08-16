@@ -1,4 +1,5 @@
 local WeaponFireEffects = {}
+local FlashTokens = setmetatable({}, {__mode = "k"})
 
 local function playFireSound(Tool, ShootingHandle)
 	if not Tool or not Tool:IsA("Tool") then
@@ -64,6 +65,49 @@ function WeaponFireEffects.Play(Tool, ShootingHandle)
 		if Bolt then Bolt.Transparency = 0 end
 		if BoltBack then BoltBack.Transparency = 1 end
 	end)
+end
+
+function WeaponFireEffects.ShowMuzzleFlash(Tool)
+	local Flash = Tool and Tool:FindFirstChild("Flash")
+	local FlashGui = Flash and Flash:FindFirstChild("LightBG")
+	local FlashImage = FlashGui and FlashGui:FindFirstChild("Light")
+	local FlashLight = Flash and Flash:FindFirstChild("lite")
+	if not FlashImage or not FlashImage:IsA("ImageLabel") then return end
+
+	local Billboard = FlashImage.Parent
+	if Billboard and Billboard:IsA("BillboardGui") then
+		Billboard.Adornee = Flash
+		Billboard.Enabled = true
+	end
+	if FlashLight and FlashLight:IsA("PointLight") then
+		FlashLight.Enabled = true
+	end
+
+	local Token = (FlashTokens[Tool] or 0) + 1
+	FlashTokens[Tool] = Token
+	FlashImage.Visible = true
+
+	task.delay(0.05, function()
+		if FlashTokens[Tool] ~= Token or not FlashImage.Parent then return end
+		FlashImage.Visible = false
+		if Billboard and Billboard.Parent and Billboard:IsA("BillboardGui") then
+			Billboard.Enabled = false
+		end
+		if FlashLight and FlashLight.Parent and FlashLight:IsA("PointLight") then
+			FlashLight.Enabled = false
+		end
+	end)
+end
+
+function WeaponFireEffects.VisualizeAndBroadcast(Tool, ShootingHandle, MuzzleOffset, EndPos, MuzzleEffect, HitEffect, HitSound, ExplosiveData, BulletData, VisualizeEnabled, BulletVisualizer, WeaponEffects)
+	if BulletVisualizer then
+		task.spawn(function()
+			BulletVisualizer.Visualize(ShootingHandle, MuzzleOffset, EndPos, MuzzleEffect, HitEffect, HitSound, ExplosiveData, BulletData, false, VisualizeEnabled)
+		end)
+	end
+	if WeaponEffects then
+		WeaponEffects:FireServer(Tool, "Bullet", ShootingHandle, MuzzleOffset, EndPos, MuzzleEffect, HitEffect, HitSound, ExplosiveData, BulletData, true, VisualizeEnabled)
+	end
 end
 
 return WeaponFireEffects
