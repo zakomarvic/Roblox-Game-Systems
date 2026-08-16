@@ -8,8 +8,8 @@ function WeaponReload.new(Options)
 	self.Module = Options.Module
 	self.Controller = Options.Controller
 	self.Handle = Options.Handle
-	self.ReloadAnim = Options.ReloadAnim
-	self.ShotgunClipinAnim = Options.ShotgunClipinAnim
+	self.GetReloadAnim = Options.GetReloadAnim
+	self.GetShotgunClipinAnim = Options.GetShotgunClipinAnim
 	self.WeaponEffects = Options.WeaponEffects
 	self.IsSprinting = Options.IsSprinting
 	self.IsAiming = Options.IsAiming
@@ -44,11 +44,14 @@ function WeaponReload:Start()
 		self.UpdateGUI()
 	end
 
+	local ShotgunClipinAnim = self.GetShotgunClipinAnim and self.GetShotgunClipinAnim() or nil
+	local ReloadAnim = self.GetReloadAnim and self.GetReloadAnim() or nil
+
 	if Module.ShotgunReload then
 		local Shells = Module.AmmoPerClip - Controller:GetAmmo()
 		for _ = 1, Shells do
-			if self.ShotgunClipinAnim then
-				self.ShotgunClipinAnim:Play(nil, nil, Module.ShotgunClipinAnimationSpeed)
+			if ShotgunClipinAnim then
+				ShotgunClipinAnim:Play(nil, nil, Module.ShotgunClipinAnimationSpeed)
 			end
 
 			local ShellSound = self.Handle:FindFirstChild("ShotgunClipin")
@@ -60,8 +63,8 @@ function WeaponReload:Start()
 		end
 	end
 
-	if self.ReloadAnim then
-		self.ReloadAnim:Play(nil, nil, Module.ReloadAnimationSpeed)
+	if ReloadAnim then
+		ReloadAnim:Play(nil, nil, Module.ReloadAnimationSpeed)
 	end
 
 	local ReloadSound = self.Handle:FindFirstChild("ReloadSound")
