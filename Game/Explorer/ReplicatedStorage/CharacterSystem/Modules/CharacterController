@@ -45,6 +45,11 @@ function CharacterController:_setupCharacter(Character)
 
 	self.Character = Character
 	self.Humanoid = Character:WaitForChild("Humanoid")
+
+	-- Preserve the R6 Motor6Ds so CharacterRagdoll can replace them with physics constraints on death.
+	self.Humanoid.BreakJointsOnDeath = false
+	self.Humanoid.RequiresNeck = false
+
 	self.Ragdoll = CharacterRagdoll.new(Character)
 	self.Sprinting = false
 	self.Humanoid.WalkSpeed = Settings.WalkSpeed
