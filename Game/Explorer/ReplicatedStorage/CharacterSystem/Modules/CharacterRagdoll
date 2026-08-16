@@ -58,6 +58,7 @@ function CharacterRagdoll.new(character)
 	self.Humanoid = character:FindFirstChildOfClass("Humanoid")
 	self.PreviousPlatformStand = false
 	self.PreviousAutoRotate = true
+	self.PreviousBreakJointsOnDeath = true
 	return self
 end
 
@@ -103,7 +104,6 @@ function CharacterRagdoll:_DestroyConstraints()
 	self.Constraints = {}
 	self.Attachments = {}
 	self.Colliders = {}
-	self.Motors = {}
 end
 
 function CharacterRagdoll:_SetServerNetworkOwnership(owner)
@@ -135,6 +135,7 @@ function CharacterRagdoll:SetRagdolled(enabled)
 		if self.Humanoid then
 			self.PreviousPlatformStand = self.Humanoid.PlatformStand
 			self.PreviousAutoRotate = self.Humanoid.AutoRotate
+			self.PreviousBreakJointsOnDeath = self.Humanoid.BreakJointsOnDeath
 			self.Humanoid.BreakJointsOnDeath = false
 			self.Humanoid.PlatformStand = true
 			self.Humanoid.AutoRotate = false
@@ -148,8 +149,14 @@ function CharacterRagdoll:SetRagdolled(enabled)
 		self:_SetServerNetworkOwnership(nil)
 		self.Ragdolled = true
 	else
+		if self.Humanoid and self.Humanoid.Health <= 0 then
+			return
+		end
+
 		for _, motor in ipairs(self.Motors) do
-			motor.Enabled = true
+			if motor.Parent then
+				motor.Enabled = true
+			end
 		end
 
 		self:_DestroyConstraints()
@@ -158,10 +165,15 @@ function CharacterRagdoll:SetRagdolled(enabled)
 		if self.Humanoid then
 			self.Humanoid.PlatformStand = self.PreviousPlatformStand
 			self.Humanoid.AutoRotate = self.PreviousAutoRotate
+			self.Humanoid.BreakJointsOnDeath = self.PreviousBreakJointsOnDeath
 		end
 
 		self.Ragdolled = false
 	end
+end
+
+function CharacterRagdoll:Recover()
+	self:SetRagdolled(false)
 end
 
 function CharacterRagdoll:IsRagdolled()
@@ -169,9 +181,18 @@ function CharacterRagdoll:IsRagdolled()
 end
 
 function CharacterRagdoll:Destroy()
-	self:SetRagdolled(false)
+	if self.Ragdolled then
+		for _, motor in ipairs(self.Motors) do
+			if motor.Parent then
+				motor.Enabled = true
+			end
+		end
+		self:_DestroyConstraints()
+		self:_SetServerNetworkOwnership(true)
+	end
 	self.Character = nil
 	self.Humanoid = nil
+	self.Ragdolled = false
 end
 
 return CharacterRagdoll
