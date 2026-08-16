@@ -152,5 +152,32 @@ Remote.OnServerEvent:Connect(function(Player, Action, Value, Extra)
 
 		Force = math.clamp(Force, 0, 100)
 		Ragdoll:ApplyImpulse(Direction, Force)
+		return
+	end
+
+	if Action == "Knockdown" then
+		local Direction = Value
+		local Force = Extra
+		local Duration = select(4, ...)
+
+		-- The knockdown request is authenticated to the sender's own character.
+		-- Keep the force and duration bounded on the server.
+		if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then
+			return
+		end
+		if typeof(Force) ~= "number" or Force <= 0 then
+			return
+		end
+		if Duration ~= nil and (typeof(Duration) ~= "number" or Duration <= 0 or Duration > 60) then
+			return
+		end
+
+		Force = math.clamp(Force, 0, 100)
+		Duration = Duration and math.clamp(Duration, 0.05, 60) or nil
+
+		Ragdoll:SetRagdolled(true)
+		Remote:FireClient(Player, true)
+		Ragdoll:ApplyImpulse(Direction, Force)
+		scheduleRecovery(Character, Duration)
 	end
 end)
