@@ -26,6 +26,7 @@ function WeaponFire.new(Config)
 	self.Character = Config.Character
 	self.Humanoid = Config.Humanoid
 	self.Mouse = Config.Mouse
+	self.GetFireAnim = Config.GetFireAnim
 	self.FireAnim = Config.FireAnim
 	self.Raycast = Config.Raycast
 	self.InflictTarget = Config.InflictTarget
@@ -72,7 +73,8 @@ function WeaponFire:Fire(ShootingHandle)
 	local PierceAvailable = Module.Piercing
 	self.PiercedHumanoid = {}
 	self:ShowLocalMuzzleFlash()
-	if self.FireAnim then self.FireAnim:Play(nil, nil, Module.FireAnimationSpeed) end
+	local FireAnim = self.GetFireAnim and self.GetFireAnim() or self.FireAnim
+	if FireAnim then FireAnim:Play(nil, nil, Module.FireAnimationSpeed) end
 	if ShootingHandle.FireSound then ShootingHandle.FireSound:Play() end
 	WeaponEffects:FireServer(self.Tool, "Fire")
 	local Start = (self.Humanoid.Torso.CFrame * CFrame.new(0, 1.5, 0)).Position
