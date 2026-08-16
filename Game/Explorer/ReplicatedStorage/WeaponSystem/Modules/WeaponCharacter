@@ -5,10 +5,6 @@ function WeaponCharacter.new(Config)
 	local self = setmetatable({}, WeaponCharacter)
 	self.Character = Config.Character
 	self.Humanoid = Config.Humanoid
-	self.Camera = Config.Camera
-	self.Fire = Config.Fire
-	self.FireCycle = Config.FireCycle
-	self.Animation = Config.Animation
 	self.Tool = Config.Tool
 	self.Module = Config.Module
 	self.Handle2 = Config.Handle2
