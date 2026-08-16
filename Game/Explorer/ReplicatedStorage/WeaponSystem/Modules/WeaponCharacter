@@ -23,16 +23,13 @@ function WeaponCharacter.new(Config)
 end
 
 function WeaponCharacter:SetCharacter(Character, Humanoid)
+	if not Character or not Humanoid then return end
+
 	local WasEquipped = self.IsEquipped and self.IsEquipped() or self.PoseRequested
 	self:ClearPose()
 	self.Character = Character
 	self.Humanoid = Humanoid
 	self.PoseRequested = WasEquipped
-
-	if self.Camera then self.Camera:SetCharacter(Character, Humanoid) end
-	if self.Fire then self.Fire:SetCharacter(Character, Humanoid) end
-	if self.FireCycle then self.FireCycle:SetHumanoid(Humanoid) end
-	if self.Animation then self.Animation:SetHumanoid(Humanoid) end
 
 	if WasEquipped then
 		local Generation = self.PoseGeneration
