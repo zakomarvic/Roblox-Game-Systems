@@ -42,7 +42,6 @@ local WeaponAimInstance = WeaponAim.new(Camera,Player,Mouse,GUI,AimSensitivity,M
 	if WeaponFireInstance then WeaponFireInstance:SetAiming(State) end
 end)
 
-WeaponCameraInstance:Start()
 WeaponFireInstance = WeaponFire.new({Tool=Tool,Module=Module,Character=Character,Humanoid=Humanoid,Mouse=Mouse,FireAnim=WeaponAnimationInstance:Get("FireAnim"),Raycast=WeaponRaycast.Cast,InflictTarget=InflictTarget,MuzzleEffect=script.MuzzleEffect,HitEffect=script.HitEffect})
 WeaponCharacterInstance = WeaponCharacter.new({Character=Character,Humanoid=Humanoid,Camera=WeaponCameraInstance,Fire=WeaponFireInstance,Animation=WeaponAnimationInstance,Tool=Tool,Module=Module,Handle2=Handle2,Mouse=Mouse,Workspace=Workspace})
 
