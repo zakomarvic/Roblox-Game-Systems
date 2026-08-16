@@ -60,12 +60,16 @@ function CharacterController:_setupCharacter(Character)
 	self.Humanoid.WalkSpeed = Settings.WalkSpeed
 end
 
-function CharacterController:SetRagdolled(State)
+function CharacterController:SetRagdolled(State, Duration)
 	if not self.Character then
 		return
 	end
 
-	RagdollRemote:FireServer(State == true)
+	if Duration ~= nil and (typeof(Duration) ~= "number" or Duration <= 0) then
+		Duration = nil
+	end
+
+	RagdollRemote:FireServer(State == true, Duration)
 end
 
 function CharacterController:IsRagdolled()
