@@ -1,0 +1,82 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local CharacterSystem = ReplicatedStorage:WaitForChild("CharacterSystem")
+local Modules = CharacterSystem:WaitForChild("Modules")
+local CharacterRagdoll = require(Modules:WaitForChild("CharacterRagdoll"))
+
+local Remote = CharacterSystem:FindFirstChild("RagdollRemote")
+if not Remote then
+	Remote = Instance.new("RemoteEvent")
+	Remote.Name = "RagdollRemote"
+	Remote.Parent = CharacterSystem
+end
+
+local ActiveRagdolls = {}
+
+local function setupCharacter(Character)
+	local Humanoid = Character:WaitForChild("Humanoid")
+	Humanoid.BreakJointsOnDeath = false
+	Humanoid.RequiresNeck = false
+
+	Humanoid.Died:Connect(function()
+		local Ragdoll = ActiveRagdolls[Character]
+		if not Ragdoll then
+			Ragdoll = CharacterRagdoll.new(Character)
+			ActiveRagdolls[Character] = Ragdoll
+		end
+
+		Ragdoll:SetRagdolled(true)
+	end)
+end
+
+local function setupPlayer(Player)
+	Player.CharacterAdded:Connect(function(Character)
+		ActiveRagdolls[Character] = nil
+		setupCharacter(Character)
+	end)
+
+	if Player.Character then
+		setupCharacter(Player.Character)
+	end
+end
+
+for _, Player in ipairs(Players:GetPlayers()) do
+	setupPlayer(Player)
+end
+
+Players.PlayerAdded:Connect(setupPlayer)
+
+Players.PlayerRemoving:Connect(function(Player)
+	if Player.Character then
+		local Ragdoll = ActiveRagdolls[Player.Character]
+		if Ragdoll then
+			Ragdoll:Destroy()
+			ActiveRagdolls[Player.Character] = nil
+		end
+	end
+end)
+
+Remote.OnServerEvent:Connect(function(Player, Enabled)
+	if typeof(Enabled) ~= "boolean" then
+		return
+	end
+
+	local Character = Player.Character
+	if not Character then
+		return
+	end
+
+	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+	if not Humanoid or Humanoid.Health <= 0 then
+		return
+	end
+
+	local Ragdoll = ActiveRagdolls[Character]
+	if not Ragdoll then
+		Ragdoll = CharacterRagdoll.new(Character)
+		ActiveRagdolls[Character] = Ragdoll
+	end
+
+	Ragdoll:SetRagdolled(Enabled)
+end)
