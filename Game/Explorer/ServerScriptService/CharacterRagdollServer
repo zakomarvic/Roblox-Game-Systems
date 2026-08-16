@@ -14,19 +14,27 @@ end
 
 local ActiveRagdolls = {}
 
+local function getRagdoll(Character)
+	local Ragdoll = ActiveRagdolls[Character]
+	if not Ragdoll then
+		Ragdoll = CharacterRagdoll.new(Character)
+		ActiveRagdolls[Character] = Ragdoll
+	end
+	return Ragdoll
+end
+
 local function setupCharacter(Character)
 	local Humanoid = Character:WaitForChild("Humanoid")
 	Humanoid.BreakJointsOnDeath = false
 	Humanoid.RequiresNeck = false
 
 	Humanoid.Died:Connect(function()
-		local Ragdoll = ActiveRagdolls[Character]
-		if not Ragdoll then
-			Ragdoll = CharacterRagdoll.new(Character)
-			ActiveRagdolls[Character] = Ragdoll
-		end
+		getRagdoll(Character):SetRagdolled(true)
 
-		Ragdoll:SetRagdolled(true)
+		local Player = Players:GetPlayerFromCharacter(Character)
+		if Player then
+			Remote:FireClient(Player, true)
+		end
 	end)
 end
 
@@ -72,11 +80,6 @@ Remote.OnServerEvent:Connect(function(Player, Enabled)
 		return
 	end
 
-	local Ragdoll = ActiveRagdolls[Character]
-	if not Ragdoll then
-		Ragdoll = CharacterRagdoll.new(Character)
-		ActiveRagdolls[Character] = Ragdoll
-	end
-
-	Ragdoll:SetRagdolled(Enabled)
+	getRagdoll(Character):SetRagdolled(Enabled)
+	Remote:FireClient(Player, Enabled)
 end)
