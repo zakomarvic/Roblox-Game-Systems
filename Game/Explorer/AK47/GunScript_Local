@@ -61,13 +61,10 @@ local WeaponLifecycleInstance = WeaponLifecycle.new({Controller=Controller,Camer
 		end
 	end
 
-	-- WeaponAnimation rebuilds its tracks for the current Humanoid after respawn.
-	-- Refresh every dependency that stores an AnimationTrack so the lifecycle does
-	-- not accidentally play a track belonging to the dead Humanoid.
 	WeaponFireInstance.FireAnim=WeaponAnimationInstance:Get("FireAnim")
 	Reload.ReloadAnim=WeaponAnimationInstance:Get("ReloadAnim")
 	Reload.ShotgunClipinAnim=WeaponAnimationInstance:Get("ShotgunClipinAnim")
-	WeaponLifecycleInstance.Dependencies.IdleAnim=WeaponAnimationInstance:Get("IdleAnim")
+	WeaponLifecycleInstance:SetDependency("IdleAnim",WeaponAnimationInstance:Get("IdleAnim"))
 
 	print("[GunScript] Refreshed weapon animation tracks for", Character and Character.Name or "nil", "Idle", WeaponAnimationInstance:Get("IdleAnim"))
 
@@ -84,12 +81,10 @@ Bootstrap:BindCharacter(WeaponLifecycleInstance,function(NewCharacter,NewHumanoi
 	Humanoid=NewHumanoid
 	WeaponCharacterInstance:SetCharacter(Character,Humanoid)
 
-	-- SetCharacter rebuilds WeaponAnimation for the new Humanoid. Update all
-	-- stored AnimationTrack references immediately, before the next equip.
 	WeaponFireInstance.FireAnim=WeaponAnimationInstance:Get("FireAnim")
 	Reload.ReloadAnim=WeaponAnimationInstance:Get("ReloadAnim")
 	Reload.ShotgunClipinAnim=WeaponAnimationInstance:Get("ShotgunClipinAnim")
-	WeaponLifecycleInstance.Dependencies.IdleAnim=WeaponAnimationInstance:Get("IdleAnim")
+	WeaponLifecycleInstance:SetDependency("IdleAnim",WeaponAnimationInstance:Get("IdleAnim"))
 	FireCycle:SetHumanoid(NewHumanoid)
 	print("[GunScript] Respawn animation tracks refreshed for", NewCharacter.Name, "Idle", WeaponAnimationInstance:Get("IdleAnim"))
 end)
