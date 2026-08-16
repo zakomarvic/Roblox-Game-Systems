@@ -5,6 +5,10 @@ local WeaponPose = {}
 local LEFT_POSE = CFrame.new(-0.4, 0.5, 0) * CFrame.Angles(0, math.rad(-80), 0)
 local RIGHT_POSE = CFrame.new(0.9, 0.5, 0) * CFrame.Angles(math.rad(-10), math.rad(80), 0)
 
+local function Debug(Character, Message)
+	print("[WeaponPose] " .. Message, Character and Character:GetFullName() or "nil")
+end
+
 function WeaponPose.Equip(Character, Settings)
 	if not Character or not Character.Parent then return nil end
 	local Torso = Character:FindFirstChild("Torso")
@@ -15,6 +19,8 @@ function WeaponPose.Equip(Character, Settings)
 	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
 	local RootPart = Character:FindFirstChild("HumanoidRootPart")
 	if not Humanoid or Humanoid.Health <= 0 then return nil end
+
+	Debug(Character, string.format("Equip Humanoid=%s Health=%.1f LeftC0=%s RightC0=%s", Humanoid:GetDebugId(), Humanoid.Health, tostring(LeftShoulder.C0), tostring(RightShoulder.C0)))
 
 	local PoseData = {
 		Character = Character,
@@ -33,6 +39,7 @@ function WeaponPose.Equip(Character, Settings)
 
 	LeftShoulder.C0 = LEFT_POSE
 	RightShoulder.C0 = RIGHT_POSE
+	Debug(Character, "Equip applied pose")
 	Humanoid.AutoRotate = false
 	return PoseData
 end
@@ -40,19 +47,26 @@ end
 function WeaponPose.BindAim(PoseData, AimSource)
 	if not PoseData then return nil end
 	WeaponPose.UnbindAim(PoseData)
+	local LastLeft = nil
+	local LastRight = nil
 	PoseData.AimConnection = RunService.RenderStepped:Connect(function(DeltaTime)
 		if not PoseData.Character or not PoseData.Character.Parent or not PoseData.Humanoid or PoseData.Humanoid.Health <= 0 then
 			WeaponPose.UnbindAim(PoseData)
 			return
 		end
 
-		-- The shoulder Motor6Ds can be reset by character/animation replication
-		-- during and after respawn. Reassert the static weapon pose each frame so
-		-- a server-side joint update cannot permanently knock the arms out of pose.
 		if PoseData.LeftShoulder and PoseData.LeftShoulder.Parent then
+			if LastLeft ~= nil and LastLeft ~= PoseData.LeftShoulder.C0 then
+				Debug(PoseData.Character, "Left Shoulder C0 changed externally")
+			end
+			LastLeft = PoseData.LeftShoulder.C0
 			PoseData.LeftShoulder.C0 = LEFT_POSE
 		end
 		if PoseData.RightShoulder and PoseData.RightShoulder.Parent then
+			if LastRight ~= nil and LastRight ~= PoseData.RightShoulder.C0 then
+				Debug(PoseData.Character, "Right Shoulder C0 changed externally")
+			end
+			LastRight = PoseData.RightShoulder.C0
 			PoseData.RightShoulder.C0 = RIGHT_POSE
 		end
 
