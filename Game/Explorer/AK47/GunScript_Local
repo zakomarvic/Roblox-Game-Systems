@@ -85,8 +85,8 @@ end,OnUnequip=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:Cl
 WeaponCharacterInstance.IsEquipped=function() return WeaponLifecycleInstance:IsEquipped() end
 
 Bootstrap:BindCharacter(WeaponLifecycleInstance,function(NewCharacter,NewHumanoid)
-	RefreshCharacterReferences(NewCharacter, NewHumanoid)
-	Lifecycle:SetDependency("IdleAnim",WeaponAnimationInstance:Get("IdleAnim"))
-	print("[GunScript] Respawn animation tracks refreshed for", NewCharacter.Name, "Idle", WeaponAnimationInstance:Get("IdleAnim"))
+	RefreshCharacterReferences(NewCharacter,NewHumanoid)
+	WeaponLifecycleInstance:SetDependency("IdleAnim",WeaponAnimationInstance:Get("IdleAnim"))
+	print("[GunScript] Respawn animation tracks refreshed for",NewCharacter.Name,"Idle",WeaponAnimationInstance:Get("IdleAnim"))
 end)
 Bootstrap:BindTool(WeaponLifecycleInstance)
