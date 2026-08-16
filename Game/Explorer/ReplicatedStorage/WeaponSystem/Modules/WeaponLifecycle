@@ -7,6 +7,7 @@ function WeaponLifecycle.new(dependencies)
 	self.HasActiveState = false
 	self.Blocked = false
 	self.Connections = {}
+	self.PersistentConnections = {}
 	self.Cleanups = {}
 	self.Dependencies = dependencies or {}
 	self.Character = nil
@@ -16,6 +17,11 @@ end
 
 function WeaponLifecycle:AddConnection(Connection)
 	if Connection then table.insert(self.Connections, Connection) end
+	return Connection
+end
+
+function WeaponLifecycle:AddPersistentConnection(Connection)
+	if Connection then table.insert(self.PersistentConnections, Connection) end
 	return Connection
 end
 
@@ -51,10 +57,10 @@ end
 
 function WeaponLifecycle:BindTool(Tool)
 	if not Tool then return false end
-	self:AddConnection(Tool.Equipped:Connect(function()
+	self:AddPersistentConnection(Tool.Equipped:Connect(function()
 		self:Equip()
 	end))
-	self:AddConnection(Tool.Unequipped:Connect(function()
+	self:AddPersistentConnection(Tool.Unequipped:Connect(function()
 		self:Unequip()
 	end))
 	return true
@@ -64,7 +70,7 @@ function WeaponLifecycle:BindCharacter(Player, RunService, Tool)
 	if not Player or not RunService then return false end
 
 	local function BindDeath(Humanoid)
-		self:AddConnection(Humanoid.Died:Connect(function()
+		self:AddPersistentConnection(Humanoid.Died:Connect(function()
 			self:Block()
 			self:Died()
 			Humanoid:UnequipTools()
@@ -83,7 +89,7 @@ function WeaponLifecycle:BindCharacter(Player, RunService, Tool)
 	self:SetCharacter(Character, Humanoid)
 	BindDeath(Humanoid)
 
-	self:AddConnection(Player.CharacterAdded:Connect(function(NewCharacter)
+	self:AddPersistentConnection(Player.CharacterAdded:Connect(function(NewCharacter)
 		local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
 
 		self:Block()
@@ -185,8 +191,12 @@ end
 
 function WeaponLifecycle:Destroy()
 	self:Unequip()
+	for _, Connection in ipairs(self.PersistentConnections) do
+		if Connection and Connection.Connected then Connection:Disconnect() end
+	end
 	for _, Cleanup in ipairs(self.Cleanups) do pcall(Cleanup) end
 	table.clear(self.Connections)
+	table.clear(self.PersistentConnections)
 	table.clear(self.Dependencies)
 	self.Character = nil
 	self.Humanoid = nil
