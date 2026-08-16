@@ -66,29 +66,42 @@ function WeaponBootstrap:BindTool(Lifecycle)
 	self:AddConnection(self.Tool.Unequipped:Connect(function() Lifecycle:Unequip() end))
 end
 
+function WeaponBootstrap:SetBackpackEnabled(Enabled)
+	pcall(function()
+		game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, Enabled)
+	end)
+end
+
 function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 	local function BindDeath(Humanoid)
-		self:AddConnection(Humanoid.Died:Connect(function() Lifecycle:Died() end))
+		self:AddConnection(Humanoid.Died:Connect(function()
+			Lifecycle:SetBlocked(true)
+			Lifecycle:Died()
+			Humanoid:UnequipTools()
+			self:SetBackpackEnabled(false)
+		end))
 	end
 
 	local Character, Humanoid = self:WaitForCharacter()
+	Lifecycle:SetBlocked(Humanoid.Health <= 0)
+	if Humanoid.Health > 0 then
+		self:SetBackpackEnabled(true)
+	end
 	if OnCharacter then OnCharacter(Character, Humanoid) end
 	BindDeath(Humanoid)
 
 	self:AddConnection(self.Player.CharacterAdded:Connect(function(NewCharacter)
 		local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
+		Lifecycle:SetBlocked(true)
+		self:SetBackpackEnabled(false)
 		if OnCharacter then OnCharacter(NewCharacter, NewHumanoid) end
 		BindDeath(NewHumanoid)
 
-		-- Roblox can keep the Tool parented to the new character across a
-		-- respawn without producing another Tool.Equipped event. Only rebuild
-		-- the lifecycle if the Tool is actually still equipped AND the lifecycle
-		-- hasn't already processed an equip event. This prevents rapid
-		-- equip/unequip input around death from running the equip path twice.
-		if self.Tool.Parent == NewCharacter and not Lifecycle:IsEquipped() then
+		if NewHumanoid.Health > 0 then
 			self.RunService.Heartbeat:Wait()
-			if self.Tool.Parent == NewCharacter and not Lifecycle:IsEquipped() then
-				Lifecycle:Equip()
+			if NewHumanoid.Health > 0 and NewHumanoid.Parent == NewCharacter then
+				Lifecycle:SetBlocked(false)
+				self:SetBackpackEnabled(true)
 			end
 		end
 	end))
