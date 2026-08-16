@@ -176,6 +176,32 @@ function CharacterRagdoll:Recover()
 	self:SetRagdolled(false)
 end
 
+function CharacterRagdoll:ApplyImpulse(direction, force)
+	if not self.Ragdolled then
+		return false
+	end
+	if not self.Character or not self.Character.Parent then
+		return false
+	end
+
+	local RootPart = self.Character:FindFirstChild("HumanoidRootPart")
+	if not RootPart then
+		return false
+	end
+
+	if typeof(direction) ~= "Vector3" or direction.Magnitude <= 0 then
+		return false
+	end
+
+	force = math.clamp(tonumber(force) or 0, 0, 100)
+	if force <= 0 then
+		return false
+	end
+
+	RootPart:ApplyImpulse(direction.Unit * force * RootPart.AssemblyMass)
+	return true
+end
+
 function CharacterRagdoll:IsRagdolled()
 	return self.Ragdolled
 end
