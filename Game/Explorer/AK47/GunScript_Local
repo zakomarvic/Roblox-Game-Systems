@@ -55,12 +55,13 @@ local function RefreshCharacterReferences(NewCharacter, NewHumanoid)
 	Character = NewCharacter
 	Humanoid = NewHumanoid
 
+	-- WeaponCharacter owns the character-bound camera, fire, fire-cycle,
+	-- and animation rebinding. Keep those references centralized there.
 	WeaponCharacterInstance:SetCharacter(Character, Humanoid)
-	WeaponFireInstance.FireAnim = WeaponAnimationInstance:Get("FireAnim")
+
+	-- Reload keeps its animation tracks directly, so refresh those tracks here.
 	Reload.ReloadAnim = WeaponAnimationInstance:Get("ReloadAnim")
 	Reload.ShotgunClipinAnim = WeaponAnimationInstance:Get("ShotgunClipinAnim")
-	FireCycle:SetHumanoid(Humanoid)
-	return WeaponAnimationInstance:Get("IdleAnim")
 end
 
 local WeaponLifecycleInstance = WeaponLifecycle.new({Controller=Controller,Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,GUI=GUI,Script=script,PlayerGui=Player.PlayerGui,IdleAnim=WeaponAnimationInstance:Get("IdleAnim"),IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=function() FireCycle:FireUp() end,SprintChanged=CharacterControllerInstance.SprintChanged,OnSprint=function(IsSprinting) if IsSprinting then Controller:SetTriggerHeld(false);if Controller:GetReloading() then Controller:SetReloading(false) end;if Controller:IsCurrentlyFiring() then Controller:StopFiring() end;WeaponAimInstance:Reset() end end,OnEquip=function(Lifecycle)
@@ -85,7 +86,7 @@ WeaponCharacterInstance.IsEquipped=function() return WeaponLifecycleInstance:IsE
 
 Bootstrap:BindCharacter(WeaponLifecycleInstance,function(NewCharacter,NewHumanoid)
 	RefreshCharacterReferences(NewCharacter, NewHumanoid)
-	WeaponLifecycleInstance:SetDependency("IdleAnim",WeaponAnimationInstance:Get("IdleAnim"))
+	Lifecycle:SetDependency("IdleAnim",WeaponAnimationInstance:Get("IdleAnim"))
 	print("[GunScript] Respawn animation tracks refreshed for", NewCharacter.Name, "Idle", WeaponAnimationInstance:Get("IdleAnim"))
 end)
 Bootstrap:BindTool(WeaponLifecycleInstance)
