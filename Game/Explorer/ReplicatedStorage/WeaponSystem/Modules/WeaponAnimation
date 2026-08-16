@@ -11,24 +11,42 @@ function WeaponAnimation.new(Config)
 	self.Tool = Config.Tool
 	self.Humanoid = Config.Humanoid
 	self.Module = Config.Module
+	self.Animator = nil
+	self.Tracks = {}
+	self:_bindAnimator(self.Humanoid)
+	return self
+end
+
+function WeaponAnimation:_bindAnimator(Humanoid)
+	self.Humanoid = Humanoid
+	self.Animator = nil
+	if not Humanoid then return nil end
+
+	local Animator = Humanoid:FindFirstChildOfClass("Animator")
+	if not Animator then
+		Animator = Instance.new("Animator")
+		Animator.Parent = Humanoid
+	end
+
+	self.Animator = Animator
 	self.Tracks = {}
 	self:_load()
-	return self
+	return Animator
 end
 
 function WeaponAnimation:_load()
 	local Module = self.Module
-	local Humanoid = self.Humanoid
-	if not Humanoid then return end
+	local Animator = self.Animator
+	if not Animator then return end
 
 	local function load(Name, Enabled)
 		if not Enabled then return nil end
 		local Animation = self.Tool:WaitForChild(Name)
-		local Track = Humanoid:LoadAnimation(Animation)
+		local Track = Animator:LoadAnimation(Animation)
 		self.Tracks[Name] = Track
-		print(string.format("[WeaponAnimation] Loaded %s on %s Priority=%s", Name, HumanoidLabel(Humanoid), tostring(Track.Priority)))
+		print(string.format("[WeaponAnimation] Loaded %s on %s Animator=%s Priority=%s", Name, HumanoidLabel(self.Humanoid), Animator.Name, tostring(Track.Priority)))
 		Track.Stopped:Connect(function()
-			print(string.format("[WeaponAnimation] Stopped %s on %s", Name, HumanoidLabel(Humanoid)))
+			print(string.format("[WeaponAnimation] Stopped %s on %s", Name, HumanoidLabel(self.Humanoid)))
 		end)
 		return Track
 	end
@@ -42,9 +60,7 @@ end
 function WeaponAnimation:SetHumanoid(Humanoid)
 	print(string.format("[WeaponAnimation] SetHumanoid old=%s new=%s", HumanoidLabel(self.Humanoid), HumanoidLabel(Humanoid)))
 	self:StopAll()
-	self.Humanoid = Humanoid
-	self.Tracks = {}
-	self:_load()
+	self:_bindAnimator(Humanoid)
 end
 
 function WeaponAnimation:Get(Name)
@@ -62,6 +78,7 @@ function WeaponAnimation:StopAll()
 			Track:Stop()
 		end
 	end
+	table.clear(self.Tracks)
 end
 
 return WeaponAnimation
