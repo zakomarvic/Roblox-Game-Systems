@@ -45,7 +45,7 @@ end)
 WeaponFireInstance = WeaponFire.new({Tool=Tool,Module=Module,Character=Character,Humanoid=Humanoid,Mouse=Mouse,GetFireAnim=function() return WeaponAnimationInstance:Get("FireAnim") end,Raycast=WeaponRaycast.Cast,InflictTarget=InflictTarget})
 WeaponCharacterInstance = WeaponCharacter.new({Character=Character,Humanoid=Humanoid,Camera=WeaponCameraInstance,Fire=WeaponFireInstance,Animation=WeaponAnimationInstance,Tool=Tool,Module=Module,Handle2=Handle2,Mouse=Mouse,Workspace=Workspace})
 
-local Reload = WeaponReload.new({Tool=Tool,Module=Module,Controller=Controller,Handle=Handle,ReloadAnim=WeaponAnimationInstance:Get("ReloadAnim"),ShotgunClipinAnim=WeaponAnimationInstance:Get("ShotgunClipinAnim"),WeaponEffects=WeaponEffects,IsSprinting=function() return Module.SprintEnabled and CharacterControllerInstance:IsSprinting() end,IsAiming=function() return WeaponAimInstance:IsAiming() end,ResetAim=function() WeaponAimInstance:Reset() end,UpdateGUI=function() WeaponGUIInstance:Update() end,Wait=function(Time) Bootstrap:Wait(Time) end})
+local Reload = WeaponReload.new({Tool=Tool,Module=Module,Controller=Controller,Handle=Handle,GetReloadAnim=function() return WeaponAnimationInstance:Get("ReloadAnim") end,GetShotgunClipinAnim=function() return WeaponAnimationInstance:Get("ShotgunClipinAnim") end,WeaponEffects=WeaponEffects,IsSprinting=function() return Module.SprintEnabled and CharacterControllerInstance:IsSprinting() end,IsAiming=function() return WeaponAimInstance:IsAiming() end,ResetAim=function() WeaponAimInstance:Reset() end,UpdateGUI=function() WeaponGUIInstance:Update() end,Wait=function(Time) Bootstrap:Wait(Time) end})
 local FireCycle = WeaponFireCycle.new({Controller=Controller,Module=Module,CharacterController=CharacterControllerInstance,Aim=WeaponAimInstance,Humanoid=Humanoid,WeaponFire=WeaponFireInstance,GUI=WeaponGUIInstance,Reload=Reload,Handle=Handle,Handle2=Handle2,Wait=function(Time) Bootstrap:Wait(Time) end,OnRecoil=function() WeaponCameraInstance:AddRecoil() end})
 WeaponCharacterInstance.FireCycle=FireCycle
 
@@ -55,8 +55,6 @@ local function RefreshCharacterReferences(NewCharacter, NewHumanoid)
 	Character = NewCharacter
 	Humanoid = NewHumanoid
 	WeaponCharacterInstance:SetCharacter(Character, Humanoid)
-	Reload.ReloadAnim = WeaponAnimationInstance:Get("ReloadAnim")
-	Reload.ShotgunClipinAnim = WeaponAnimationInstance:Get("ShotgunClipinAnim")
 end
 
 local WeaponLifecycleInstance = WeaponLifecycle.new({Controller=Controller,Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,Script=script,GetIdleAnim=function() return WeaponAnimationInstance:Get("IdleAnim") end,IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=function() FireCycle:FireUp() end,SprintChanged=CharacterControllerInstance.SprintChanged,OnSprint=function(IsSprinting) if IsSprinting then Controller:SetTriggerHeld(false);if Controller:GetReloading() then Controller:SetReloading(false) end;if Controller:IsCurrentlyFiring() then Controller:StopFiring() end;WeaponAimInstance:Reset() end end,OnEquip=function()
