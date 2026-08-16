@@ -15,18 +15,27 @@ local function getAttachments(part0, part1, c0, c1)
 	return attachment0, attachment1
 end
 
+local function isTorso(part)
+	return part.Name == "Torso" or part.Name == "UpperTorso" or part.Name == "LowerTorso"
+end
+
 function CharacterRagdoll.new(character)
 	local self = setmetatable({}, CharacterRagdoll)
 	self.Character = character
+	self.Humanoid = character:FindFirstChildOfClass("Humanoid")
 	self.Ragdolled = false
 	self.Motors = {}
 	self.Constraints = {}
 	self.Attachments = {}
+	self.Colliders = {}
+	self.OriginalPlatformStand = self.Humanoid and self.Humanoid.PlatformStand or false
+	self.OriginalAutoRotate = self.Humanoid and self.Humanoid.AutoRotate or true
 	return self
 end
 
 function CharacterRagdoll:_Build()
 	self:_DestroyConstraints()
+	self:_DestroyColliders()
 
 	for _, joint in ipairs(self.Character:GetDescendants()) do
 		if joint:IsA("Motor6D") and joint.Part0 and joint.Part1 and joint.Name ~= "RootJoint" then
@@ -45,6 +54,33 @@ function CharacterRagdoll:_Build()
 			table.insert(self.Constraints, constraint)
 		end
 	end
+
+	-- Give every non-torso body part its own simple collision volume.
+	-- The welded colliders keep limbs from clipping deeply into the floor
+	-- while the visible character parts remain non-collidable.
+	for _, part in ipairs(self.Character:GetDescendants()) do
+		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" and not isTorso(part) then
+			local collider = Instance.new("Part")
+			collider.Name = "RagdollCollider_" .. part.Name
+			collider.Size = part.Size
+			collider.CFrame = part.CFrame
+			collider.Transparency = 1
+			collider.CanCollide = true
+			collider.CanTouch = false
+			collider.CanQuery = false
+			collider.Massless = true
+			collider.CastShadow = false
+			collider.Parent = self.Character
+
+			local weld = Instance.new("WeldConstraint")
+			weld.Name = "RagdollColliderWeld"
+			weld.Part0 = collider
+			weld.Part1 = part
+			weld.Parent = collider
+
+			table.insert(self.Colliders, collider)
+		end
+	end
 end
 
 function CharacterRagdoll:_DestroyConstraints()
@@ -59,22 +95,45 @@ function CharacterRagdoll:_DestroyConstraints()
 	self.Motors = {}
 end
 
+function CharacterRagdoll:_DestroyColliders()
+	for _, collider in ipairs(self.Colliders) do
+		collider:Destroy()
+	end
+	self.Colliders = {}
+end
+
 function CharacterRagdoll:SetRagdolled(enabled)
 	if self.Ragdolled == enabled then
 		return
 	end
 
 	if enabled then
+		self.OriginalPlatformStand = self.Humanoid and self.Humanoid.PlatformStand or false
+		self.OriginalAutoRotate = self.Humanoid and self.Humanoid.AutoRotate or true
+
 		self:_Build()
 		for _, motor in ipairs(self.Motors) do
 			motor.Enabled = false
 		end
+
+		if self.Humanoid then
+			self.Humanoid.PlatformStand = true
+			self.Humanoid.AutoRotate = false
+		end
+
 		self.Ragdolled = true
 	else
 		for _, motor in ipairs(self.Motors) do
 			motor.Enabled = true
 		end
+
+		if self.Humanoid then
+			self.Humanoid.PlatformStand = self.OriginalPlatformStand
+			self.Humanoid.AutoRotate = self.OriginalAutoRotate
+		end
+
 		self:_DestroyConstraints()
+		self:_DestroyColliders()
 		self.Ragdolled = false
 	end
 end
@@ -86,6 +145,7 @@ end
 function CharacterRagdoll:Destroy()
 	self:SetRagdolled(false)
 	self.Character = nil
+	self.Humanoid = nil
 end
 
 return CharacterRagdoll
