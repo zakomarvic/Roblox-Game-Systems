@@ -9,6 +9,7 @@ function WeaponFireCycle.new(Config)
 	self.Aim = Config.Aim
 	self.Humanoid = Config.Humanoid
 	self.WeaponFire = Config.WeaponFire
+	self.FireEffects = Config.FireEffects
 	self.GUI = Config.GUI
 	self.Reload = Config.Reload
 	self.Handle = Config.Handle
@@ -58,33 +59,41 @@ function WeaponFireCycle:FireDown()
 	Controller:SetEnabled(false)
 
 	if Module.ChargedShotEnabled then
-		local ChargeSound = self.HandleToFire and self.HandleToFire:FindFirstChild("ChargeSound")
-		if ChargeSound then
-			ChargeSound:Play()
+		if self.FireEffects then
+			self.FireEffects.PlaySound(self.HandleToFire, "ChargeSound")
 		end
 		self.Wait(Module.ChargingTime)
 		IsChargedShot = true
 	end
 
 	if Module.MinigunEnabled then
-		local WindUp = self.HandleToFire and self.HandleToFire:FindFirstChild("WindUp")
-		if WindUp then
-			WindUp:Play()
+		if self.FireEffects then
+			self.FireEffects.PlaySound(self.HandleToFire, "WindUp")
 		end
 		self.Wait(Module.DelayBeforeFiring)
 	end
 
-	Controller:RunFireCycle(
-		function()
-			return self.Equipped
-				and not Controller:GetReloading()
-				and not (Module.SprintEnabled and self.CharacterController:IsSprinting())
-				and (Controller:IsTriggerHeld() or IsChargedShot)
-				and Controller:GetAmmo() > 0
-				and Humanoid
-				and Humanoid.Health > 0
-		end,
-		function()
+	while self.Equipped
+		and not Controller:GetReloading()
+		and not (Module.SprintEnabled and self.CharacterController:IsSprinting())
+		and (Controller:IsTriggerHeld() or IsChargedShot)
+		and Controller:GetAmmo() > 0
+		and Humanoid
+		and Humanoid.Health > 0 do
+
+		local BurstCount = Module.BurstFireEnabled and Module.BulletPerBurst or 1
+
+		for _ = 1, BurstCount do
+			if not self.Equipped
+				or Controller:GetReloading()
+				or (Module.SprintEnabled and self.CharacterController:IsSprinting())
+				or not (Controller:IsTriggerHeld() or IsChargedShot)
+				or Controller:GetAmmo() <= 0
+				or not Humanoid
+				or Humanoid.Health <= 0 then
+				break
+			end
+
 			IsChargedShot = false
 
 			if self.OnRecoil then
@@ -106,26 +115,32 @@ function WeaponFireCycle:FireDown()
 			else
 				self.HandleToFire = self.Handle
 			end
-		end
-	)
 
-	if self.HandleToFire and self.HandleToFire:FindFirstChild("FireSound") then
-		local FireSound = self.HandleToFire.FireSound
-		if FireSound.Playing and FireSound.Looped then
-			FireSound:Stop()
+			if Module.BurstFireEnabled then
+				self.Wait(Module.BurstRate or 0)
+			end
 		end
-	end
 
-	if Module.MinigunEnabled then
-		local WindDown = self.HandleToFire and self.HandleToFire:FindFirstChild("WindDown")
-		if WindDown then
-			WindDown:Play()
+		if not Module.Auto then
+			break
 		end
-		self.Wait(Module.DelayAfterFiring)
+
+		self.Wait(Module.FireRate or 0)
 	end
 
 	Controller:StopFiring()
 	Controller:SetEnabled(true)
+
+	if self.FireEffects then
+		self.FireEffects.StopLoopedSound(self.HandleToFire, "FireSound")
+	end
+
+	if Module.MinigunEnabled then
+		if self.FireEffects then
+			self.FireEffects.PlaySound(self.HandleToFire, "WindDown")
+		end
+		self.Wait(Module.DelayAfterFiring)
+	end
 
 	if Controller:GetAmmo() <= 0 and self.Reload then
 		self.Reload:Start()

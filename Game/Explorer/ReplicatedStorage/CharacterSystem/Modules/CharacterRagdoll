@@ -1,0 +1,224 @@
+local RunService = game:GetService("RunService")
+
+local CharacterRagdoll = {}
+CharacterRagdoll.__index = CharacterRagdoll
+
+local R6BodyParts = {
+	Head = true,
+	["Left Arm"] = true,
+	["Right Arm"] = true,
+	["Left Leg"] = true,
+	["Right Leg"] = true,
+}
+
+local function getAttachments(part0, part1, c0, c1)
+	local attachment0 = Instance.new("Attachment")
+	attachment0.Name = "RagdollAttachment0"
+	attachment0.CFrame = c0
+	attachment0.Parent = part0
+
+	local attachment1 = Instance.new("Attachment")
+	attachment1.Name = "RagdollAttachment1"
+	attachment1.CFrame = c1
+	attachment1.Parent = part1
+
+	return attachment0, attachment1
+end
+
+local function createCollider(part)
+	local collider = Instance.new("Part")
+	collider.Name = "RagdollCollider_" .. part.Name
+	collider.Size = Vector3.new(1, 1, 1)
+	collider.CFrame = part.CFrame
+	collider.Transparency = 1
+	collider.CanCollide = true
+	collider.CanTouch = false
+	collider.CanQuery = false
+	collider.Massless = true
+	collider.CastShadow = false
+	collider.Parent = part.Parent
+
+	local weld = Instance.new("WeldConstraint")
+	weld.Name = "RagdollColliderWeld"
+	weld.Part0 = collider
+	weld.Part1 = part
+	weld.Parent = collider
+
+	return collider
+end
+
+function CharacterRagdoll.new(character)
+	local self = setmetatable({}, CharacterRagdoll)
+	self.Character = character
+	self.Ragdolled = false
+	self.Motors = {}
+	self.Constraints = {}
+	self.Attachments = {}
+	self.Colliders = {}
+	self.Humanoid = character:FindFirstChildOfClass("Humanoid")
+	self.PreviousPlatformStand = false
+	self.PreviousAutoRotate = true
+	self.PreviousBreakJointsOnDeath = true
+	return self
+end
+
+function CharacterRagdoll:_Build()
+	self:_DestroyConstraints()
+
+	for _, joint in ipairs(self.Character:GetDescendants()) do
+		if joint:IsA("Motor6D") and joint.Part0 and joint.Part1 and joint.Name ~= "RootJoint" then
+			local attachment0, attachment1 = getAttachments(joint.Part0, joint.Part1, joint.C0, joint.C1)
+			local constraint = Instance.new("BallSocketConstraint")
+			constraint.Name = "RagdollConstraint_" .. joint.Name
+			constraint.Attachment0 = attachment0
+			constraint.Attachment1 = attachment1
+			constraint.LimitsEnabled = true
+			constraint.UpperAngle = 45
+			constraint.Parent = joint.Parent
+
+			table.insert(self.Motors, joint)
+			table.insert(self.Attachments, attachment0)
+			table.insert(self.Attachments, attachment1)
+			table.insert(self.Constraints, constraint)
+		end
+	end
+
+	for partName in pairs(R6BodyParts) do
+		local part = self.Character:FindFirstChild(partName)
+		if part and part:IsA("BasePart") then
+			table.insert(self.Colliders, createCollider(part))
+		end
+	end
+end
+
+function CharacterRagdoll:_DestroyConstraints()
+	for _, constraint in ipairs(self.Constraints) do
+		constraint:Destroy()
+	end
+	for _, attachment in ipairs(self.Attachments) do
+		attachment:Destroy()
+	end
+	for _, collider in ipairs(self.Colliders) do
+		collider:Destroy()
+	end
+	self.Constraints = {}
+	self.Attachments = {}
+	self.Colliders = {}
+end
+
+function CharacterRagdoll:_SetServerNetworkOwnership(owner)
+	if not RunService:IsServer() then
+		return
+	end
+
+	for _, part in ipairs(self.Character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			if owner == nil then
+				part:SetNetworkOwner(nil)
+			else
+				part:SetNetworkOwnershipAuto()
+			end
+		end
+	end
+end
+
+function CharacterRagdoll:SetRagdolled(enabled)
+	if self.Ragdolled == enabled then
+		return
+	end
+
+	if enabled then
+		if not self.Humanoid then
+			self.Humanoid = self.Character:FindFirstChildOfClass("Humanoid")
+		end
+
+		if self.Humanoid then
+			self.PreviousPlatformStand = self.Humanoid.PlatformStand
+			self.PreviousAutoRotate = self.Humanoid.AutoRotate
+			self.PreviousBreakJointsOnDeath = self.Humanoid.BreakJointsOnDeath
+			self.Humanoid.BreakJointsOnDeath = false
+			self.Humanoid.PlatformStand = true
+			self.Humanoid.AutoRotate = false
+		end
+
+		self:_Build()
+		for _, motor in ipairs(self.Motors) do
+			motor.Enabled = false
+		end
+
+		self:_SetServerNetworkOwnership(nil)
+		self.Ragdolled = true
+	else
+		if self.Humanoid and self.Humanoid.Health <= 0 then
+			return
+		end
+
+		for _, motor in ipairs(self.Motors) do
+			if motor.Parent then
+				motor.Enabled = true
+			end
+		end
+
+		self:_DestroyConstraints()
+		self:_SetServerNetworkOwnership(true)
+
+		if self.Humanoid then
+			self.Humanoid.PlatformStand = self.PreviousPlatformStand
+			self.Humanoid.AutoRotate = self.PreviousAutoRotate
+			self.Humanoid.BreakJointsOnDeath = self.PreviousBreakJointsOnDeath
+		end
+
+		self.Ragdolled = false
+	end
+end
+
+function CharacterRagdoll:Recover()
+	self:SetRagdolled(false)
+end
+
+function CharacterRagdoll:ApplyImpulse(direction, force)
+	if not self.Ragdolled then
+		return false
+	end
+	if not self.Character or not self.Character.Parent then
+		return false
+	end
+
+	local RootPart = self.Character:FindFirstChild("HumanoidRootPart")
+	if not RootPart then
+		return false
+	end
+
+	if typeof(direction) ~= "Vector3" or direction.Magnitude <= 0 then
+		return false
+	end
+
+	force = math.clamp(tonumber(force) or 0, 0, 100)
+	if force <= 0 then
+		return false
+	end
+
+	RootPart:ApplyImpulse(direction.Unit * force * RootPart.AssemblyMass)
+	return true
+end
+
+function CharacterRagdoll:IsRagdolled()
+	return self.Ragdolled
+end
+
+function CharacterRagdoll:Destroy()
+	if self.Ragdolled then
+		for _, motor in ipairs(self.Motors) do
+			if motor.Parent then
+				motor.Enabled = true
+			end
+		end
+		self:_DestroyConstraints()
+		self:_SetServerNetworkOwnership(true)
+	end
+	self.Character = nil
+	self.Humanoid = nil
+	self.Ragdolled = false
+end
+
+return CharacterRagdoll

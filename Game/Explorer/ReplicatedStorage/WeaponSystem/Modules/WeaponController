@@ -1,5 +1,12 @@
+local RunService = game:GetService("RunService")
+
 local WeaponController = {}
 WeaponController.__index = WeaponController
+
+local ProjectileController
+if RunService:IsClient() then
+	ProjectileController = require(script.Parent:WaitForChild("ProjectileController"))
+end
 
 function WeaponController.new(Tool, Settings)
 	local self = setmetatable({}, WeaponController)
@@ -13,6 +20,7 @@ function WeaponController.new(Tool, Settings)
 	self.LastFireTime = 0
 	self.Enabled = true
 	self.TriggerHeld = false
+	self.Projectiles = ProjectileController and ProjectileController.new() or nil
 
 	return self
 end
@@ -39,15 +47,12 @@ end
 
 function WeaponController:ConsumeAmmo(Amount)
 	Amount = Amount or 1
-
 	if self.Ammo == math.huge then
 		return true
 	end
-
 	if self.Ammo < Amount then
 		return false
 	end
-
 	self.Ammo -= Amount
 	return true
 end
@@ -56,7 +61,6 @@ function WeaponController:CanFire()
 	if not self.Enabled or self.IsFiring or self.IsReloading then
 		return false
 	end
-
 	return self.Ammo > 0 or self.Ammo == math.huge
 end
 
@@ -64,7 +68,6 @@ function WeaponController:CanFireNow()
 	if not self:CanFire() then
 		return false
 	end
-
 	local FireRate = self.Settings.FireRate or 0
 	return os.clock() - self.LastFireTime >= FireRate
 end
@@ -89,15 +92,12 @@ function WeaponController:CanReload()
 	if not self.Enabled or self.IsFiring or self.IsReloading then
 		return false
 	end
-
 	if self.Ammo >= self.Settings.AmmoPerClip then
 		return false
 	end
-
 	if self.Settings.LimitedClipEnabled and self.Clips <= 0 then
 		return false
 	end
-
 	return true
 end
 
@@ -105,7 +105,6 @@ function WeaponController:StartReload()
 	if not self:CanReload() then
 		return false
 	end
-
 	self.IsReloading = true
 	return true
 end
@@ -114,14 +113,11 @@ function WeaponController:FinishReload()
 	if not self.IsReloading then
 		return
 	end
-
 	local Needed = self.Settings.AmmoPerClip - self.Ammo
-
 	if self.Settings.LimitedClipEnabled then
 		Needed = math.min(Needed, self.Clips)
 		self.Clips -= Needed
 	end
-
 	self.Ammo += Needed
 	self.IsReloading = false
 end
@@ -150,7 +146,6 @@ function WeaponController:StartFiring()
 	if not self:CanFire() then
 		return false
 	end
-
 	self.IsFiring = true
 	self.LastFireTime = os.clock()
 	return true
@@ -160,61 +155,35 @@ function WeaponController:StopFiring()
 	self.IsFiring = false
 end
 
--- Runs the generic fire cycle. The weapon script supplies the actual shot.
--- Existing weapons may consume ammo inside FireShot(), so the controller
--- only consumes ammo when the callback did not already do so.
-function WeaponController:RunFireCycle(ShouldContinue, FireShot, OnCycleFinished)
-	if not self:IsCurrentlyFiring() then
-		return false
+function WeaponController:IsProjectile()
+	return self.Settings.ProjectileType == "Projectile"
+end
+
+function WeaponController:IsHitscan()
+	return self.Settings.ProjectileType ~= "Projectile"
+end
+
+function WeaponController:FireProjectile(Origin, Direction, Data)
+	if not self.Projectiles then
+		return nil
+	end
+	if not self:IsProjectile() then
+		return nil
 	end
 
-	local Settings = self.Settings
+	Data = Data or {}
+	Data.Speed = Data.Speed or self.Settings.ProjectileSpeed or 500
+	Data.Gravity = Data.Gravity or self.Settings.ProjectileGravity or Vector3.zero
+	Data.Lifetime = Data.Lifetime or self.Settings.ProjectileLifetime or 10
 
-	while ShouldContinue() and self:GetAmmo() > 0 do
-		local BurstCount = Settings.BurstFireEnabled and Settings.BulletPerBurst or 1
+	return self.Projectiles:Fire(Origin, Direction, Data)
+end
 
-		for _ = 1, BurstCount do
-			if not ShouldContinue() or self:GetAmmo() <= 0 then
-				break
-			end
-
-			local AmmoBeforeShot = self:GetAmmo()
-			local ShotResult = FireShot()
-
-			if ShotResult == false then
-				self:StopFiring()
-				if OnCycleFinished then
-					OnCycleFinished()
-				end
-				return false
-			end
-
-			-- Preserve compatibility with weapon callbacks that already consume
-			-- ammo while still supporting callbacks that leave ammo management
-			-- entirely to the controller.
-			if self:GetAmmo() == AmmoBeforeShot then
-				self:ConsumeAmmo(1)
-			end
-
-			if Settings.BurstFireEnabled then
-				task.wait(Settings.BurstRate or 0)
-			end
-		end
-
-		if not Settings.Auto then
-			break
-		end
-
-		task.wait(Settings.FireRate or 0)
+function WeaponController:Destroy()
+	if self.Projectiles then
+		self.Projectiles:Destroy()
+		self.Projectiles = nil
 	end
-
-	self:StopFiring()
-
-	if OnCycleFinished then
-		OnCycleFinished()
-	end
-
-	return true
 end
 
 return WeaponController
