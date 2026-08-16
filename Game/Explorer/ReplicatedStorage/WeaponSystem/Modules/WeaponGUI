@@ -1,3 +1,6 @@
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+
 local WeaponGUI = {}
 WeaponGUI.__index = WeaponGUI
 
@@ -7,6 +10,23 @@ function WeaponGUI.new(GUI, Module, Controller)
 	self.Module = Module
 	self.Controller = Controller
 	return self
+end
+
+function WeaponGUI:_TweenFill(Fill, Scale)
+	if not Fill then
+		return
+	end
+
+	Scale = math.clamp(tonumber(Scale) or 0, 0, 1)
+
+	TweenService:Create(
+		Fill,
+		TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		{
+			Size = UDim2.new(Scale, 0, 1, 0),
+			Position = UDim2.new(0, 0, 0, 0),
+		}
+	):Play()
 end
 
 function WeaponGUI:Update()
@@ -19,36 +39,20 @@ function WeaponGUI:Update()
 	local MaxClip = Module.MaxClip
 	local LimitedClipEnabled = Module.LimitedClipEnabled == true
 
-	-- Clips are not configured for weapons with unlimited clips.
-	-- Do not perform arithmetic with a missing MaxClip value.
 	if LimitedClipEnabled and typeof(MaxClip) == "number" and MaxClip > 0 then
-		GUI.Frame.Clips.Fill:TweenSizeAndPosition(
-			UDim2.new(CurrentClips / MaxClip, 0, 1, 0),
-			UDim2.new(0, 0, 0, 0),
-			Enum.EasingDirection.Out,
-			Enum.EasingStyle.Quint,
-			0.25,
-			true
-		)
+		self:_TweenFill(GUI.Frame.Clips.Fill, CurrentClips / MaxClip)
 	end
 
 	if typeof(AmmoPerClip) == "number" and AmmoPerClip > 0 and AmmoPerClip ~= math.huge then
-		GUI.Frame.Ammo.Fill:TweenSizeAndPosition(
-			UDim2.new(CurrentAmmo / AmmoPerClip, 0, 1, 0),
-			UDim2.new(0, 0, 0, 0),
-			Enum.EasingDirection.Out,
-			Enum.EasingStyle.Quint,
-			0.25,
-			true
-		)
+		self:_TweenFill(GUI.Frame.Ammo.Fill, CurrentAmmo / AmmoPerClip)
 	end
 
-	GUI.Frame.Ammo.Current.Text = CurrentAmmo
-	GUI.Frame.Ammo.Max.Text = AmmoPerClip or "∞"
+	GUI.Frame.Ammo.Current.Text = tostring(CurrentAmmo)
+	GUI.Frame.Ammo.Max.Text = tostring(AmmoPerClip or "∞")
 
 	if LimitedClipEnabled then
-		GUI.Frame.Clips.Current.Text = CurrentClips
-		GUI.Frame.Clips.Max.Text = MaxClip or "∞"
+		GUI.Frame.Clips.Current.Text = tostring(CurrentClips)
+		GUI.Frame.Clips.Max.Text = tostring(MaxClip or "∞")
 	end
 
 	local Reloading = Controller:GetReloading()
@@ -73,7 +77,7 @@ end
 
 function WeaponGUI:Show()
 	if self.Module.AmmoPerClip ~= math.huge then
-		self.GUI.Parent = game:GetService("Players").LocalPlayer.PlayerGui
+		self.GUI.Parent = Players.LocalPlayer.PlayerGui
 	end
 end
 
