@@ -61,6 +61,26 @@ function WeaponBootstrap:AddConnection(Connection)
 	return Connection
 end
 
+function WeaponBootstrap:SetLifecycleBlocked(Lifecycle, Blocked)
+	if Blocked then
+		if typeof(Lifecycle.Block) == "function" then
+			Lifecycle:Block()
+		elseif typeof(Lifecycle.SetBlocked) == "function" then
+			Lifecycle:SetBlocked(true)
+		else
+			Lifecycle.Blocked = true
+		end
+	else
+		if typeof(Lifecycle.Unblock) == "function" then
+			Lifecycle:Unblock()
+		elseif typeof(Lifecycle.SetBlocked) == "function" then
+			Lifecycle:SetBlocked(false)
+		else
+			Lifecycle.Blocked = false
+		end
+	end
+end
+
 function WeaponBootstrap:BindTool(Lifecycle)
 	self:AddConnection(self.Tool.Equipped:Connect(function()
 		Lifecycle:Equip()
@@ -79,8 +99,10 @@ end
 function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 	local function BindDeath(Humanoid)
 		self:AddConnection(Humanoid.Died:Connect(function()
-			Lifecycle:Block()
-			Lifecycle:Died()
+			self:SetLifecycleBlocked(Lifecycle, true)
+			if typeof(Lifecycle.Died) == "function" then
+				Lifecycle:Died()
+			end
 			Humanoid:UnequipTools()
 			self:SetBackpackEnabled(false)
 		end))
@@ -88,9 +110,9 @@ function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 
 	local Character, Humanoid = self:WaitForCharacter()
 	if Humanoid.Health <= 0 then
-		Lifecycle:Block()
+		self:SetLifecycleBlocked(Lifecycle, true)
 	else
-		Lifecycle:Unblock()
+		self:SetLifecycleBlocked(Lifecycle, false)
 		self:SetBackpackEnabled(true)
 	end
 	if OnCharacter then OnCharacter(Character, Humanoid) end
@@ -98,7 +120,7 @@ function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 
 	self:AddConnection(self.Player.CharacterAdded:Connect(function(NewCharacter)
 		local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
-		Lifecycle:Block()
+		self:SetLifecycleBlocked(Lifecycle, true)
 		self:SetBackpackEnabled(false)
 		if OnCharacter then OnCharacter(NewCharacter, NewHumanoid) end
 		BindDeath(NewHumanoid)
@@ -106,7 +128,7 @@ function WeaponBootstrap:BindCharacter(Lifecycle, OnCharacter)
 		if NewHumanoid.Health > 0 then
 			self.RunService.Heartbeat:Wait()
 			if NewHumanoid.Health > 0 and NewHumanoid.Parent == NewCharacter then
-				Lifecycle:Unblock()
+				self:SetLifecycleBlocked(Lifecycle, false)
 				self:SetBackpackEnabled(true)
 			end
 		end
