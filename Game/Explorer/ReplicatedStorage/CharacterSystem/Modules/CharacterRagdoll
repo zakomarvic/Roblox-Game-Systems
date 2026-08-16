@@ -117,8 +117,10 @@ function CharacterRagdoll:SetRagdolled(enabled)
 		if self.Humanoid then
 			self.PreviousPlatformStand = self.Humanoid.PlatformStand
 			self.PreviousAutoRotate = self.Humanoid.AutoRotate
+			self.Humanoid.BreakJointsOnDeath = false
 			self.Humanoid.PlatformStand = true
 			self.Humanoid.AutoRotate = false
+			self.Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 		end
 
 		self:_Build()
