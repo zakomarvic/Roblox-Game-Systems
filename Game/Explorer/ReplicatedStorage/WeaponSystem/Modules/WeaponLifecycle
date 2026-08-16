@@ -5,6 +5,7 @@ function WeaponLifecycle.new(dependencies)
 	local self = setmetatable({}, WeaponLifecycle)
 	self.Equipped = false
 	self.HasActiveState = false
+	self.Blocked = false
 	self.Connections = {}
 	self.Cleanups = {}
 	self.Dependencies = dependencies or {}
@@ -28,7 +29,21 @@ function WeaponLifecycle:IsEquipped()
 	return self.Equipped
 end
 
+function WeaponLifecycle:SetBlocked(Blocked)
+	self.Blocked = Blocked == true
+	if self.Blocked and (self.Equipped or self.HasActiveState) then
+		self:Unequip()
+	end
+end
+
+function WeaponLifecycle:IsBlocked()
+	return self.Blocked
+end
+
 function WeaponLifecycle:Equip()
+	if self.Blocked then
+		return
+	end
 	self:CleanupConnections()
 	self.Equipped = true
 	self.HasActiveState = true
