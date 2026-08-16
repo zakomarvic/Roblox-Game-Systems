@@ -38,16 +38,31 @@ function WeaponPose.Equip(Character, Settings)
 end
 
 function WeaponPose.BindAim(PoseData, AimSource)
-	if not PoseData or not AimSource then return nil end
+	if not PoseData then return nil end
 	WeaponPose.UnbindAim(PoseData)
 	PoseData.AimConnection = RunService.RenderStepped:Connect(function(DeltaTime)
-		if not PoseData.Character or not PoseData.Character.Parent then
+		if not PoseData.Character or not PoseData.Character.Parent or not PoseData.Humanoid or PoseData.Humanoid.Health <= 0 then
 			WeaponPose.UnbindAim(PoseData)
 			return
 		end
+
+		-- The shoulder Motor6Ds can be reset by character/animation replication
+		-- during and after respawn. Reassert the static weapon pose each frame so
+		-- a server-side joint update cannot permanently knock the arms out of pose.
+		if PoseData.LeftShoulder and PoseData.LeftShoulder.Parent then
+			PoseData.LeftShoulder.C0 = LEFT_POSE
+		end
+		if PoseData.RightShoulder and PoseData.RightShoulder.Parent then
+			PoseData.RightShoulder.C0 = RIGHT_POSE
+		end
+
+		if not AimSource then return end
 		local AimPosition
-		if typeof(AimSource) == "function" then AimPosition = AimSource()
-		elseif typeof(AimSource) == "Instance" then AimPosition = AimSource.Hit.Position end
+		if typeof(AimSource) == "function" then
+			AimPosition = AimSource()
+		elseif typeof(AimSource) == "Instance" then
+			AimPosition = AimSource.Hit.Position
+		end
 		if AimPosition then WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime) end
 	end)
 	return PoseData.AimConnection
@@ -55,7 +70,10 @@ end
 
 function WeaponPose.UnbindAim(PoseData)
 	if not PoseData then return end
-	if PoseData.AimConnection then PoseData.AimConnection:Disconnect(); PoseData.AimConnection = nil end
+	if PoseData.AimConnection then
+		PoseData.AimConnection:Disconnect()
+		PoseData.AimConnection = nil
+	end
 end
 
 function WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime)
