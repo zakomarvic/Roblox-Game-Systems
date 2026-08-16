@@ -6,6 +6,20 @@ local function HumanoidLabel(Humanoid)
 	return Humanoid.Name .. "@" .. (Humanoid.Parent and Humanoid.Parent.Name or "no-parent")
 end
 
+local function GetAnimation(Tool, Name, AnimationId)
+	if AnimationId == nil then return nil end
+
+	local Animation = Tool:FindFirstChild(Name)
+	if not Animation then
+		Animation = Instance.new("Animation")
+		Animation.Name = Name
+		Animation.Parent = Tool
+	end
+
+	Animation.AnimationId = "rbxassetid://" .. tostring(AnimationId)
+	return Animation
+end
+
 function WeaponAnimation.new(Config)
 	local self = setmetatable({}, WeaponAnimation)
 	self.Tool = Config.Tool
@@ -39,9 +53,11 @@ function WeaponAnimation:_load()
 	local Animator = self.Animator
 	if not Animator then return end
 
-	local function load(Name, Enabled)
-		if not Enabled then return nil end
-		local Animation = self.Tool:WaitForChild(Name)
+	local function load(Name, AnimationId, Enabled)
+		if not Enabled or AnimationId == nil then return nil end
+		local Animation = GetAnimation(self.Tool, Name, AnimationId)
+		if not Animation then return nil end
+
 		local Track = Animator:LoadAnimation(Animation)
 		self.Tracks[Name] = Track
 		print(string.format("[WeaponAnimation] Loaded %s on %s Animator=%s Priority=%s", Name, HumanoidLabel(self.Humanoid), Animator.Name, tostring(Track.Priority)))
@@ -51,10 +67,11 @@ function WeaponAnimation:_load()
 		return Track
 	end
 
-	load("IdleAnim", Module.IdleAnimationID ~= nil or Module.DualEnabled)
-	load("FireAnim", Module.FireAnimationID ~= nil)
-	load("ReloadAnim", Module.ReloadAnimationID ~= nil)
-	load("ShotgunClipinAnim", Module.ShotgunClipinAnimationID ~= nil)
+	local IdleId = Module.DualEnabled and 53610688 or Module.IdleAnimationID
+	load("IdleAnim", IdleId, IdleId ~= nil)
+	load("FireAnim", Module.FireAnimationID, Module.FireAnimationID ~= nil)
+	load("ReloadAnim", Module.ReloadAnimationID, Module.ReloadAnimationID ~= nil)
+	load("ShotgunClipinAnim", Module.ShotgunClipinAnimationID, Module.ShotgunClipinAnimationID ~= nil)
 end
 
 function WeaponAnimation:SetHumanoid(Humanoid)
