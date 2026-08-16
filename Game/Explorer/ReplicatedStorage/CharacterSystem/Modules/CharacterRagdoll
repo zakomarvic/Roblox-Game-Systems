@@ -26,7 +26,7 @@ end
 local function createCollider(part)
 	local collider = Instance.new("Part")
 	collider.Name = "RagdollCollider_" .. part.Name
-	collider.Size = part.Size
+	collider.Size = Vector3.new(1, 1, 1)
 	collider.CFrame = part.CFrame
 	collider.Transparency = 1
 	collider.CanCollide = true
@@ -80,8 +80,6 @@ function CharacterRagdoll:_Build()
 		end
 	end
 
-	-- R6 collision proxies: only the actual body parts, never accessories,
-	-- HumanoidRootPart, or the torso. The torso remains the physical core.
 	for partName in pairs(R6BodyParts) do
 		local part = self.Character:FindFirstChild(partName)
 		if part and part:IsA("BasePart") then
