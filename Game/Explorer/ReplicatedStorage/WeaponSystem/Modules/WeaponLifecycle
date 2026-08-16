@@ -9,6 +9,8 @@ function WeaponLifecycle.new(dependencies)
 	self.Connections = {}
 	self.Cleanups = {}
 	self.Dependencies = dependencies or {}
+	self.Character = nil
+	self.Humanoid = nil
 	return self
 end
 
@@ -27,6 +29,18 @@ function WeaponLifecycle:IsBlocked() return self.Blocked end
 function WeaponLifecycle:SetDependency(Name, Value)
 	if not self.Dependencies then self.Dependencies = {} end
 	self.Dependencies[Name] = Value
+end
+
+function WeaponLifecycle:SetCharacter(Character, Humanoid)
+	if not Character or not Humanoid then return false end
+	self.Character = Character
+	self.Humanoid = Humanoid
+
+	local D = self.Dependencies
+	if D.OnCharacterChanged then
+		D.OnCharacterChanged(Character, Humanoid, self)
+	end
+	return true
 end
 
 function WeaponLifecycle:Equip()
@@ -111,6 +125,8 @@ function WeaponLifecycle:Destroy()
 	for _, Cleanup in ipairs(self.Cleanups) do pcall(Cleanup) end
 	table.clear(self.Connections)
 	table.clear(self.Dependencies)
+	self.Character = nil
+	self.Humanoid = nil
 end
 
 return WeaponLifecycle
