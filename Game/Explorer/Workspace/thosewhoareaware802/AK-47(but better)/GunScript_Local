@@ -24,7 +24,7 @@ local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
 local Camera = Workspace.CurrentCamera
 local CharacterControllerInstance = CharacterController.Get()
-local Bootstrap = WeaponBootstrap.new({Tool=Tool,Module=Module,ReplicatedStorage=ReplicatedStorage,CharacterController=CharacterControllerInstance,Player=Player,Mouse=Mouse,Camera=Camera,Workspace=Workspace,Script=script,RunService=RunService})
+local Bootstrap = WeaponBootstrap.new({Tool=Tool,Module=Module,ReplicatedStorage=ReplicatedStorage,Player=Player,Script=script,RunService=RunService})
 local Character, Humanoid = Bootstrap:WaitForCharacter()
 local Controller = WeaponController.new(Tool,Module)
 local Handle = Bootstrap:WaitForHandle()
@@ -66,10 +66,8 @@ end,OnSprint=function(IsSprinting) if IsSprinting then Controller:SetTriggerHeld
 	WeaponCharacterInstance:EquipPose()
 	WeaponGUIInstance:Show()
 	Mouse.Icon="rbxassetid://"..Module.MouseIconID
-end,OnUnequip=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose();WeaponGUIInstance:Hide() end,OnDeath=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose();WeaponGUIInstance:Hide() end})
+end,OnUnequip=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose();WeaponGUIInstance:Hide() end,OnDeath=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose();WeaponGUIInstance:Hide() end,Player=Player,Tool=Tool,RunService=RunService})
 WeaponCharacterInstance.IsEquipped=function() return WeaponLifecycleInstance:IsEquipped() end
 
-Bootstrap:BindCharacter(WeaponLifecycleInstance,function(NewCharacter,NewHumanoid)
-	WeaponLifecycleInstance:SetCharacter(NewCharacter,NewHumanoid)
-end)
-Bootstrap:BindTool(WeaponLifecycleInstance)
+WeaponLifecycleInstance:BindCharacter(Player,RunService,Tool)
+WeaponLifecycleInstance:BindTool(Tool)
