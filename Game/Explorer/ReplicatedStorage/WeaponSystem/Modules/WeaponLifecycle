@@ -24,6 +24,11 @@ end
 function WeaponLifecycle:IsEquipped() return self.Equipped end
 function WeaponLifecycle:IsBlocked() return self.Blocked end
 
+function WeaponLifecycle:SetDependency(Name, Value)
+	if not self.Dependencies then self.Dependencies = {} end
+	self.Dependencies[Name] = Value
+end
+
 function WeaponLifecycle:Equip()
 	if self.Blocked or self.Equipped then return false end
 	self:CleanupConnections()
