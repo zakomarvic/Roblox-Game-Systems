@@ -52,11 +52,9 @@ function WeaponFire:Fire(ShootingHandle)
 	local Module = self.Module
 	local PierceAvailable = Module.Piercing
 	self.PiercedHumanoid = {}
-	WeaponFireEffects.ShowMuzzleFlash(self.Tool)
+	WeaponFireEffects.PlayFirePresentation(self.Tool, ShootingHandle, WeaponEffects)
 	local FireAnim = self.GetFireAnim and self.GetFireAnim() or self.FireAnim
 	if FireAnim then FireAnim:Play(nil, nil, Module.FireAnimationSpeed) end
-	if ShootingHandle.FireSound then ShootingHandle.FireSound:Play() end
-	WeaponEffects:FireServer(self.Tool, "Fire")
 	local Start = (self.Humanoid.Torso.CFrame * CFrame.new(0, 1.5, 0)).Position
 	local Spread = Module.Spread * (self.IsAiming and 1 - Module.SpreadRedution or 1)
 	local Direction = (CFrame.new(Start, self.Mouse.Hit.Position) * CFrame.Angles(math.rad(-Spread + math.random() * (Spread * 2)), math.rad(-Spread + math.random() * (Spread * 2)), 0)).LookVector
