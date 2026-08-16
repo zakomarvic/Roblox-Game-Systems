@@ -1,0 +1,192 @@
+local RunService = game:GetService("RunService")
+
+local ProjectileController = {}
+ProjectileController.__index = ProjectileController
+
+local DEFAULTS = {
+	Speed = 300,
+	Gravity = Vector3.new(0, -workspace.Gravity, 0),
+	MaxLifetime = 10,
+	RaycastParams = nil,
+	IgnoreWater = true,
+}
+
+local function copyDefaults(Settings)
+	local Result = {}
+	for Name, Value in pairs(DEFAULTS) do
+		Result[Name] = Value
+	end
+	for Name, Value in pairs(Settings or {}) do
+		Result[Name] = Value
+	end
+	return Result
+end
+
+function ProjectileController.new(Settings)
+	local self = setmetatable({}, ProjectileController)
+
+	self.Settings = copyDefaults(Settings)
+	self.Projectiles = {}
+	self.Connection = nil
+	self.Destroyed = false
+	self.ProjectileCreated = Instance.new("BindableEvent")
+	self.ProjectileHit = Instance.new("BindableEvent")
+	self.ProjectileExpired = Instance.new("BindableEvent")
+
+	return self
+end
+
+function ProjectileController:_EnsureConnection()
+	if self.Connection or self.Destroyed then
+		return
+	end
+
+	self.Connection = RunService.Heartbeat:Connect(function(DeltaTime)
+		self:_Step(DeltaTime)
+	end)
+end
+
+function ProjectileController:_ResolveRaycastParams(Projectile)
+	local Params = Projectile.RaycastParams or self.Settings.RaycastParams
+	if Params then
+		return Params
+	end
+
+	local NewParams = RaycastParams.new()
+	NewParams.FilterType = Enum.RaycastFilterType.Exclude
+	NewParams.IgnoreWater = self.Settings.IgnoreWater
+	return NewParams
+end
+
+function ProjectileController:_Step(DeltaTime)
+	for Id, Projectile in pairs(self.Projectiles) do
+		if Projectile.Destroyed then
+			self.Projectiles[Id] = nil
+			continue
+		end
+
+		Projectile.Age += DeltaTime
+		if Projectile.Age >= Projectile.MaxLifetime then
+			self:_Expire(Projectile)
+			self.Projectiles[Id] = nil
+			continue
+		end
+
+		local OldPosition = Projectile.Position
+		Projectile.Velocity += Projectile.Gravity * DeltaTime
+		local NewPosition = OldPosition + Projectile.Velocity * DeltaTime
+		local Travel = NewPosition - OldPosition
+
+		local Params = self:_ResolveRaycastParams(Projectile)
+		local Result = workspace:Raycast(OldPosition, Travel, Params)
+
+		if Result then
+			Projectile.Position = Result.Position
+			Projectile.Velocity = Vector3.zero
+			self:_Hit(Projectile, Result)
+			self.Projectiles[Id] = nil
+		else
+			Projectile.Position = NewPosition
+			if Projectile.OnStep then
+				Projectile.OnStep(Projectile, DeltaTime)
+			end
+		end
+	end
+
+	if next(self.Projectiles) == nil and self.Connection then
+		self.Connection:Disconnect()
+		self.Connection = nil
+	end
+end
+
+function ProjectileController:_Hit(Projectile, Result)
+	Projectile.Destroyed = true
+	if Projectile.OnHit then
+		Projectile.OnHit(Projectile, Result)
+	end
+	self.ProjectileHit:Fire(Projectile, Result)
+end
+
+function ProjectileController:_Expire(Projectile)
+	Projectile.Destroyed = true
+	if Projectile.OnExpire then
+		Projectile.OnExpire(Projectile)
+	end
+	self.ProjectileExpired:Fire(Projectile)
+end
+
+function ProjectileController:Fire(Origin, Direction, Settings)
+	if self.Destroyed then
+		return nil
+	end
+	if typeof(Origin) ~= "Vector3" then
+		return nil
+	end
+	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then
+		return nil
+	end
+
+	Settings = Settings or {}
+	local Projectile = {
+		Id = {},
+		Origin = Origin,
+		Position = Origin,
+		Direction = Direction.Unit,
+		Velocity = Direction.Unit * (Settings.Speed or self.Settings.Speed),
+		Gravity = Settings.Gravity or self.Settings.Gravity,
+		MaxLifetime = Settings.MaxLifetime or self.Settings.MaxLifetime,
+		Age = 0,
+		Destroyed = false,
+		RaycastParams = Settings.RaycastParams or self.Settings.RaycastParams,
+		OnStep = Settings.OnStep,
+		OnHit = Settings.OnHit,
+		OnExpire = Settings.OnExpire,
+		Data = Settings.Data,
+	}
+
+	self.Projectiles[Projectile.Id] = Projectile
+	self.ProjectileCreated:Fire(Projectile)
+	self:_EnsureConnection()
+
+	return Projectile
+end
+
+function ProjectileController:DestroyProjectile(Projectile)
+	if not Projectile or Projectile.Destroyed then
+		return
+	end
+
+	Projectile.Destroyed = true
+	self.Projectiles[Projectile.Id] = nil
+end
+
+function ProjectileController:GetActiveCount()
+	local Count = 0
+	for _ in pairs(self.Projectiles) do
+		Count += 1
+	end
+	return Count
+end
+
+function ProjectileController:Destroy()
+	if self.Destroyed then
+		return
+	end
+
+	self.Destroyed = true
+	if self.Connection then
+		self.Connection:Disconnect()
+		self.Connection = nil
+	end
+
+	for _, Projectile in pairs(self.Projectiles) do
+		Projectile.Destroyed = true
+	end
+	self.Projectiles = {}
+
+	self.ProjectileCreated:Destroy()
+	self.ProjectileHit:Destroy()
+	self.ProjectileExpired:Destroy()
+end
+
+return ProjectileController
