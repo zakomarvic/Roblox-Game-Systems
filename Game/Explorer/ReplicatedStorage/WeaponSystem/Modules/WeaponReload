@@ -10,7 +10,7 @@ function WeaponReload.new(Options)
 	self.Handle = Options.Handle
 	self.GetReloadAnim = Options.GetReloadAnim
 	self.GetShotgunClipinAnim = Options.GetShotgunClipinAnim
-	self.WeaponEffects = Options.WeaponEffects
+	self.ReloadEffects = Options.ReloadEffects
 	self.IsSprinting = Options.IsSprinting
 	self.IsAiming = Options.IsAiming
 	self.ResetAim = Options.ResetAim
@@ -54,9 +54,8 @@ function WeaponReload:Start()
 				ShotgunClipinAnim:Play(nil, nil, Module.ShotgunClipinAnimationSpeed)
 			end
 
-			local ShellSound = self.Handle:FindFirstChild("ShotgunClipin")
-			if ShellSound then
-				ShellSound:Play()
+			if self.ReloadEffects then
+				self.ReloadEffects.PlayShotgunInsert(self.Handle)
 			end
 
 			self.Wait(Module.ShellClipinSpeed)
@@ -67,13 +66,9 @@ function WeaponReload:Start()
 		ReloadAnim:Play(nil, nil, Module.ReloadAnimationSpeed)
 	end
 
-	local ReloadSound = self.Handle:FindFirstChild("ReloadSound")
-	if ReloadSound then
-		ReloadSound:Play()
-	end
-
-	if self.WeaponEffects then
-		self.WeaponEffects:FireServer(self.Tool, "Reload")
+	if self.ReloadEffects then
+		self.ReloadEffects.PlayReload(self.Handle)
+		self.ReloadEffects.Broadcast(self.Tool, self.WeaponEffects)
 	end
 
 	self.Wait(Module.ReloadTime)
