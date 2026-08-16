@@ -1,9 +1,5 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local WeaponAnimations = require(
-	ReplicatedStorage.WeaponSystem.Modules.WeaponAnimations
-)
-
 local WeaponPose = require(
 	ReplicatedStorage.WeaponSystem.Modules.WeaponPose
 )
@@ -30,7 +26,6 @@ function WeaponService.Initialize(Tool)
 	end
 
 	local Module = require(Setting)
-	WeaponAnimations.Create(Tool, Module)
 
 	local State = {
 		Tool = Tool,
