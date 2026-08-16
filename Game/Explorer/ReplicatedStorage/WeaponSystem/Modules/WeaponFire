@@ -9,6 +9,16 @@ local Remotes = WeaponSystem:WaitForChild("Remotes")
 local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
 local BulletVisualizer = require(WeaponSystem.Modules:WaitForChild("BulletVisualizer"))
 
+local function getEffectTemplate(Tool, Name)
+	if not Tool then return nil end
+	local LocalScript = Tool:FindFirstChild("GunScript_Local")
+	if LocalScript then
+		local Effect = LocalScript:FindFirstChild(Name)
+		if Effect then return Effect end
+	end
+	return Tool:FindFirstChild(Name, true)
+end
+
 function WeaponFire.new(Config)
 	local self = setmetatable({}, WeaponFire)
 	self.Tool = Config.Tool
@@ -19,8 +29,8 @@ function WeaponFire.new(Config)
 	self.FireAnim = Config.FireAnim
 	self.Raycast = Config.Raycast
 	self.InflictTarget = Config.InflictTarget
-	self.MuzzleEffect = Config.MuzzleEffect
-	self.HitEffect = Config.HitEffect
+	self.MuzzleEffect = Config.MuzzleEffect or getEffectTemplate(self.Tool, "MuzzleEffect")
+	self.HitEffect = Config.HitEffect or getEffectTemplate(self.Tool, "HitEffect")
 	self.PiercedHumanoid = {}
 	self.IsAiming = false
 	self.FlashToken = 0
@@ -31,48 +41,29 @@ function WeaponFire:SetCharacter(Character, Humanoid)
 	self.Character = Character
 	self.Humanoid = Humanoid
 	self.PiercedHumanoid = {}
+	self.MuzzleEffect = getEffectTemplate(self.Tool, "MuzzleEffect") or self.MuzzleEffect
+	self.HitEffect = getEffectTemplate(self.Tool, "HitEffect") or self.HitEffect
 end
 
-function WeaponFire:SetAiming(State)
-	self.IsAiming = State == true
-end
+function WeaponFire:SetAiming(State) self.IsAiming = State == true end
 
 function WeaponFire:ShowLocalMuzzleFlash()
 	local Flash = self.Tool and self.Tool:FindFirstChild("Flash")
 	local FlashGui = Flash and Flash:FindFirstChild("LightBG")
 	local FlashImage = FlashGui and FlashGui:FindFirstChild("Light")
 	local FlashLight = Flash and Flash:FindFirstChild("lite")
-
-	if not FlashImage or not FlashImage:IsA("ImageLabel") then
-		return
-	end
-
+	if not FlashImage or not FlashImage:IsA("ImageLabel") then return end
 	local Billboard = FlashImage.Parent
-	if Billboard and Billboard:IsA("BillboardGui") then
-		Billboard.Adornee = Flash
-		Billboard.Enabled = true
-	end
-
-	if FlashLight and FlashLight:IsA("PointLight") then
-		FlashLight.Enabled = true
-	end
-
+	if Billboard and Billboard:IsA("BillboardGui") then Billboard.Adornee = Flash Billboard.Enabled = true end
+	if FlashLight and FlashLight:IsA("PointLight") then FlashLight.Enabled = true end
 	self.FlashToken += 1
 	local Token = self.FlashToken
 	FlashImage.Visible = true
-
 	task.delay(0.05, function()
-		if self.FlashToken ~= Token or not FlashImage.Parent then
-			return
-		end
-
+		if self.FlashToken ~= Token or not FlashImage.Parent then return end
 		FlashImage.Visible = false
-		if Billboard and Billboard.Parent and Billboard:IsA("BillboardGui") then
-			Billboard.Enabled = false
-		end
-		if FlashLight and FlashLight.Parent and FlashLight:IsA("PointLight") then
-			FlashLight.Enabled = false
-		end
+		if Billboard and Billboard.Parent and Billboard:IsA("BillboardGui") then Billboard.Enabled = false end
+		if FlashLight and FlashLight.Parent and FlashLight:IsA("PointLight") then FlashLight.Enabled = false end
 	end)
 end
 
@@ -80,30 +71,15 @@ function WeaponFire:Fire(ShootingHandle)
 	local Module = self.Module
 	local PierceAvailable = Module.Piercing
 	self.PiercedHumanoid = {}
-
 	self:ShowLocalMuzzleFlash()
-
-	if self.FireAnim then
-		self.FireAnim:Play(nil, nil, Module.FireAnimationSpeed)
-	end
-
-	if ShootingHandle.FireSound then
-		ShootingHandle.FireSound:Play()
-	end
-
+	if self.FireAnim then self.FireAnim:Play(nil, nil, Module.FireAnimationSpeed) end
+	if ShootingHandle.FireSound then ShootingHandle.FireSound:Play() end
 	WeaponEffects:FireServer(self.Tool, "Fire")
-
 	local Start = (self.Humanoid.Torso.CFrame * CFrame.new(0, 1.5, 0)).Position
 	local Spread = Module.Spread * (self.IsAiming and 1 - Module.SpreadRedution or 1)
-	local Direction = (CFrame.new(Start, self.Mouse.Hit.Position) * CFrame.Angles(
-		math.rad(-Spread + math.random() * (Spread * 2)),
-		math.rad(-Spread + math.random() * (Spread * 2)),
-		0
-	)).LookVector
-
+	local Direction = (CFrame.new(Start, self.Mouse.Hit.Position) * CFrame.Angles(math.rad(-Spread + math.random() * (Spread * 2)), math.rad(-Spread + math.random() * (Spread * 2)), 0)).LookVector
 	while PierceAvailable >= 0 do
 		local Hit, EndPos = self.Raycast(Start, Direction, 5000, self.Character, self.PiercedHumanoid)
-
 		if not Module.ExplosiveEnabled then
 			if Hit and Hit.Parent then
 				local TargetHumanoid = Hit.Parent:FindFirstChild("Humanoid")
@@ -111,9 +87,7 @@ function WeaponFire:Fire(ShootingHandle)
 				if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
 					self.InflictTarget:FireServer(TargetHumanoid, TargetTorso, Hit, Direction)
 					self.PiercedHumanoid[TargetHumanoid] = true
-				else
-					PierceAvailable = 0
-				end
+				else PierceAvailable = 0 end
 			end
 		else
 			local Explosion = Instance.new("Explosion")
@@ -125,63 +99,22 @@ function WeaponFire:Fire(ShootingHandle)
 				if HitPart and HitPart.Parent and HitPart.Name == "Torso" then
 					local TargetHumanoid = HitPart.Parent:FindFirstChild("Humanoid")
 					local TargetTorso = HitPart.Parent:FindFirstChild("Torso")
-					if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
-						self.InflictTarget:FireServer(TargetHumanoid, TargetTorso, HitPart, Direction)
-					end
+					if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then self.InflictTarget:FireServer(TargetHumanoid, TargetTorso, HitPart, Direction) end
 				end
 			end)
 			PierceAvailable = 0
 		end
-
 		PierceAvailable = Hit and (PierceAvailable - 1) or -1
-
-		WeaponFire.VisualizeAndBroadcast(
-			self.Tool,
-			ShootingHandle,
-			Module.MuzzleOffset,
-			EndPos,
-			self.MuzzleEffect,
-			self.HitEffect,
-			Module.HitSoundIDs[math.random(1, #Module.HitSoundIDs)],
-			{Module.ExplosiveEnabled, Module.BlastRadius, Module.BlastPressure},
-			{Module.BulletSpeed, Module.BulletSize, Module.BulletColor, Module.BulletTransparency, Module.BulletMaterial, Module.FadeTime},
-			PierceAvailable == -1 and Module.VisualizerEnabled or false
-		)
-
+		WeaponFire.VisualizeAndBroadcast(self.Tool, ShootingHandle, Module.MuzzleOffset, EndPos, self.MuzzleEffect, self.HitEffect, Module.HitSoundIDs[math.random(1, #Module.HitSoundIDs)], {Module.ExplosiveEnabled, Module.BlastRadius, Module.BlastPressure}, {Module.BulletSpeed, Module.BulletSize, Module.BulletColor, Module.BulletTransparency, Module.BulletMaterial, Module.FadeTime}, PierceAvailable == -1 and Module.VisualizerEnabled or false)
 		Start = EndPos + Direction * 0.01
 	end
 end
 
 function WeaponFire.VisualizeAndBroadcast(Tool, ShootingHandle, MuzzleOffset, EndPos, MuzzleEffect, HitEffect, HitSound, ExplosiveData, BulletData, VisualizeEnabled)
 	task.spawn(function()
-		BulletVisualizer.Visualize(
-			ShootingHandle,
-			MuzzleOffset,
-			EndPos,
-			MuzzleEffect,
-			HitEffect,
-			HitSound,
-			ExplosiveData,
-			BulletData,
-			false,
-			VisualizeEnabled
-		)
+		BulletVisualizer.Visualize(ShootingHandle, MuzzleOffset, EndPos, MuzzleEffect, HitEffect, HitSound, ExplosiveData, BulletData, false, VisualizeEnabled)
 	end)
-
-	WeaponEffects:FireServer(
-		Tool,
-		"Bullet",
-		ShootingHandle,
-		MuzzleOffset,
-		EndPos,
-		MuzzleEffect,
-		HitEffect,
-		HitSound,
-		ExplosiveData,
-		BulletData,
-		true,
-		VisualizeEnabled
-	)
+	WeaponEffects:FireServer(Tool, "Bullet", ShootingHandle, MuzzleOffset, EndPos, MuzzleEffect, HitEffect, HitSound, ExplosiveData, BulletData, true, VisualizeEnabled)
 end
 
 return WeaponFire
