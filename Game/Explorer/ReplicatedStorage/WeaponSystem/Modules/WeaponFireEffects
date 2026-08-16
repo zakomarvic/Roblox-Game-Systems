@@ -15,6 +15,28 @@ local function playFireSound(Tool, ShootingHandle)
 	end
 end
 
+function WeaponFireEffects.PlaySound(Handle, SoundName)
+	if not Handle or not Handle:IsA("BasePart") then
+		return
+	end
+
+	local Sound = Handle:FindFirstChild(SoundName)
+	if Sound and Sound:IsA("Sound") then
+		Sound:Play()
+	end
+end
+
+function WeaponFireEffects.StopLoopedSound(Handle, SoundName)
+	if not Handle or not Handle:IsA("BasePart") then
+		return
+	end
+
+	local Sound = Handle:FindFirstChild(SoundName)
+	if Sound and Sound:IsA("Sound") and Sound.Playing and Sound.Looped then
+		Sound:Stop()
+	end
+end
+
 function WeaponFireEffects.Play(Tool, ShootingHandle)
 	if not Tool or not Tool:IsA("Tool") then
 		return

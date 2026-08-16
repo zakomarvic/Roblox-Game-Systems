@@ -9,6 +9,7 @@ function WeaponFireCycle.new(Config)
 	self.Aim = Config.Aim
 	self.Humanoid = Config.Humanoid
 	self.WeaponFire = Config.WeaponFire
+	self.FireEffects = Config.FireEffects
 	self.GUI = Config.GUI
 	self.Reload = Config.Reload
 	self.Handle = Config.Handle
@@ -58,18 +59,16 @@ function WeaponFireCycle:FireDown()
 	Controller:SetEnabled(false)
 
 	if Module.ChargedShotEnabled then
-		local ChargeSound = self.HandleToFire and self.HandleToFire:FindFirstChild("ChargeSound")
-		if ChargeSound then
-			ChargeSound:Play()
+		if self.FireEffects then
+			self.FireEffects.PlaySound(self.HandleToFire, "ChargeSound")
 		end
 		self.Wait(Module.ChargingTime)
 		IsChargedShot = true
 	end
 
 	if Module.MinigunEnabled then
-		local WindUp = self.HandleToFire and self.HandleToFire:FindFirstChild("WindUp")
-		if WindUp then
-			WindUp:Play()
+		if self.FireEffects then
+			self.FireEffects.PlaySound(self.HandleToFire, "WindUp")
 		end
 		self.Wait(Module.DelayBeforeFiring)
 	end
@@ -109,17 +108,13 @@ function WeaponFireCycle:FireDown()
 		end
 	)
 
-	if self.HandleToFire and self.HandleToFire:FindFirstChild("FireSound") then
-		local FireSound = self.HandleToFire.FireSound
-		if FireSound.Playing and FireSound.Looped then
-			FireSound:Stop()
-		end
+	if self.FireEffects then
+		self.FireEffects.StopLoopedSound(self.HandleToFire, "FireSound")
 	end
 
 	if Module.MinigunEnabled then
-		local WindDown = self.HandleToFire and self.HandleToFire:FindFirstChild("WindDown")
-		if WindDown then
-			WindDown:Play()
+		if self.FireEffects then
+			self.FireEffects.PlaySound(self.HandleToFire, "WindDown")
 		end
 		self.Wait(Module.DelayAfterFiring)
 	end
