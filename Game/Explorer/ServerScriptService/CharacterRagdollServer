@@ -13,6 +13,7 @@ if not Remote then
 end
 
 local ActiveRagdolls = {}
+local RagdollTimers = {}
 
 local function getRagdoll(Character)
 	local Ragdoll = ActiveRagdolls[Character]
@@ -23,12 +24,43 @@ local function getRagdoll(Character)
 	return Ragdoll
 end
 
+local function cancelTimer(Character)
+	RagdollTimers[Character] = (RagdollTimers[Character] or 0) + 1
+end
+
+local function scheduleRecovery(Character, Duration)
+	if not Duration then
+		return
+	end
+
+	local Token = (RagdollTimers[Character] or 0) + 1
+	RagdollTimers[Character] = Token
+
+	task.delay(Duration, function()
+		if RagdollTimers[Character] ~= Token then
+			return
+		end
+
+		local Ragdoll = ActiveRagdolls[Character]
+		local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+		if not Ragdoll or not Humanoid or Humanoid.Health <= 0 then
+			return
+		end
+
+		if Ragdoll:IsRagdolled() then
+			Ragdoll:Recover()
+			Remote:FireClient(Players:GetPlayerFromCharacter(Character), false)
+		end
+	end)
+end
+
 local function setupCharacter(Character)
 	local Humanoid = Character:WaitForChild("Humanoid")
 	Humanoid.BreakJointsOnDeath = false
 	Humanoid.RequiresNeck = false
 
 	Humanoid.Died:Connect(function()
+		cancelTimer(Character)
 		getRagdoll(Character):SetRagdolled(true)
 
 		local Player = Players:GetPlayerFromCharacter(Character)
@@ -41,6 +73,7 @@ end
 local function setupPlayer(Player)
 	Player.CharacterAdded:Connect(function(Character)
 		ActiveRagdolls[Character] = nil
+		RagdollTimers[Character] = nil
 		setupCharacter(Character)
 	end)
 
@@ -57,16 +90,24 @@ Players.PlayerAdded:Connect(setupPlayer)
 
 Players.PlayerRemoving:Connect(function(Player)
 	if Player.Character then
+		cancelTimer(Player.Character)
+
 		local Ragdoll = ActiveRagdolls[Player.Character]
 		if Ragdoll then
 			Ragdoll:Destroy()
 			ActiveRagdolls[Player.Character] = nil
 		end
+
+		RagdollTimers[Player.Character] = nil
 	end
 end)
 
-Remote.OnServerEvent:Connect(function(Player, Enabled)
+Remote.OnServerEvent:Connect(function(Player, Enabled, Duration)
 	if typeof(Enabled) ~= "boolean" then
+		return
+	end
+
+	if Duration ~= nil and (typeof(Duration) ~= "number" or Duration <= 0 or Duration > 60) then
 		return
 	end
 
@@ -80,6 +121,15 @@ Remote.OnServerEvent:Connect(function(Player, Enabled)
 		return
 	end
 
-	getRagdoll(Character):SetRagdolled(Enabled)
-	Remote:FireClient(Player, Enabled)
+	local Ragdoll = getRagdoll(Character)
+
+	if Enabled then
+		Ragdoll:SetRagdolled(true)
+		Remote:FireClient(Player, true)
+		scheduleRecovery(Character, Duration)
+	else
+		cancelTimer(Character)
+		Ragdoll:SetRagdolled(false)
+		Remote:FireClient(Player, false)
+	end
 end)
