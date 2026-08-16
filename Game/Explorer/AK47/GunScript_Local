@@ -54,8 +54,6 @@ WeaponCharacterInstance.FireCycle=FireCycle
 local WeaponInputInstance = WeaponInput.new(Mouse,{OnFireDown=function() FireCycle:FireDown() end,OnFireUp=function() FireCycle:FireUp() end,OnReload=function() Reload:Start() end,OnAim=function() if not Controller:GetReloading() and Setting.SniperEnabled then WeaponAimInstance:Toggle() end end})
 
 local WeaponLifecycleInstance = WeaponLifecycle.new({Controller=Controller,Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,Script=script,GetIdleAnim=function() return WeaponAnimationInstance:Get("IdleAnim") end,IdleAnimationSpeed=Setting.IdleAnimationSpeed,TriggerReleased=function() FireCycle:FireUp() end,SprintChanged=CharacterControllerInstance.SprintChanged,OnCharacterChanged=function(NewCharacter,NewHumanoid)
-	Character=NewCharacter
-	Humanoid=NewHumanoid
 	WeaponCameraInstance:SetCharacter(NewCharacter,NewHumanoid)
 	WeaponFireInstance:SetCharacter(NewCharacter,NewHumanoid)
 	FireCycle:SetHumanoid(NewHumanoid)
