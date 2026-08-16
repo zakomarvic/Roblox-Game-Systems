@@ -55,16 +55,13 @@ local function RefreshCharacterReferences(NewCharacter, NewHumanoid)
 	Character = NewCharacter
 	Humanoid = NewHumanoid
 
-	-- WeaponCharacter owns the character-bound camera, fire, fire-cycle,
-	-- and animation rebinding. Keep those references centralized there.
 	WeaponCharacterInstance:SetCharacter(Character, Humanoid)
 
-	-- Reload keeps its animation tracks directly, so refresh those tracks here.
 	Reload.ReloadAnim = WeaponAnimationInstance:Get("ReloadAnim")
 	Reload.ShotgunClipinAnim = WeaponAnimationInstance:Get("ShotgunClipinAnim")
 end
 
-local WeaponLifecycleInstance = WeaponLifecycle.new({Controller=Controller,Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,GUI=GUI,Script=script,PlayerGui=Player.PlayerGui,IdleAnim=WeaponAnimationInstance:Get("IdleAnim"),IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=function() FireCycle:FireUp() end,SprintChanged=CharacterControllerInstance.SprintChanged,OnSprint=function(IsSprinting) if IsSprinting then Controller:SetTriggerHeld(false);if Controller:GetReloading() then Controller:SetReloading(false) end;if Controller:IsCurrentlyFiring() then Controller:StopFiring() end;WeaponAimInstance:Reset() end end,OnEquip=function(Lifecycle)
+local WeaponLifecycleInstance = WeaponLifecycle.new({Controller=Controller,Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,Script=script,IdleAnim=WeaponAnimationInstance:Get("IdleAnim"),IdleAnimationSpeed=Module.IdleAnimationSpeed,TriggerReleased=function() FireCycle:FireUp() end,SprintChanged=CharacterControllerInstance.SprintChanged,OnSprint=function(IsSprinting) if IsSprinting then Controller:SetTriggerHeld(false);if Controller:GetReloading() then Controller:SetReloading(false) end;if Controller:IsCurrentlyFiring() then Controller:StopFiring() end;WeaponAimInstance:Reset() end end,OnEquip=function(Lifecycle)
 	local EquippedCharacter=Player.Character
 	local EquippedHumanoid=EquippedCharacter and EquippedCharacter:FindFirstChildOfClass("Humanoid")
 	if EquippedCharacter and EquippedHumanoid and EquippedHumanoid.Health>0 then
