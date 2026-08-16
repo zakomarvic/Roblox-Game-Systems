@@ -1,6 +1,4 @@
 local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CharacterController = require(ReplicatedStorage.CharacterSystem.Modules.CharacterController)
 
 local WeaponPose = {}
 
@@ -8,14 +6,6 @@ local LEFT_POSE = CFrame.new(-0.4, 0.5, 0) * CFrame.Angles(0, math.rad(-80), 0)
 local RIGHT_POSE = CFrame.new(0.9, 0.5, 0) * CFrame.Angles(math.rad(-10), math.rad(80), 0)
 
 function WeaponPose.Equip(Character, Settings)
-	-- The CharacterController is the game's authoritative character reference.
-	-- Gun scripts can temporarily hold a stale Character during respawn.
-	local Controller = CharacterController.Get()
-	local CurrentCharacter = Controller and Controller:GetCharacter()
-	if CurrentCharacter and CurrentCharacter.Parent then
-		Character = CurrentCharacter
-	end
-
 	if not Character or not Character.Parent then return nil end
 	local Torso = Character:FindFirstChild("Torso")
 	if not Torso then return nil end
@@ -56,11 +46,8 @@ function WeaponPose.BindAim(PoseData, AimSource)
 			return
 		end
 		local AimPosition
-		if typeof(AimSource) == "function" then
-			AimPosition = AimSource()
-		elseif typeof(AimSource) == "Instance" then
-			AimPosition = AimSource.Hit.Position
-		end
+		if typeof(AimSource) == "function" then AimPosition = AimSource()
+		elseif typeof(AimSource) == "Instance" then AimPosition = AimSource.Hit.Position end
 		if AimPosition then WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime) end
 	end)
 	return PoseData.AimConnection
@@ -68,10 +55,7 @@ end
 
 function WeaponPose.UnbindAim(PoseData)
 	if not PoseData then return end
-	if PoseData.AimConnection then
-		PoseData.AimConnection:Disconnect()
-		PoseData.AimConnection = nil
-	end
+	if PoseData.AimConnection then PoseData.AimConnection:Disconnect(); PoseData.AimConnection = nil end
 end
 
 function WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime)
