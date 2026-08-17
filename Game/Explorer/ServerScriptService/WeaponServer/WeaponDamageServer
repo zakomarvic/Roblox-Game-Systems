@@ -165,41 +165,44 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction)
 
 	Direction = Direction.Unit
 
+	local OverlapParams = OverlapParams.new()
+	OverlapParams.FilterType = Enum.RaycastFilterType.Exclude
+	OverlapParams.FilterDescendantsInstances = {Character, Tool}
+
+	local Parts = workspace:GetPartBoundsInRadius(Position, Radius, OverlapParams)
 	local ProcessedCharacters = {}
-	for _, Descendant in ipairs(workspace:GetDescendants()) do
-		if Descendant:IsA("Humanoid") and not ProcessedCharacters[Descendant] then
-			local TargetHumanoid = Descendant
-			local TargetCharacter = TargetHumanoid.Parent
-			local TargetTorso = getTorso(TargetCharacter)
 
-			if TargetCharacter and TargetCharacter:IsA("Model") and TargetHumanoid.Health > 0 and TargetTorso then
-				ProcessedCharacters[TargetHumanoid] = true
+	for _, Part in ipairs(Parts) do
+		local TargetCharacter = Part:FindFirstAncestorOfClass("Model")
+		local TargetHumanoid = TargetCharacter and TargetCharacter:FindFirstChildOfClass("Humanoid")
+		local TargetTorso = getTorso(TargetCharacter)
 
-				local Offset = TargetTorso.Position - Position
-				local Distance = Offset.Magnitude
+		if TargetCharacter and TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso and not ProcessedCharacters[TargetCharacter] then
+			ProcessedCharacters[TargetCharacter] = true
 
-				if Distance <= Radius then
-					local ExplosionDirection = Distance > 0 and Offset.Unit or Direction
-					local Falloff = 1 - math.clamp(Distance / Radius, 0, 1)
-					local AppliedDamage = Damage * Falloff
+			local Offset = TargetTorso.Position - Position
+			local Distance = Offset.Magnitude
+			if Distance <= Radius then
+				local ExplosionDirection = Distance > 0 and Offset.Unit or Direction
+				local Falloff = 1 - math.clamp(Distance / Radius, 0, 1)
+				local AppliedDamage = Damage * Falloff
 
-					if AppliedDamage > 0 then
-						while TargetHumanoid:FindFirstChild("creator") do
-							TargetHumanoid.creator:Destroy()
-						end
-
-						local Creator = Instance.new("ObjectValue")
-						Creator.Name = "creator"
-						Creator.Value = Player
-						Creator.Parent = TargetHumanoid
-						game.Debris:AddItem(Creator, 5)
-
-						TargetHumanoid:TakeDamage(AppliedDamage)
+				if AppliedDamage > 0 then
+					while TargetHumanoid:FindFirstChild("creator") do
+						TargetHumanoid.creator:Destroy()
 					end
 
-					if Knockback > 0 then
-						TargetTorso.AssemblyLinearVelocity += ExplosionDirection * (Knockback * Falloff)
-					end
+					local Creator = Instance.new("ObjectValue")
+					Creator.Name = "creator"
+					Creator.Value = Player
+					Creator.Parent = TargetHumanoid
+					game.Debris:AddItem(Creator, 5)
+
+					TargetHumanoid:TakeDamage(AppliedDamage)
+				end
+
+				if Knockback > 0 then
+					TargetTorso.AssemblyLinearVelocity += ExplosionDirection * (Knockback * Falloff)
 				end
 			end
 		end
