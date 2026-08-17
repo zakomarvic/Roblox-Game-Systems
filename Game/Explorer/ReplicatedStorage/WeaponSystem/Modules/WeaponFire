@@ -10,6 +10,7 @@ local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
 local BulletVisualizer = require(WeaponSystem.Modules:WaitForChild("BulletVisualizer"))
 local ProjectileController = require(WeaponSystem.Modules:WaitForChild("ProjectileController"))
 local WeaponFireEffects = require(WeaponSystem.Modules:WaitForChild("WeaponFireEffects"))
+local WeaponProjectileVisual = require(WeaponSystem.Modules:WaitForChild("WeaponProjectileVisual"))
 
 function WeaponFire.new(Config)
 	local self = setmetatable({}, WeaponFire)
@@ -97,6 +98,8 @@ end
 function WeaponFire:_FireProjectile(Start, Direction, ShootingHandle)
 	local Module = self.Module
 	local EndPosition = Start + Direction * ((Module.ProjectileSpeed or 500) * (Module.ProjectileLifetime or 10))
+
+	WeaponProjectileVisual.Hide(self.Tool, Module)
 
 	self.Projectiles:Fire(Start, Direction, {
 		Speed = Module.ProjectileSpeed or 500,
@@ -192,6 +195,7 @@ function WeaponFire:Destroy()
 		self.Projectiles:Destroy()
 		self.Projectiles = nil
 	end
+	WeaponProjectileVisual.Clear(self.Tool)
 end
 
 return WeaponFire
