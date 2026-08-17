@@ -177,7 +177,7 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction)
 		local TargetHumanoid = TargetCharacter and TargetCharacter:FindFirstChildOfClass("Humanoid")
 		local TargetTorso = getTorso(TargetCharacter)
 
-		if TargetCharacter and TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso and not ProcessedCharacters[TargetCharacter] then
+		if TargetCharacter and TargetCharacter ~= Character and TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso and not ProcessedCharacters[TargetCharacter] then
 			ProcessedCharacters[TargetCharacter] = true
 
 			local Offset = TargetTorso.Position - Position
