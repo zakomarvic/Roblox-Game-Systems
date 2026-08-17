@@ -24,6 +24,14 @@ function BulletVisualizer.Visualize(
 		return
 	end
 
+	BulletData = BulletData or {}
+	local BulletSpeed = tonumber(BulletData[1]) or math.huge
+	local BulletSize = typeof(BulletData[2]) == "Vector3" and BulletData[2] or Vector3.new(0.25, 0.25, 100)
+	local BulletColor = BulletData[3] or BrickColor.new("Bright yellow")
+	local BulletTransparency = tonumber(BulletData[4]) or 0.25
+	local BulletMaterial = BulletData[5] or Enum.Material.SmoothPlastic
+	local FadeTime = math.max(tonumber(BulletData[6]) or 0.1, 0.01)
+
 	local MuzzlePos = LaserAttachment.WorldPosition
 	local Distance = (MuzzlePos - EndPos).Magnitude / 2
 
@@ -67,7 +75,7 @@ function BulletVisualizer.Visualize(
 	HitParticle.Parent = HitPart
 
 	local Sound = Instance.new("Sound")
-	Sound.SoundId = "rbxassetid://" .. HitSound
+	Sound.SoundId = "rbxassetid://" .. tostring(HitSound or "")
 	Sound.Volume = 1
 	Sound.Parent = HitPart
 
@@ -76,14 +84,16 @@ function BulletVisualizer.Visualize(
 
 	task.spawn(function()
 		HitParticle:Emit(2)
-		Sound:Play()
+		if HitSound then
+			Sound:Play()
+		end
 	end)
 
 	Debris:AddItem(HitPart, 2)
 
-	if ExplosiveData[1] and VisualizeExplosion then
+	if ExplosiveData and ExplosiveData[1] and VisualizeExplosion then
 		local Explosion = Instance.new("Explosion")
-		Explosion.BlastRadius = ExplosiveData[2]
+		Explosion.BlastRadius = ExplosiveData[2] or 0
 		Explosion.BlastPressure = 0
 		Explosion.Position = EndPos
 		Explosion.Parent = workspace.CurrentCamera
@@ -93,9 +103,9 @@ function BulletVisualizer.Visualize(
 		local Bullet = Instance.new("Part")
 		Bullet.Name = "Bullet"
 		Bullet.Size = Vector3.new(0.2, 0.2, 0.2)
-		Bullet.BrickColor = BulletData[3]
-		Bullet.Transparency = BulletData[4]
-		Bullet.Material = BulletData[5]
+		Bullet.BrickColor = BulletColor
+		Bullet.Transparency = BulletTransparency
+		Bullet.Material = BulletMaterial
 		Bullet.Anchored = true
 		Bullet.CanCollide = false
 		Bullet.CanQuery = false
@@ -105,7 +115,7 @@ function BulletVisualizer.Visualize(
 
 		local Mesh = Instance.new("SpecialMesh")
 		Mesh.MeshType = Enum.MeshType.Brick
-		Mesh.Scale = BulletData[2] * 5
+		Mesh.Scale = BulletSize * 5
 		Mesh.Offset = Vector3.new(0, 0, -Mesh.Scale.Z / 10)
 		Mesh.Parent = Bullet
 
@@ -113,23 +123,23 @@ function BulletVisualizer.Visualize(
 		Bullet.Parent = workspace.CurrentCamera
 		Debris:AddItem(Bullet, 10)
 
-		if BulletData[1] ~= math.huge then
-			for i = 0, Distance, BulletData[1] do
+		if BulletSpeed ~= math.huge then
+			for i = 0, Distance, BulletSpeed do
 				if i ~= 0 then
-					Bullet.CFrame = Bullet.CFrame * CFrame.new(0, 0, -BulletData[1])
+					Bullet.CFrame = Bullet.CFrame * CFrame.new(0, 0, -BulletSpeed)
 				end
-				if (Bullet.Position - EndPos).Magnitude < BulletData[2].Z then
-					Mesh.Scale = Vector3.new(BulletData[2].X, BulletData[2].Y, (Bullet.Position - EndPos).Magnitude) * 5
+				if (Bullet.Position - EndPos).Magnitude < BulletSize.Z then
+					Mesh.Scale = Vector3.new(BulletSize.X, BulletSize.Y, (Bullet.Position - EndPos).Magnitude) * 5
 					Mesh.Offset = Vector3.new(0, 0, -Mesh.Scale.Z / 10)
 				end
 				RunService.Stepped:Wait()
 			end
 		else
-			Mesh.Scale = Vector3.new(BulletData[2].X, BulletData[2].Y, (Bullet.Position - EndPos).Magnitude) * 5
+			Mesh.Scale = Vector3.new(BulletSize.X, BulletSize.Y, (Bullet.Position - EndPos).Magnitude) * 5
 			Mesh.Offset = Vector3.new(0, 0, -Mesh.Scale.Z / 10)
 			local Time = RunService.Heartbeat:Wait()
-			while Bullet.Transparency < 1 do
-				Bullet.Transparency += Time / BulletData[6]
+			while Bullet.Parent and Bullet.Transparency < 1 do
+				Bullet.Transparency = math.min(1, Bullet.Transparency + Time / FadeTime)
 				Time = RunService.Heartbeat:Wait()
 			end
 		end
