@@ -75,6 +75,21 @@ function ProjectileController:_ResolveRaycastParams(Projectile)
 	return NewParams
 end
 
+function ProjectileController:_ExcludeVisualFromRaycast(Projectile, Params)
+	if not Projectile.Visual then
+		return Params
+	end
+
+	local Excluded = {}
+	for _, Instance in ipairs(Params.FilterDescendantsInstances) do
+		table.insert(Excluded, Instance)
+	end
+
+	table.insert(Excluded, Projectile.Visual)
+	Params.FilterDescendantsInstances = Excluded
+	return Params
+end
+
 function ProjectileController:_CreateVisual(Projectile, Settings)
 	local ProjectileName = Settings.ProjectileName
 	if not ProjectileName then
@@ -135,6 +150,7 @@ function ProjectileController:_Step(DeltaTime)
 		local Travel = NewPosition - OldPosition
 
 		local Params = self:_ResolveRaycastParams(Projectile)
+		Params = self:_ExcludeVisualFromRaycast(Projectile, Params)
 		local Result = workspace:Raycast(OldPosition, Travel, Params)
 
 		if Result then
