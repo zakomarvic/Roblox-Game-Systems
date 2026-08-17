@@ -4,23 +4,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ProjectileController = {}
 ProjectileController.__index = ProjectileController
 
-local DEFAULTS = {
-	Speed = 300,
-	Gravity = Vector3.new(0, -workspace.Gravity, 0),
-	MaxLifetime = 10,
-	RaycastParams = nil,
-	IgnoreWater = true,
-	ProjectileFolderName = "Projectiles",
-}
+local DEFAULTS = { Speed = 300, Gravity = Vector3.new(0, -workspace.Gravity, 0), MaxLifetime = 10, RaycastParams = nil, IgnoreWater = true, ProjectileFolderName = "Projectiles" }
 
 local function copyDefaults(Settings)
 	local Result = {}
-	for Name, Value in pairs(DEFAULTS) do
-		Result[Name] = Value
-	end
-	for Name, Value in pairs(Settings or {}) do
-		Result[Name] = Value
-	end
+	for Name, Value in pairs(DEFAULTS) do Result[Name] = Value end
+	for Name, Value in pairs(Settings or {}) do Result[Name] = Value end
 	return Result
 end
 
@@ -28,11 +17,8 @@ local function setProjectileCFrame(Visual, Position, Direction)
 	if not Visual then return end
 	local Look = Direction.Magnitude > 0 and Direction.Unit or Vector3.zAxis
 	local CFrameValue = CFrame.lookAt(Position, Position + Look)
-	if Visual:IsA("Model") then
-		Visual:PivotTo(CFrameValue)
-	elseif Visual:IsA("BasePart") then
-		Visual.CFrame = CFrameValue
-	end
+	if Visual:IsA("Model") then Visual:PivotTo(CFrameValue)
+	elseif Visual:IsA("BasePart") then Visual.CFrame = CFrameValue end
 end
 
 function ProjectileController.new(Settings)
@@ -49,9 +35,7 @@ end
 
 function ProjectileController:_EnsureConnection()
 	if self.Connection or self.Destroyed then return end
-	self.Connection = RunService.Heartbeat:Connect(function(DeltaTime)
-		self:_Step(DeltaTime)
-	end)
+	self.Connection = RunService.Heartbeat:Connect(function(DeltaTime) self:_Step(DeltaTime) end)
 end
 
 function ProjectileController:_ResolveRaycastParams(Projectile)
@@ -66,9 +50,7 @@ end
 function ProjectileController:_ExcludeVisualFromRaycast(Projectile, Params)
 	if not Projectile.Visual then return Params end
 	local Excluded = {}
-	for _, Instance in ipairs(Params.FilterDescendantsInstances) do
-		table.insert(Excluded, Instance)
-	end
+	for _, Instance in ipairs(Params.FilterDescendantsInstances) do table.insert(Excluded, Instance) end
 	table.insert(Excluded, Projectile.Visual)
 	Params.FilterDescendantsInstances = Excluded
 	return Params
@@ -105,27 +87,18 @@ end
 
 function ProjectileController:_Step(DeltaTime)
 	for Id, Projectile in pairs(self.Projectiles) do
-		if Projectile.Destroyed then
-			self.Projectiles[Id] = nil
-			continue
-		end
-
+		if Projectile.Destroyed then self.Projectiles[Id] = nil; continue end
 		Projectile.Age += DeltaTime
 		if Projectile.Age >= Projectile.MaxLifetime then
 			warn(("[ProjectileController] EXPIRED after %.2fs"):format(Projectile.Age))
-			self:_Expire(Projectile)
-			self.Projectiles[Id] = nil
-			continue
+			self:_Expire(Projectile); self.Projectiles[Id] = nil; continue
 		end
-
 		local OldPosition = Projectile.Position
 		Projectile.Velocity += Projectile.Gravity * DeltaTime
 		local NewPosition = OldPosition + Projectile.Velocity * DeltaTime
 		local Travel = NewPosition - OldPosition
-		local Params = self:_ResolveRaycastParams(Projectile)
-		Params = self:_ExcludeVisualFromRaycast(Projectile, Params)
+		local Params = self:_ExcludeVisualFromRaycast(Projectile, self:_ResolveRaycastParams(Projectile))
 		local Result = workspace:Raycast(OldPosition, Travel, Params)
-
 		if Result then
 			Projectile.Position = Result.Position
 			Projectile.Velocity = Vector3.zero
@@ -140,16 +113,18 @@ function ProjectileController:_Step(DeltaTime)
 			if Projectile.OnStep then Projectile.OnStep(Projectile, DeltaTime) end
 		end
 	end
-
-	if next(self.Projectiles) == nil and self.Connection then
-		self.Connection:Disconnect()
-		self.Connection = nil
-	end
+	if next(self.Projectiles) == nil and self.Connection then self.Connection:Disconnect(); self.Connection = nil end
 end
 
 function ProjectileController:_Hit(Projectile, Result)
 	Projectile.Destroyed = true
-	if Projectile.OnHit then Projectile.OnHit(Projectile, Result) end
+	warn("[ProjectileController] CALLING OnHit", Projectile.Data and Projectile.Data.Tool and Projectile.Data.Tool:GetFullName() or "NoTool")
+	if Projectile.OnHit then
+		local Ok, ErrorMessage = xpcall(function() Projectile.OnHit(Projectile, Result) end, debug.traceback)
+		if not Ok then warn("[ProjectileController] OnHit ERROR:\n" .. tostring(ErrorMessage)) end
+	else
+		warn("[ProjectileController] OnHit callback is NIL")
+	end
 	self:_DestroyVisual(Projectile)
 	self.ProjectileHit:Fire(Projectile, Result)
 end
@@ -162,19 +137,14 @@ function ProjectileController:_Expire(Projectile)
 end
 
 function ProjectileController:Fire(Origin, Direction, Settings)
-	if self.Destroyed then return nil end
-	if typeof(Origin) ~= "Vector3" then return nil end
-	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return nil end
+	if self.Destroyed or typeof(Origin) ~= "Vector3" or typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return nil end
 	Settings = Settings or {}
 	local Projectile = {
 		Id = {}, Origin = Origin, Position = Origin, Direction = Direction.Unit,
-		Velocity = Direction.Unit * (Settings.Speed or self.Settings.Speed),
-		Gravity = Settings.Gravity or self.Settings.Gravity,
-		MaxLifetime = Settings.MaxLifetime or self.Settings.MaxLifetime,
-		Age = 0, Destroyed = false,
+		Velocity = Direction.Unit * (Settings.Speed or self.Settings.Speed), Gravity = Settings.Gravity or self.Settings.Gravity,
+		MaxLifetime = Settings.MaxLifetime or self.Settings.MaxLifetime, Age = 0, Destroyed = false,
 		RaycastParams = Settings.RaycastParams or self.Settings.RaycastParams,
-		OnStep = Settings.OnStep, OnHit = Settings.OnHit, OnExpire = Settings.OnExpire,
-		Data = Settings.Data, Visual = nil,
+		OnStep = Settings.OnStep, OnHit = Settings.OnHit, OnExpire = Settings.OnExpire, Data = Settings.Data, Visual = nil,
 	}
 	Projectile.Visual = self:_CreateVisual(Projectile, Settings)
 	self.Projectiles[Projectile.Id] = Projectile
@@ -185,9 +155,7 @@ end
 
 function ProjectileController:DestroyProjectile(Projectile)
 	if not Projectile or Projectile.Destroyed then return end
-	Projectile.Destroyed = true
-	self:_DestroyVisual(Projectile)
-	self.Projectiles[Projectile.Id] = nil
+	Projectile.Destroyed = true; self:_DestroyVisual(Projectile); self.Projectiles[Projectile.Id] = nil
 end
 
 function ProjectileController:GetActiveCount()
@@ -200,14 +168,9 @@ function ProjectileController:Destroy()
 	if self.Destroyed then return end
 	self.Destroyed = true
 	if self.Connection then self.Connection:Disconnect(); self.Connection = nil end
-	for _, Projectile in pairs(self.Projectiles) do
-		Projectile.Destroyed = true
-		self:_DestroyVisual(Projectile)
-	end
+	for _, Projectile in pairs(self.Projectiles) do Projectile.Destroyed = true; self:_DestroyVisual(Projectile) end
 	self.Projectiles = {}
-	self.ProjectileCreated:Destroy()
-	self.ProjectileHit:Destroy()
-	self.ProjectileExpired:Destroy()
+	self.ProjectileCreated:Destroy(); self.ProjectileHit:Destroy(); self.ProjectileExpired:Destroy()
 end
 
 return ProjectileController
