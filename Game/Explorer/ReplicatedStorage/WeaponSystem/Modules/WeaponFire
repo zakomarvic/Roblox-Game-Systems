@@ -149,3 +149,49 @@ function WeaponFire:Fire(ShootingHandle)
 		self:_FireProjectile(Start, Direction, ShootingHandle)
 		return
 	end
+
+	while PierceAvailable >= 0 do
+		local Hit, EndPos = self.Raycast(Start, Direction, 5000, self.Character, self.PiercedHumanoid)
+		if not Module.ExplosiveEnabled then
+			if Hit and Hit.Parent then
+				local TargetHumanoid = Hit.Parent:FindFirstChild("Humanoid")
+				local TargetTorso = Hit.Parent:FindFirstChild("Torso")
+				if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
+					self.InflictTarget:FireServer(TargetHumanoid, TargetTorso, Hit, Direction)
+					self.PiercedHumanoid[TargetHumanoid] = true
+				else
+					PierceAvailable = 0
+				end
+			end
+		else
+			local Explosion = Instance.new("Explosion")
+			Explosion.BlastRadius = Module.Radius or Module.ExplosionRadius or 0
+			Explosion.BlastPressure = 0
+			Explosion.Position = EndPos
+			Explosion.Parent = Workspace.CurrentCamera
+			Explosion.Hit:Connect(function(HitPart)
+				if HitPart and HitPart.Parent and HitPart.Name == "Torso" then
+					local TargetHumanoid = HitPart.Parent:FindFirstChild("Humanoid")
+					local TargetTorso = HitPart.Parent:FindFirstChild("Torso")
+					if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
+						self.InflictTarget:FireServer(TargetHumanoid, TargetTorso, HitPart, Direction)
+					end
+				end
+			end)
+			PierceAvailable = 0
+		end
+
+		PierceAvailable = Hit and (PierceAvailable - 1) or -1
+		self:_VisualizeHit(ShootingHandle, EndPos, PierceAvailable == -1, {Module.ExplosiveEnabled == true, Module.BlastRadius or Module.ExplosionRadius or 0, Module.BlastPressure or 0})
+		Start = EndPos + Direction * 0.01
+	end
+end
+
+function WeaponFire:Destroy()
+	if self.Projectiles then
+		self.Projectiles:Destroy()
+		self.Projectiles = nil
+	end
+end
+
+return WeaponFire
