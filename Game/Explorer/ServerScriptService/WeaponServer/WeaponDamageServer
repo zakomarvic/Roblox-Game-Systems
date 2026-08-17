@@ -1,8 +1,16 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 local InflictTarget = Remotes:WaitForChild("InflictTarget")
+local Explosion = Remotes:FindFirstChild("Explosion")
+if not Explosion then
+	Explosion = Instance.new("RemoteEvent")
+	Explosion.Name = "Explosion"
+	Explosion.Parent = Remotes
+end
+
 local WeaponState = require(WeaponSystem.Modules:WaitForChild("WeaponState"))
 local BulletEffects = require(WeaponSystem.Modules:WaitForChild("BulletEffects"))
 
@@ -19,6 +27,10 @@ local function getEquippedWeapon(Player)
 	local Module = require(Setting)
 	if type(Module) ~= "table" then return nil, nil end
 	return Tool, Module
+end
+
+local function getTorso(Character)
+	return Character and (Character:FindFirstChild("Torso") or Character:FindFirstChild("HumanoidRootPart"))
 end
 
 InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso, HitPart, Direction)
@@ -41,7 +53,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 
 	local Character = Player.Character
 	local ShooterHumanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-	local ShooterTorso = Character and Character:FindFirstChild("Torso")
+	local ShooterTorso = getTorso(Character)
 	if not ShooterHumanoid or not ShooterTorso or ShooterHumanoid.Health <= 0 then return end
 
 	local Tool, Module = getEquippedWeapon(Player)
@@ -97,7 +109,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	TargetHumanoid:TakeDamage(Damage)
 
 	if Knockback > 0 then
-		TargetTorso.Velocity = Direction * Knockback
+		TargetTorso.AssemblyLinearVelocity += Direction * Knockback
 	end
 
 	if Lifesteal > 0 and ShooterHumanoid.Health > 0 then
@@ -119,6 +131,69 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	end
 end)
 
-game.Players.PlayerRemoving:Connect(function(Player)
+Explosion.OnServerEvent:Connect(function(Player, Position, Direction)
+	if typeof(Position) ~= "Vector3" then return end
+	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return end
+
+	local Character = Player.Character
+	local ShooterHumanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+	local ShooterTorso = getTorso(Character)
+	if not ShooterHumanoid or not ShooterTorso or ShooterHumanoid.Health <= 0 then return end
+
+	local Tool, Module = getEquippedWeapon(Player)
+	if not Tool or Module.ProjectileType ~= "Projectile" or Module.ExplosiveEnabled ~= true then return end
+
+	local State = WeaponState.Get(Player, Tool)
+	if not State or State.Reloading then return end
+	if os.clock() - State.LastShot > 0.5 then return end
+
+	local Radius = tonumber(Module.ExplosionRadius) or 0
+	local Damage = tonumber(Module.ExplosionDamage) or 0
+	local Knockback = tonumber(Module.ExplosionKnockback) or 0
+	if Radius <= 0 or Damage <= 0 then return end
+
+	local MaxDistance = ((tonumber(Module.ProjectileSpeed) or 500) * (tonumber(Module.ProjectileLifetime) or 10)) + Radius
+	if (Position - ShooterTorso.Position).Magnitude > MaxDistance then return end
+
+	Direction = Direction.Unit
+
+	for _, TargetCharacter in ipairs(workspace:GetChildren()) do
+		if TargetCharacter:IsA("Model") then
+			local TargetHumanoid = TargetCharacter:FindFirstChildOfClass("Humanoid")
+			local TargetTorso = getTorso(TargetCharacter)
+
+			if TargetHumanoid and TargetTorso and TargetHumanoid.Health > 0 then
+				local Offset = TargetTorso.Position - Position
+				local Distance = Offset.Magnitude
+
+				if Distance <= Radius then
+					local ExplosionDirection = Distance > 0 and Offset.Unit or Direction
+					local Falloff = 1 - math.clamp(Distance / Radius, 0, 1)
+					local AppliedDamage = Damage * Falloff
+
+					if AppliedDamage > 0 then
+						while TargetHumanoid:FindFirstChild("creator") do
+							TargetHumanoid.creator:Destroy()
+						end
+
+						local Creator = Instance.new("ObjectValue")
+						Creator.Name = "creator"
+						Creator.Value = Player
+						Creator.Parent = TargetHumanoid
+						game.Debris:AddItem(Creator, 5)
+
+						TargetHumanoid:TakeDamage(AppliedDamage)
+					end
+
+					if Knockback > 0 then
+						TargetTorso.AssemblyLinearVelocity += ExplosionDirection * (Knockback * Falloff)
+					end
+				end
+			end
+		end
+	end
+end)
+
+Players.PlayerRemoving:Connect(function(Player)
 	WeaponState.ClearPlayer(Player)
 end)
