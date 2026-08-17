@@ -123,6 +123,7 @@ function WeaponFire:_FireProjectile(Start, Direction, ShootingHandle)
 				or Direction
 
 			if Module.ExplosiveEnabled == true then
+				warn("[WeaponFire] Projectile impact; firing Explosion remote", Result.Position, self.Tool:GetFullName())
 				Explosion:FireServer(Result.Position, DirectionAtImpact)
 			else
 				local Hit = Result.Instance
