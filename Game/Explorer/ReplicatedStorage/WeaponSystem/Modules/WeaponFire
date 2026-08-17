@@ -118,14 +118,20 @@ function WeaponFire:_FireProjectile(Start, Direction, ShootingHandle)
 			Projectile.LastPosition = Projectile.Position
 		end,
 		OnHit = function(Projectile, Result)
+			warn("[WeaponFire] OnHit CALLBACK ENTERED", Result.Instance:GetFullName())
+
 			local DirectionAtImpact = Projectile.Velocity.Magnitude > 0
 				and Projectile.Velocity.Unit
 				or Direction
+			warn("[WeaponFire] DirectionAtImpact calculated")
 
 			if Module.ExplosiveEnabled == true then
-				warn("[WeaponFire] Projectile impact; firing Explosion remote", Result.Position, self.Tool:GetFullName())
+				warn("[WeaponFire] ExplosiveEnabled = true")
+				warn("[WeaponFire] ABOUT TO FireServer Explosion", Result.Position)
 				Explosion:FireServer(Result.Position, DirectionAtImpact)
+				warn("[WeaponFire] Explosion:FireServer completed")
 			else
+				warn("[WeaponFire] ExplosiveEnabled = false")
 				local Hit = Result.Instance
 				local TargetModel = Hit and Hit:FindFirstAncestorOfClass("Model")
 				local TargetHumanoid = TargetModel and TargetModel:FindFirstChildOfClass("Humanoid")
