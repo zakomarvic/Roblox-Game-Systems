@@ -7,6 +7,7 @@ WeaponFire.__index = WeaponFire
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
+local Explosion = Remotes:WaitForChild("Explosion")
 local BulletVisualizer = require(WeaponSystem.Modules:WaitForChild("BulletVisualizer"))
 local ProjectileController = require(WeaponSystem.Modules:WaitForChild("ProjectileController"))
 local WeaponFireEffects = require(WeaponSystem.Modules:WaitForChild("WeaponFireEffects"))
@@ -117,20 +118,29 @@ function WeaponFire:_FireProjectile(Start, Direction, ShootingHandle)
 			Projectile.LastPosition = Projectile.Position
 		end,
 		OnHit = function(Projectile, Result)
-			local Hit = Result.Instance
 			local DirectionAtImpact = Projectile.Velocity.Magnitude > 0
 				and Projectile.Velocity.Unit
 				or Direction
 
-			local TargetModel = Hit and Hit:FindFirstAncestorOfClass("Model")
-			local TargetHumanoid = TargetModel and TargetModel:FindFirstChildOfClass("Humanoid")
-			local TargetTorso = TargetModel and TargetModel:FindFirstChild("Torso")
+			if Module.ExplosiveEnabled == true then
+				Explosion:FireServer(Result.Position, DirectionAtImpact)
+			else
+				local Hit = Result.Instance
+				local TargetModel = Hit and Hit:FindFirstAncestorOfClass("Model")
+				local TargetHumanoid = TargetModel and TargetModel:FindFirstChildOfClass("Humanoid")
+				local TargetTorso = TargetModel and TargetModel:FindFirstChild("Torso")
 
-			if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
-				self.InflictTarget:FireServer(TargetHumanoid, TargetTorso, Hit, DirectionAtImpact)
+				if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
+					self.InflictTarget:FireServer(TargetHumanoid, TargetTorso, Hit, DirectionAtImpact)
+				end
 			end
 
-			self:_VisualizeHit(ShootingHandle, Result.Position, false)
+			self:_VisualizeHit(
+				ShootingHandle,
+				Result.Position,
+				false,
+				{Module.ExplosiveEnabled == true, Module.ExplosionRadius or 0, 0}
+			)
 		end,
 	})
 
@@ -167,12 +177,12 @@ function WeaponFire:Fire(ShootingHandle)
 				end
 			end
 		else
-			local Explosion = Instance.new("Explosion")
-			Explosion.BlastRadius = Module.Radius or Module.ExplosionRadius or 0
-			Explosion.BlastPressure = 0
-			Explosion.Position = EndPos
-			Explosion.Parent = Workspace.CurrentCamera
-			Explosion.Hit:Connect(function(HitPart)
+			local ExplosionInstance = Instance.new("Explosion")
+			ExplosionInstance.BlastRadius = Module.Radius or Module.ExplosionRadius or 0
+			ExplosionInstance.BlastPressure = 0
+			ExplosionInstance.Position = EndPos
+			ExplosionInstance.Parent = Workspace.CurrentCamera
+			ExplosionInstance.Hit:Connect(function(HitPart)
 				if HitPart and HitPart.Parent and HitPart.Name == "Torso" then
 					local TargetHumanoid = HitPart.Parent:FindFirstChild("Humanoid")
 					local TargetTorso = HitPart.Parent:FindFirstChild("Torso")
