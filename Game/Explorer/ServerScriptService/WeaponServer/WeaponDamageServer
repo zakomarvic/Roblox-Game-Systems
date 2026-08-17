@@ -14,6 +14,8 @@ end
 local WeaponState = require(WeaponSystem.Modules:WaitForChild("WeaponState"))
 local BulletEffects = require(WeaponSystem.Modules:WaitForChild("BulletEffects"))
 
+local ProjectileExplosionState = {}
+
 local function getEquippedWeapon(Player)
 	local Character = Player.Character
 	if not Character then return nil, nil end
@@ -145,7 +147,6 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction)
 
 	local State = WeaponState.Get(Player, Tool)
 	if not State or State.Reloading then return end
-	if os.clock() - State.LastShot > 0.5 then return end
 
 	local Radius = tonumber(Module.ExplosionRadius) or 0
 	local Damage = tonumber(Module.ExplosionDamage) or 0
@@ -155,14 +156,25 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction)
 	local MaxDistance = ((tonumber(Module.ProjectileSpeed) or 500) * (tonumber(Module.ProjectileLifetime) or 10)) + Radius
 	if (Position - ShooterTorso.Position).Magnitude > MaxDistance then return end
 
+	local Key = Player.UserId .. ":" .. tostring(Tool)
+	local Now = os.clock()
+	local FireRate = math.max(tonumber(Module.FireRate) or 0.03, 0.03)
+	local LastExplosion = ProjectileExplosionState[Key] or 0
+	if Now - LastExplosion < FireRate then return end
+	ProjectileExplosionState[Key] = Now
+
 	Direction = Direction.Unit
 
-	for _, TargetCharacter in ipairs(workspace:GetChildren()) do
-		if TargetCharacter:IsA("Model") then
-			local TargetHumanoid = TargetCharacter:FindFirstChildOfClass("Humanoid")
+	local ProcessedCharacters = {}
+	for _, Descendant in ipairs(workspace:GetDescendants()) do
+		if Descendant:IsA("Humanoid") and not ProcessedCharacters[Descendant] then
+			local TargetHumanoid = Descendant
+			local TargetCharacter = TargetHumanoid.Parent
 			local TargetTorso = getTorso(TargetCharacter)
 
-			if TargetHumanoid and TargetTorso and TargetHumanoid.Health > 0 then
+			if TargetCharacter and TargetCharacter:IsA("Model") and TargetHumanoid.Health > 0 and TargetTorso then
+				ProcessedCharacters[TargetHumanoid] = true
+
 				local Offset = TargetTorso.Position - Position
 				local Distance = Offset.Magnitude
 
@@ -195,5 +207,11 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction)
 end)
 
 Players.PlayerRemoving:Connect(function(Player)
+	local Prefix = Player.UserId .. ":"
+	for Key in pairs(ProjectileExplosionState) do
+		if string.sub(Key, 1, #Prefix) == Prefix then
+			ProjectileExplosionState[Key] = nil
+		end
+	end
 	WeaponState.ClearPlayer(Player)
 end)
