@@ -1,7 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Debris = game:GetService("Debris")
-local TweenService = game:GetService("TweenService")
 
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
@@ -15,6 +14,7 @@ ProjectileFired.Parent = Remotes
 
 local WeaponState = require(WeaponSystem.Modules:WaitForChild("WeaponState"))
 local BulletEffects = require(WeaponSystem.Modules:WaitForChild("BulletEffects"))
+local ExplosionEffects = require(WeaponSystem.Modules:WaitForChild("ExplosionEffects"))
 local ProjectileRecords = {}
 
 local function getOwnedWeapon(Player, Tool)
@@ -46,99 +46,6 @@ local function addCreator(TargetHumanoid, Player)
 	Creator.Value = Player
 	Creator.Parent = TargetHumanoid
 	Debris:AddItem(Creator, 5)
-end
-
-local function findExplosionSound(Tool)
-	if not Tool then return nil end
-	local Handle = Tool:FindFirstChild("Handle")
-	if not Handle then return nil end
-	for _, Child in ipairs(Handle:GetDescendants()) do
-		if Child:IsA("Sound") then
-			local Name = string.lower(Child.Name)
-			if Name:find("expl") or Name:find("rocket") or Name:find("blast") or Name:find("boom") then
-				return Child
-			end
-		end
-	end
-	return nil
-end
-
-local function createExplosionVisual(Position, Radius, Tool)
-	local Model = Instance.new("Model")
-	Model.Name = "RPGExplosion"
-	Model.Parent = workspace
-
-	local Core = Instance.new("Part")
-	Core.Name = "Core"
-	Core.Shape = Enum.PartType.Ball
-	Core.Size = Vector3.new(1, 1, 1)
-	Core.CFrame = CFrame.new(Position)
-	Core.Anchored = true
-	Core.CanCollide = false
-	Core.CanTouch = false
-	Core.CanQuery = false
-	Core.CastShadow = false
-	Core.Material = Enum.Material.Neon
-	Core.Transparency = 0.05
-	Core.Parent = Model
-
-	local Light = Instance.new("PointLight")
-	Light.Brightness = 12
-	Light.Range = math.max(Radius * 2, 20)
-	Light.Shadows = true
-	Light.Parent = Core
-
-	local Fire = Instance.new("Fire")
-	Fire.Heat = 15
-	Fire.Size = math.clamp(Radius * 1.4, 8, 30)
-	Fire.Parent = Core
-
-	local Smoke = Instance.new("Smoke")
-	Smoke.Opacity = 0.65
-	Smoke.RiseVelocity = 8
-	Smoke.Size = math.clamp(Radius * 1.2, 6, 24)
-	Smoke.Parent = Core
-
-	local Shockwave = Instance.new("Part")
-	Shockwave.Name = "Shockwave"
-	Shockwave.Shape = Enum.PartType.Ball
-	Shockwave.Size = Vector3.new(1, 1, 1)
-	Shockwave.CFrame = CFrame.new(Position)
-	Shockwave.Anchored = true
-	Shockwave.CanCollide = false
-	Shockwave.CanTouch = false
-	Shockwave.CanQuery = false
-	Shockwave.CastShadow = false
-	Shockwave.Material = Enum.Material.Neon
-	Shockwave.Transparency = 0.35
-	Shockwave.Parent = Model
-
-	local SoundTemplate = findExplosionSound(Tool)
-	if SoundTemplate then
-		local Sound = SoundTemplate:Clone()
-		Sound.Name = "ExplosionSound"
-		Sound.Parent = Core
-		Sound.Looped = false
-		Sound:Play()
-		Debris:AddItem(Sound, math.max(Sound.TimeLength + 0.5, 3))
-	end
-
-	local CoreTween = TweenService:Create(Core, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Size = Vector3.new(Radius * 0.7, Radius * 0.7, Radius * 0.7),
-		Transparency = 1,
-	})
-	local LightTween = TweenService:Create(Light, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Brightness = 0,
-	})
-	local ShockwaveTween = TweenService:Create(Shockwave, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Size = Vector3.new(Radius * 2, Radius * 2, Radius * 2),
-		Transparency = 1,
-	})
-
-	CoreTween:Play()
-	LightTween:Play()
-	ShockwaveTween:Play()
-	Debris:AddItem(Model, 1)
 end
 
 ProjectileFired.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
@@ -218,7 +125,7 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool)
 	if AlongShot < -Radius then warn("[WeaponDamageServer] Rejected: explosion behind origin") return end
 	Records[Tool] = nil
 	Direction = Direction.Unit
-	createExplosionVisual(Position, Radius, Tool)
+	ExplosionEffects.Create(Position, {Radius = Radius, Tool = Tool})
 
 	local OverlapParams = OverlapParams.new()
 	OverlapParams.FilterType = Enum.RaycastFilterType.Exclude
