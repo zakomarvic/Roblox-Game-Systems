@@ -1,4 +1,5 @@
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ProjectileController = {}
 ProjectileController.__index = ProjectileController
@@ -9,6 +10,7 @@ local DEFAULTS = {
 	MaxLifetime = 10,
 	RaycastParams = nil,
 	IgnoreWater = true,
+	ProjectileFolderName = "Projectiles",
 }
 
 local function copyDefaults(Settings)
@@ -20,6 +22,21 @@ local function copyDefaults(Settings)
 		Result[Name] = Value
 	end
 	return Result
+end
+
+local function setProjectileCFrame(Visual, Position, Direction)
+	if not Visual then
+		return
+	end
+
+	local Look = Direction.Magnitude > 0 and Direction.Unit or Vector3.zAxis
+	local CFrameValue = CFrame.lookAt(Position, Position + Look)
+
+	if Visual:IsA("Model") then
+		Visual:PivotTo(CFrameValue)
+	elseif Visual:IsA("BasePart") then
+		Visual.CFrame = CFrameValue
+	end
 end
 
 function ProjectileController.new(Settings)
@@ -58,6 +75,46 @@ function ProjectileController:_ResolveRaycastParams(Projectile)
 	return NewParams
 end
 
+function ProjectileController:_CreateVisual(Projectile, Settings)
+	local ProjectileName = Settings.ProjectileName
+	if not ProjectileName then
+		return nil
+	end
+
+	local FolderName = Settings.ProjectileFolderName or self.Settings.ProjectileFolderName
+	local Folder = ReplicatedStorage:FindFirstChild(FolderName)
+	if not Folder then
+		warn(("ProjectileController: ReplicatedStorage.%s does not exist"):format(FolderName))
+		return nil
+	end
+
+	local Template = Folder:FindFirstChild(ProjectileName)
+	if not Template then
+		warn(("ProjectileController: projectile '%s' was not found in ReplicatedStorage.%s"):format(ProjectileName, FolderName))
+		return nil
+	end
+
+	local Visual = Template:Clone()
+	Visual.Parent = workspace
+
+	if Visual:IsA("Model") and not Visual.PrimaryPart then
+		local Primary = Visual:FindFirstChildWhichIsA("BasePart", true)
+		if Primary then
+			Visual.PrimaryPart = Primary
+		end
+	end
+
+	setProjectileCFrame(Visual, Projectile.Position, Projectile.Direction)
+	return Visual
+end
+
+function ProjectileController:_DestroyVisual(Projectile)
+	if Projectile.Visual and Projectile.Visual.Parent then
+		Projectile.Visual:Destroy()
+	end
+	Projectile.Visual = nil
+end
+
 function ProjectileController:_Step(DeltaTime)
 	for Id, Projectile in pairs(self.Projectiles) do
 		if Projectile.Destroyed then
@@ -83,10 +140,15 @@ function ProjectileController:_Step(DeltaTime)
 		if Result then
 			Projectile.Position = Result.Position
 			Projectile.Velocity = Vector3.zero
+			setProjectileCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction)
 			self:_Hit(Projectile, Result)
 			self.Projectiles[Id] = nil
 		else
 			Projectile.Position = NewPosition
+			if Projectile.Velocity.Magnitude > 0 then
+				Projectile.Direction = Projectile.Velocity.Unit
+			end
+			setProjectileCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction)
 			if Projectile.OnStep then
 				Projectile.OnStep(Projectile, DeltaTime)
 			end
@@ -104,6 +166,7 @@ function ProjectileController:_Hit(Projectile, Result)
 	if Projectile.OnHit then
 		Projectile.OnHit(Projectile, Result)
 	end
+	self:_DestroyVisual(Projectile)
 	self.ProjectileHit:Fire(Projectile, Result)
 end
 
@@ -112,6 +175,7 @@ function ProjectileController:_Expire(Projectile)
 	if Projectile.OnExpire then
 		Projectile.OnExpire(Projectile)
 	end
+	self:_DestroyVisual(Projectile)
 	self.ProjectileExpired:Fire(Projectile)
 end
 
@@ -142,8 +206,10 @@ function ProjectileController:Fire(Origin, Direction, Settings)
 		OnHit = Settings.OnHit,
 		OnExpire = Settings.OnExpire,
 		Data = Settings.Data,
+		Visual = nil,
 	}
 
+	Projectile.Visual = self:_CreateVisual(Projectile, Settings)
 	self.Projectiles[Projectile.Id] = Projectile
 	self.ProjectileCreated:Fire(Projectile)
 	self:_EnsureConnection()
@@ -157,6 +223,7 @@ function ProjectileController:DestroyProjectile(Projectile)
 	end
 
 	Projectile.Destroyed = true
+	self:_DestroyVisual(Projectile)
 	self.Projectiles[Projectile.Id] = nil
 end
 
@@ -181,6 +248,7 @@ function ProjectileController:Destroy()
 
 	for _, Projectile in pairs(self.Projectiles) do
 		Projectile.Destroyed = true
+		self:_DestroyVisual(Projectile)
 	end
 	self.Projectiles = {}
 
