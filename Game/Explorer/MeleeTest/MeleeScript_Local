@@ -9,8 +9,10 @@ local MeleeHitbox = require(ReplicatedStorage.WeaponSystem.Modules:WaitForChild(
 local Player = Players.LocalPlayer
 local Character
 local Humanoid
+local Handle
 local Hitbox
 local Controller
+local CustomGrip
 local Equipped = false
 local LastAttack = 0
 
@@ -19,13 +21,51 @@ local function getCharacter()
 	Humanoid = Character:WaitForChild("Humanoid")
 end
 
+local function removeDefaultGrip()
+	if not Character then return end
+	local RightArm = Character:FindFirstChild("Right Arm") or Character:FindFirstChild("RightHand")
+	if not RightArm then return end
+
+	local DefaultGrip = RightArm:FindFirstChild("RightGrip")
+	if DefaultGrip then
+		DefaultGrip:Destroy()
+	end
+
+	if CustomGrip then
+		CustomGrip:Destroy()
+		CustomGrip = nil
+	end
+
+	if not Handle then return end
+
+	-- Attach the melee weapon to the animated hand without using Roblox's
+	-- automatic RightGrip. This prevents the Tool from forcing a gun-like arm pose.
+	CustomGrip = Instance.new("Motor6D")
+	CustomGrip.Name = "MeleeGrip"
+	CustomGrip.Part0 = RightArm
+	CustomGrip.Part1 = Handle
+	CustomGrip.C0 = CFrame.identity
+	CustomGrip.C1 = Tool.Grip:Inverse()
+	CustomGrip.Parent = RightArm
+end
+
+local function clearGrip()
+	if CustomGrip then
+		CustomGrip:Destroy()
+		CustomGrip = nil
+	end
+end
+
 local function setup()
 	getCharacter()
-	local Handle = Tool:FindFirstChild("Handle")
+	Handle = Tool:FindFirstChild("Handle")
 	if not Handle then
 		warn("[MeleeTest] Tool needs a Handle")
 		return
 	end
+
+	-- Replace Roblox's automatic RightGrip with a neutral hand attachment.
+	removeDefaultGrip()
 
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
@@ -69,6 +109,7 @@ end)
 Tool.Unequipped:Connect(function()
 	Equipped = false
 	if Controller then Controller:Stop() end
+	clearGrip()
 end)
 
 Tool.Activated:Connect(attack)
