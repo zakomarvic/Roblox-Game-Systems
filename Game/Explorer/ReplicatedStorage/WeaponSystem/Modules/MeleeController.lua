@@ -1,5 +1,3 @@
-local RunService = game:GetService("RunService")
-
 local MeleeController = {}
 MeleeController.__index = MeleeController
 
@@ -16,7 +14,6 @@ function MeleeController.new(Config)
 	self.Active = false
 	self.AttackId = 0
 	self.HitTargets = {}
-	self.Connection = nil
 	return self
 end
 
@@ -43,17 +40,7 @@ function MeleeController:Start()
 	self.HitTargets = {}
 
 	if self.OnStart then self.OnStart(self.AttackId) end
-
-	if self.Hitbox.Start then
-		self.Hitbox:Start()
-	end
-
-	if self.Hitbox.OnHit then
-		self.Connection = self.Hitbox.OnHit:Connect(function(HitPart, RaycastResult, Group)
-			self:_HandleHit(HitPart, RaycastResult, Group)
-		end)
-	end
-
+	if self.Hitbox.Start then self.Hitbox:Start() end
 	return true
 end
 
@@ -83,16 +70,7 @@ end
 function MeleeController:Stop()
 	if not self.Active then return false end
 	self.Active = false
-
-	if self.Connection then
-		self.Connection:Disconnect()
-		self.Connection = nil
-	end
-
-	if self.Hitbox and self.Hitbox.Stop then
-		self.Hitbox:Stop()
-	end
-
+	if self.Hitbox and self.Hitbox.Stop then self.Hitbox:Stop() end
 	if self.OnStop then self.OnStop(self.AttackId) end
 	self.HitTargets = {}
 	return true
@@ -110,9 +88,7 @@ end
 
 function MeleeController:Destroy()
 	self:Stop()
-	if self.Hitbox and self.Hitbox.Destroy then
-		self.Hitbox:Destroy()
-	end
+	if self.Hitbox and self.Hitbox.Destroy then self.Hitbox:Destroy() end
 	self.Hitbox = nil
 	self.OnHit = nil
 	self.OnStart = nil
