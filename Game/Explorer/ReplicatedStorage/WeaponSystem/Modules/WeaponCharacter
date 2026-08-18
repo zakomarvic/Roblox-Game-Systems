@@ -38,7 +38,13 @@ function WeaponCharacter:SetCharacter(Character, Humanoid)
 end
 
 function WeaponCharacter:EquipPose()
-	if not self.Module.BodyAimEnabled then return end
+	-- WeaponPose is the gun-specific body/arm posing system.
+	-- Melee weapons must not enter it because it forces the gun shoulder pose.
+	if not self.Module or self.Module.WeaponType == "Melee" then
+		return
+	end
+	if self.Module.BodyAimEnabled == false then return end
+
 	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 
 	self:ClearPose()
