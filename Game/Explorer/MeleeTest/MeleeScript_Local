@@ -1,0 +1,80 @@
+local Tool = script.Parent
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local Setting = require(Tool:WaitForChild("Setting"))
+local MeleeController = require(ReplicatedStorage.WeaponSystem.Modules:WaitForChild("MeleeController"))
+local MeleeHitbox = require(ReplicatedStorage.WeaponSystem.Modules:WaitForChild("MeleeHitbox"))
+
+local Player = Players.LocalPlayer
+local Character
+local Humanoid
+local Hitbox
+local Controller
+local Equipped = false
+local LastAttack = 0
+
+local function getCharacter()
+	Character = Player.Character or Player.CharacterAdded:Wait()
+	Humanoid = Character:WaitForChild("Humanoid")
+end
+
+local function setup()
+	getCharacter()
+	local Handle = Tool:FindFirstChild("Handle")
+	if not Handle then
+		warn("[MeleeTest] Tool needs a Handle")
+		return
+	end
+
+	local Params = RaycastParams.new()
+	Params.FilterType = Enum.RaycastFilterType.Exclude
+	Params.FilterDescendantsInstances = {Character, Tool}
+	Params.IgnoreWater = true
+
+	Hitbox = MeleeHitbox.new({
+		Origin = Handle,
+		Size = Setting.MeleeHitboxSize,
+		Offset = Setting.MeleeHitboxOffset,
+		RaycastParams = Params,
+	})
+
+	Controller = MeleeController.new({
+		Tool = Tool,
+		Character = Character,
+		Humanoid = Humanoid,
+		Module = Setting,
+		Hitbox = Hitbox,
+		OnHit = function(Hit)
+			warn("[MeleeTest] HIT", Hit.TargetCharacter:GetFullName(), Hit.HitPart:GetFullName())
+		end,
+	})
+end
+
+local function attack()
+	if not Equipped or not Controller then return end
+	if not Setting.MeleeEnabled then return end
+	if os.clock() - LastAttack < Setting.AttackCooldown then return end
+	if Humanoid.Health <= 0 then return end
+
+	LastAttack = os.clock()
+	Controller:Attack(Setting.AttackDuration)
+end
+
+Tool.Equipped:Connect(function()
+	Equipped = true
+	setup()
+end)
+
+Tool.Unequipped:Connect(function()
+	Equipped = false
+	if Controller then Controller:Stop() end
+end)
+
+Tool.Activated:Connect(attack)
+
+Player.CharacterAdded:Connect(function()
+	if Equipped then
+		task.defer(setup)
+	end
+end)
