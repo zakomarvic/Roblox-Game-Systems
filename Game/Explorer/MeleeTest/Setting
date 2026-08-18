@@ -1,0 +1,34 @@
+local Setting = {
+	--==================================================
+	-- CORE
+	--==================================================
+	WeaponType = "Melee";
+	BaseDamage = 35;
+	AttackCooldown = 0.6;
+	AttackDuration = 0.22;
+	
+	--==================================================
+	-- MELEE HITBOX
+	--==================================================
+	MeleeEnabled = true;
+	MeleeHitboxSize = Vector3.new(4, 5, 4);
+	MeleeHitboxOffset = CFrame.new(0, 0, -2.5);
+	MeleeHitOnce = true;
+	MeleeKnockback = 20;
+	
+	--==================================================
+	-- ANIMATION
+	--==================================================
+	IdleAnimationID = nil;
+	IdleAnimationSpeed = 1;
+	AttackAnimationID = nil;
+	AttackAnimationSpeed = 1;
+	
+	--==================================================
+	-- AUDIO
+	--==================================================
+	SwingSoundID = "";
+	HitSoundIDs = {};
+}
+
+return Setting
