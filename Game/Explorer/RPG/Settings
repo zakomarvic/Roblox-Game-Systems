@@ -74,9 +74,11 @@ local Setting = {
 	HitSoundIDs = {};
 	
 	--==================================================
-	-- MOVEMENT / BODY AIM
+	-- AIM / BODY
 	--==================================================
-	BodyAimEnabled = true;
+	-- Controls the gun-specific arm/shoulder pose independently from body aim.
+	WeaponPoseEnabled = false;
+	BodyAimEnabled = false;
 	BodyAimSpeed = 20;
 	SprintEnabled = true;
 	SprintWalkSpeed = 24;
