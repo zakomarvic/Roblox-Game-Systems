@@ -27,7 +27,7 @@ function WeaponCharacter:SetCharacter(Character, Humanoid)
 	self.Humanoid = Humanoid
 	self.PoseRequested = WasEquipped
 
-	if WasEquipped then
+	if WasEquipped and self.Module and self.Module.WeaponPoseEnabled ~= false then
 		local Generation = self.PoseGeneration
 		task.defer(function()
 			if self.PoseRequested and self.PoseGeneration == Generation and self.Character == Character and self.Humanoid == Humanoid and self.IsEquipped and self.IsEquipped() then
@@ -38,12 +38,13 @@ function WeaponCharacter:SetCharacter(Character, Humanoid)
 end
 
 function WeaponCharacter:EquipPose()
-	-- WeaponPose is the gun-specific body/arm posing system.
-	-- Melee weapons must not enter it because it forces the gun shoulder pose.
-	if not self.Module or self.Module.WeaponType == "Melee" then
+	-- WeaponPose is optional and explicitly controlled by WeaponPoseEnabled.
+	if not self.Module or self.Module.WeaponPoseEnabled == false then
 		return
 	end
-	if self.Module.BodyAimEnabled == false then return end
+	if self.Module.WeaponType == "Melee" then
+		return
+	end
 
 	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 
