@@ -27,7 +27,7 @@ function WeaponCharacter:SetCharacter(Character, Humanoid)
 	self.Humanoid = Humanoid
 	self.PoseRequested = WasEquipped
 
-	if WasEquipped and self.Module and self.Module.WeaponPoseEnabled ~= false then
+	if WasEquipped and self.Module and self.Module.WeaponPoseEnabled == true then
 		local Generation = self.PoseGeneration
 		task.defer(function()
 			if self.PoseRequested and self.PoseGeneration == Generation and self.Character == Character and self.Humanoid == Humanoid and self.IsEquipped and self.IsEquipped() then
@@ -38,8 +38,8 @@ function WeaponCharacter:SetCharacter(Character, Humanoid)
 end
 
 function WeaponCharacter:EquipPose()
-	-- WeaponPose is optional and explicitly controlled by WeaponPoseEnabled.
-	if not self.Module or self.Module.WeaponPoseEnabled == false then
+	-- Gun posing is opt-in. Only a setting explicitly set to true can enable it.
+	if not self.Module or self.Module.WeaponPoseEnabled ~= true then
 		return
 	end
 	if self.Module.WeaponType == "Melee" then
