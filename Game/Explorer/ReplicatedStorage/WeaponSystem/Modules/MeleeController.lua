@@ -23,7 +23,9 @@ end
 function MeleeController:SetCharacter(Character, Humanoid)
 	self.Character = Character
 	self.Humanoid = Humanoid
-	if self.Active and (not Character or not Humanoid or Humanoid.Health <= 0) then self:Stop() end
+	if self.Active and (not Character or not Humanoid or Humanoid.Health <= 0) then
+		self:Stop()
+	end
 end
 
 function MeleeController:SetHitbox(Hitbox)
@@ -46,40 +48,53 @@ end
 
 function MeleeController:_BindHitbox()
 	if not self.Hitbox then return end
-	self.Hitbox.OnHit = function(HitPart, RaycastResult, Group)
-		self:_HandleHit(HitPart, RaycastResult, Group)
+	self.Hitbox.OnHit = function(RaycastResult, Segment)
+		self:_HandleHit(RaycastResult, Segment)
 	end
 end
 
 function MeleeController:Start()
 	if not self:CanAttack() then return false end
+
+	local Duration = math.max(0, self.Module.MeleeAttackDuration or self.Module.AttackDuration or 0)
+
 	self.Active = true
 	self.AttackId += 1
 	self.LastAttackTime = os.clock()
 	self.HitTargets = {}
+	self.AttackEndTime = os.clock() + Duration
 	self:_BindHitbox()
+
 	if self.OnStart then self.OnStart(self.AttackId) end
-	if self.Hitbox.Start and not self.Hitbox:Start() then
+
+	if self.Hitbox.Start and not self.Hitbox:Start(Duration > 0 and Duration or nil) then
 		self.Active = false
+		self.AttackEndTime = 0
 		self.HitTargets = {}
 		return false
 	end
 
-	local Duration = math.max(0, self.Module.MeleeAttackDuration or self.Module.AttackDuration or 0)
-	self.AttackEndTime = os.clock() + Duration
 	if Duration > 0 then
 		local AttackId = self.AttackId
 		task.delay(Duration, function()
-			if self.Active and self.AttackId == AttackId then self:Stop() end
+			if self.Active and self.AttackId == AttackId then
+				self:Stop()
+			end
 		end)
 	end
+
 	return true
 end
 
-function MeleeController:_HandleHit(HitPart, RaycastResult, Group)
-	if not self.Active or not HitPart then return end
+function MeleeController:_HandleHit(RaycastResult, Segment)
+	if not self.Active or not RaycastResult then return end
+
+	local HitPart = RaycastResult.Instance
+	if not HitPart then return end
+
 	local TargetCharacter = HitPart:FindFirstAncestorOfClass("Model")
 	if not TargetCharacter or TargetCharacter == self.Character then return end
+
 	local TargetHumanoid = TargetCharacter:FindFirstChildOfClass("Humanoid")
 	if not TargetHumanoid or TargetHumanoid.Health <= 0 then return end
 
@@ -92,7 +107,7 @@ function MeleeController:_HandleHit(HitPart, RaycastResult, Group)
 			AttackId = self.AttackId,
 			HitPart = HitPart,
 			RaycastResult = RaycastResult,
-			Group = Group,
+			Segment = Segment,
 			TargetCharacter = TargetCharacter,
 			TargetHumanoid = TargetHumanoid,
 		})
@@ -120,7 +135,9 @@ function MeleeController:Attack(Duration)
 	return self:Start()
 end
 
-function MeleeController:GetAttackId() return self.AttackId end
+function MeleeController:GetAttackId()
+	return self.AttackId
+end
 
 function MeleeController:GetRemainingAttackTime()
 	if not self.Active then return 0 end
