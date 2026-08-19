@@ -8,12 +8,19 @@ local Setting = {
 	AttackDuration = 0.22;
 	
 	--==================================================
-	-- MELEE HITBOX
+	-- SHAPECAST HITBOX
 	--==================================================
 	MeleeEnabled = true;
-	MeleeHitboxSize = Vector3.new(4, 5, 4);
-	MeleeHitboxOffset = CFrame.new(0, 0, -2.5);
 	MeleeHitOnce = true;
+	MeleeResolution = 60;
+	MeleeCastType = "Raycast";
+	MeleeCastSize = Vector3.zero;
+	MeleeCastCFrame = CFrame.identity;
+	MeleeCastRadius = 0;
+	
+	--==================================================
+	-- COMBAT
+	--==================================================
 	MeleeKnockback = 20;
 	
 	--==================================================
