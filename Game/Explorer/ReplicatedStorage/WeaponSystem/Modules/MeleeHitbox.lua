@@ -1,100 +1,104 @@
-local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local MeleeHitbox = {}
 MeleeHitbox.__index = MeleeHitbox
 
+local function getShapecastHitbox()
+	local Container = ReplicatedStorage.WeaponSystem.Modules:WaitForChild("ShapecastHitbox")
+
+	if Container:IsA("ModuleScript") then
+		return require(Container)
+	end
+
+	local Module = Container:FindFirstChild("init") or Container:FindFirstChild("ShapecastHitbox")
+	if not Module or not Module:IsA("ModuleScript") then
+		Module = Container:FindFirstChildWhichIsA("ModuleScript", true)
+	end
+
+	assert(Module, "ShapecastHitbox module was not found inside WeaponSystem.Modules.ShapecastHitbox")
+	return require(Module)
+end
+
 function MeleeHitbox.new(Config)
+	assert(Config.Origin, "MeleeHitbox requires an Origin instance")
+
 	local self = setmetatable({}, MeleeHitbox)
 	self.Origin = Config.Origin
-	self.Size = Config.Size or Vector3.new(4, 4, 4)
-	self.Offset = Config.Offset or CFrame.identity
-	self.RaycastParams = Config.RaycastParams
+	self.RaycastParams = Config.RaycastParams or RaycastParams.new()
 	self.OnHit = Config.OnHit
+	self.Resolution = Config.Resolution or 60
+	self.CastData = Config.CastData
 	self.Active = false
-	self.Connection = nil
-	self.LastCFrame = nil
-	self.HitParts = {}
+	self.Destroyed = false
+
+	local ShapecastHitbox = getShapecastHitbox()
+	self.Hitbox = ShapecastHitbox.new(self.Origin, self.RaycastParams)
+	self.Hitbox:SetResolution(self.Resolution)
+
+	if self.CastData then
+		self.Hitbox:SetCastData(self.CastData)
+	end
+
+	self.Hitbox:OnHit(function(RaycastResult, Segment)
+		if self.OnHit then
+			self.OnHit(RaycastResult, Segment)
+		end
+	end)
+
 	return self
 end
 
 function MeleeHitbox:SetOrigin(Origin)
+	assert(not self.Destroyed, "MeleeHitbox has been destroyed")
 	self.Origin = Origin
+	self.Hitbox.Instance = Origin
+	self.Hitbox:Reconcile()
 end
 
-function MeleeHitbox:SetSize(Size)
-	self.Size = Size
+function MeleeHitbox:SetResolution(Resolution)
+	self.Resolution = Resolution
+	self.Hitbox:SetResolution(Resolution)
 end
 
-function MeleeHitbox:SetOffset(Offset)
-	self.Offset = Offset or CFrame.identity
+function MeleeHitbox:SetCastData(CastData)
+	self.CastData = CastData
+	self.Hitbox:SetCastData(CastData)
 end
 
-function MeleeHitbox:_GetCFrame()
-	if not self.Origin then return nil end
-	if self.Origin:IsA("Attachment") then
-		return self.Origin.WorldCFrame * self.Offset
-	elseif self.Origin:IsA("BasePart") then
-		return self.Origin.CFrame * self.Offset
-	elseif self.Origin:IsA("Model") then
-		local Root = self.Origin.PrimaryPart or self.Origin:FindFirstChild("HumanoidRootPart")
-		return Root and Root.CFrame * self.Offset or nil
-	end
-	return nil
+function MeleeHitbox:Reconcile()
+	self.Hitbox:Reconcile()
 end
 
-function MeleeHitbox:_Cast()
-	local CurrentCFrame = self:_GetCFrame()
-	if not CurrentCFrame then return end
-
-	local Direction = Vector3.zero
-	if self.LastCFrame then
-		Direction = CurrentCFrame.Position - self.LastCFrame.Position
-	end
-
-	local Result = workspace:Blockcast(CurrentCFrame, self.Size, Direction, self.RaycastParams)
-	self.LastCFrame = CurrentCFrame
-
-	if Result and Result.Instance and not self.HitParts[Result.Instance] then
-		self.HitParts[Result.Instance] = true
-		if self.OnHit then
-			self.OnHit(Result.Instance, Result)
-		end
-	end
-end
-
-function MeleeHitbox:Start()
-	if self.Active then return false end
-	if not self.Origin then return false end
+function MeleeHitbox:Start(Duration, OverrideRaycastParams)
+	if self.Destroyed or self.Active then return false end
+	if not self.Origin or not self.Origin.Parent then return false end
 
 	self.Active = true
-	self.HitParts = {}
-	self.LastCFrame = self:_GetCFrame()
-	self:_Cast()
-
-	self.Connection = RunService.Heartbeat:Connect(function()
-		if not self.Active then return end
-		self:_Cast()
-	end)
+	self.Hitbox:HitStart(Duration, OverrideRaycastParams)
 	return true
 end
 
 function MeleeHitbox:Stop()
-	if not self.Active then return false end
+	if self.Destroyed or not self.Active then return false end
 	self.Active = false
-	if self.Connection then
-		self.Connection:Disconnect()
-		self.Connection = nil
-	end
-	self.LastCFrame = nil
-	self.HitParts = {}
+	self.Hitbox:HitStop()
 	return true
 end
 
+function MeleeHitbox:IsActive()
+	return self.Active and self.Hitbox.Active
+end
+
 function MeleeHitbox:Destroy()
-	self:Stop()
+	if self.Destroyed then return end
+	self.Destroyed = true
+	self.Active = false
+	if self.Hitbox then
+		self.Hitbox:Destroy()
+	end
+	self.Hitbox = nil
 	self.Origin = nil
 	self.OnHit = nil
-	self.RaycastParams = nil
 end
 
 return MeleeHitbox
