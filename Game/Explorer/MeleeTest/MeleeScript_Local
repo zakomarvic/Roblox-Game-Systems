@@ -15,6 +15,7 @@ local Controller
 local CustomGrip
 local Equipped = false
 local LastAttack = 0
+local OldAutoRotate = nil
 
 local function getCharacter()
 	Character = Player.Character or Player.CharacterAdded:Wait()
@@ -38,8 +39,12 @@ local function removeDefaultGrip()
 
 	if not Handle then return end
 
-	-- Attach the melee weapon to the animated hand without using Roblox's
-	-- automatic RightGrip. This prevents the Tool from forcing a gun-like arm pose.
+	-- A melee Tool should not physically push against the character.
+	Handle.CanCollide = false
+	Handle.CanTouch = false
+	Handle.CanQuery = true
+	Handle.Massless = true
+
 	CustomGrip = Instance.new("Motor6D")
 	CustomGrip.Name = "MeleeGrip"
 	CustomGrip.Part0 = RightArm
@@ -64,7 +69,11 @@ local function setup()
 		return
 	end
 
-	-- Replace Roblox's automatic RightGrip with a neutral hand attachment.
+	-- Keep normal character rotation enabled. Gun WeaponPose may have disabled it
+	-- on a previous weapon, so explicitly restore it for melee weapons.
+	OldAutoRotate = Humanoid.AutoRotate
+	Humanoid.AutoRotate = true
+
 	removeDefaultGrip()
 
 	local Params = RaycastParams.new()
@@ -110,6 +119,10 @@ Tool.Unequipped:Connect(function()
 	Equipped = false
 	if Controller then Controller:Stop() end
 	clearGrip()
+	if Humanoid and Humanoid.Parent then
+		Humanoid.AutoRotate = OldAutoRotate ~= nil and OldAutoRotate or true
+	end
+	OldAutoRotate = nil
 end)
 
 Tool.Activated:Connect(attack)
