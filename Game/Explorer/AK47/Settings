@@ -44,8 +44,6 @@ local Setting = {
 	--==================================================
 	-- PROJECTILE / HIT DETECTION
 	--==================================================
-	-- "Hitscan" = instant raycast.
-	-- "Projectile" = simulated projectile.
 	ProjectileType = "Hitscan";
 	ProjectileSpeed = 500;
 	ProjectileGravity = Vector3.zero;
@@ -67,6 +65,9 @@ local Setting = {
 	FieldOfView = 12.5;
 	MouseSensitive = 0.05;
 	SpreadRedution = 1;
+	
+	-- Controls the gun-specific arm/shoulder pose.
+	WeaponPoseEnabled = true;
 	BodyAimEnabled = true;
 	BodyAimSpeed = 20;
 	
