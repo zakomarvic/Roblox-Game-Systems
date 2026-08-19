@@ -1,3 +1,5 @@
+local RunService = game:GetService("RunService")
+
 local CharacterRagdoll = {}
 CharacterRagdoll.__index = CharacterRagdoll
 
@@ -56,6 +58,7 @@ function CharacterRagdoll.new(character)
 	self.Humanoid = character:FindFirstChildOfClass("Humanoid")
 	self.PreviousPlatformStand = false
 	self.PreviousAutoRotate = true
+	self.PreviousBreakJointsOnDeath = true
 	return self
 end
 
@@ -101,7 +104,22 @@ function CharacterRagdoll:_DestroyConstraints()
 	self.Constraints = {}
 	self.Attachments = {}
 	self.Colliders = {}
-	self.Motors = {}
+end
+
+function CharacterRagdoll:_SetServerNetworkOwnership(owner)
+	if not RunService:IsServer() then
+		return
+	end
+
+	for _, part in ipairs(self.Character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			if owner == nil then
+				part:SetNetworkOwner(nil)
+			else
+				part:SetNetworkOwnershipAuto()
+			end
+		end
+	end
 end
 
 function CharacterRagdoll:SetRagdolled(enabled)
@@ -117,31 +135,71 @@ function CharacterRagdoll:SetRagdolled(enabled)
 		if self.Humanoid then
 			self.PreviousPlatformStand = self.Humanoid.PlatformStand
 			self.PreviousAutoRotate = self.Humanoid.AutoRotate
+			self.PreviousBreakJointsOnDeath = self.Humanoid.BreakJointsOnDeath
 			self.Humanoid.BreakJointsOnDeath = false
 			self.Humanoid.PlatformStand = true
 			self.Humanoid.AutoRotate = false
-			self.Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 		end
 
 		self:_Build()
 		for _, motor in ipairs(self.Motors) do
 			motor.Enabled = false
 		end
+
+		self:_SetServerNetworkOwnership(nil)
 		self.Ragdolled = true
 	else
+		if self.Humanoid and self.Humanoid.Health <= 0 then
+			return
+		end
+
 		for _, motor in ipairs(self.Motors) do
-			motor.Enabled = true
+			if motor.Parent then
+				motor.Enabled = true
+			end
 		end
 
 		self:_DestroyConstraints()
+		self:_SetServerNetworkOwnership(true)
 
 		if self.Humanoid then
 			self.Humanoid.PlatformStand = self.PreviousPlatformStand
 			self.Humanoid.AutoRotate = self.PreviousAutoRotate
+			self.Humanoid.BreakJointsOnDeath = self.PreviousBreakJointsOnDeath
 		end
 
 		self.Ragdolled = false
 	end
+end
+
+function CharacterRagdoll:Recover()
+	self:SetRagdolled(false)
+end
+
+function CharacterRagdoll:ApplyImpulse(direction, force)
+	if not self.Ragdolled then
+		return false
+	end
+	if not self.Character or not self.Character.Parent then
+		return false
+	end
+
+	local RootPart = self.Character:FindFirstChild("HumanoidRootPart")
+	if not RootPart then
+		return false
+	end
+
+	if typeof(direction) ~= "Vector3" or direction.Magnitude <= 0 then
+		return false
+	end
+
+	force = math.clamp(tonumber(force) or 0, 0, 100)
+	if force <= 0 then
+		return false
+	end
+
+	RootPart:ApplyImpulse(direction.Unit * force * RootPart.AssemblyMass)
+	return true
 end
 
 function CharacterRagdoll:IsRagdolled()
@@ -149,9 +207,18 @@ function CharacterRagdoll:IsRagdolled()
 end
 
 function CharacterRagdoll:Destroy()
-	self:SetRagdolled(false)
+	if self.Ragdolled then
+		for _, motor in ipairs(self.Motors) do
+			if motor.Parent then
+				motor.Enabled = true
+			end
+		end
+		self:_DestroyConstraints()
+		self:_SetServerNetworkOwnership(true)
+	end
 	self.Character = nil
 	self.Humanoid = nil
+	self.Ragdolled = false
 end
 
 return CharacterRagdoll
