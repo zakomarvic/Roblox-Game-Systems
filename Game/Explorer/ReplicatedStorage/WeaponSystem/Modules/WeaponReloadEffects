@@ -1,0 +1,31 @@
+local WeaponReloadEffects = {}
+
+function WeaponReloadEffects.PlayShotgunInsert(Handle)
+	if not Handle or not Handle:IsA("BasePart") then
+		return
+	end
+
+	local Sound = Handle:FindFirstChild("ShotgunClipin")
+	if Sound and Sound:IsA("Sound") then
+		Sound:Play()
+	end
+end
+
+function WeaponReloadEffects.PlayReload(Handle)
+	if not Handle or not Handle:IsA("BasePart") then
+		return
+	end
+
+	local Sound = Handle:FindFirstChild("ReloadSound")
+	if Sound and Sound:IsA("Sound") then
+		Sound:Play()
+	end
+end
+
+function WeaponReloadEffects.Broadcast(Tool, WeaponEffects)
+	if WeaponEffects then
+		WeaponEffects:FireServer(Tool, "Reload")
+	end
+end
+
+return WeaponReloadEffects
