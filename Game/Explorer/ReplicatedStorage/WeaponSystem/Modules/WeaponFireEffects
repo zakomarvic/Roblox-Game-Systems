@@ -121,6 +121,14 @@ function WeaponFireEffects.ShowMuzzleFlash(Tool)
 	end)
 end
 
+function WeaponFireEffects.PlayFirePresentation(Tool, ShootingHandle, WeaponEffects)
+	WeaponFireEffects.ShowMuzzleFlash(Tool)
+	playFireSound(Tool, ShootingHandle)
+	if WeaponEffects then
+		WeaponEffects:FireServer(Tool, "Fire")
+	end
+end
+
 function WeaponFireEffects.VisualizeAndBroadcast(Tool, ShootingHandle, MuzzleOffset, EndPos, MuzzleEffect, HitEffect, HitSound, ExplosiveData, BulletData, VisualizeEnabled, BulletVisualizer, WeaponEffects)
 	if BulletVisualizer then
 		task.spawn(function()
