@@ -17,6 +17,16 @@ function MeleeController.new(Config)
 	self.LastAttackTime = -math.huge
 	self.AttackEndTime = 0
 	self.Destroyed = false
+
+	-- Bind the wrapper callback once. MeleeHitbox owns the underlying
+	-- ShapecastHitbox:OnHit listener, so rebinding this on every swing
+	-- is unnecessary and could make callback lifecycle harder to reason about.
+	if self.Hitbox then
+		self.Hitbox.OnHit = function(RaycastResult, Segment)
+			self:_HandleHit(RaycastResult, Segment)
+		end
+	end
+
 	return self
 end
 
@@ -31,6 +41,12 @@ end
 function MeleeController:SetHitbox(Hitbox)
 	if self.Active then self:Stop() end
 	self.Hitbox = Hitbox
+
+	if self.Hitbox then
+		self.Hitbox.OnHit = function(RaycastResult, Segment)
+			self:_HandleHit(RaycastResult, Segment)
+		end
+	end
 end
 
 function MeleeController:IsActive()
@@ -46,13 +62,6 @@ function MeleeController:CanAttack()
 	return os.clock() - self.LastAttackTime >= Cooldown
 end
 
-function MeleeController:_BindHitbox()
-	if not self.Hitbox then return end
-	self.Hitbox.OnHit = function(RaycastResult, Segment)
-		self:_HandleHit(RaycastResult, Segment)
-	end
-end
-
 function MeleeController:Start()
 	if not self:CanAttack() then return false end
 
@@ -63,7 +72,6 @@ function MeleeController:Start()
 	self.LastAttackTime = os.clock()
 	self.HitTargets = {}
 	self.AttackEndTime = os.clock() + Duration
-	self:_BindHitbox()
 
 	if self.OnStart then self.OnStart(self.AttackId) end
 
