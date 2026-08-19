@@ -6,7 +6,8 @@ local LEFT_POSE = CFrame.new(-0.4, 0.5, 0) * CFrame.Angles(0, math.rad(-80), 0)
 local RIGHT_POSE = CFrame.new(0.9, 0.5, 0) * CFrame.Angles(math.rad(-10), math.rad(80), 0)
 
 function WeaponPose.Equip(Character, Settings)
-	if Settings and Settings.WeaponPoseEnabled == false then
+	-- Weapon posing is opt-in. Missing/nil settings must never enable it.
+	if not Settings or Settings.WeaponPoseEnabled ~= true then
 		return nil
 	end
 	if not Character or not Character.Parent then return nil end
@@ -29,8 +30,8 @@ function WeaponPose.Equip(Character, Settings)
 		DefaultLeftC0 = LeftShoulder.C0,
 		DefaultRightC0 = RightShoulder.C0,
 		OldAutoRotate = Humanoid.AutoRotate,
-		BodyAimEnabled = Settings and Settings.BodyAimEnabled ~= false or true,
-		BodyAimSpeed = Settings and Settings.BodyAimSpeed or 12,
+		BodyAimEnabled = Settings.BodyAimEnabled == true,
+		BodyAimSpeed = Settings.BodyAimSpeed or 12,
 		AimConnection = nil,
 	}
 
@@ -43,8 +44,6 @@ end
 function WeaponPose.BindAim(PoseData, AimSource)
 	if not PoseData then return nil end
 	WeaponPose.UnbindAim(PoseData)
-	local LastLeft = nil
-	local LastRight = nil
 	PoseData.AimConnection = RunService.RenderStepped:Connect(function(DeltaTime)
 		if not PoseData.Character or not PoseData.Character.Parent or not PoseData.Humanoid or PoseData.Humanoid.Health <= 0 then
 			WeaponPose.UnbindAim(PoseData)
@@ -52,11 +51,9 @@ function WeaponPose.BindAim(PoseData, AimSource)
 		end
 
 		if PoseData.LeftShoulder and PoseData.LeftShoulder.Parent then
-			LastLeft = PoseData.LeftShoulder.C0
 			PoseData.LeftShoulder.C0 = LEFT_POSE
 		end
 		if PoseData.RightShoulder and PoseData.RightShoulder.Parent then
-			LastRight = PoseData.RightShoulder.C0
 			PoseData.RightShoulder.C0 = RIGHT_POSE
 		end
 
