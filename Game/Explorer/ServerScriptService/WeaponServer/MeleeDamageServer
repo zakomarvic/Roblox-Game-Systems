@@ -133,7 +133,7 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 		Speed = math.clamp(tonumber(Module.ThrowSpeed) or 120, 1, 1000),
 		Gravity = Module.ThrowGravity or Vector3.new(0, -workspace.Gravity * 0.35, 0),
 		MaxLifetime = math.clamp(tonumber(Module.ThrowLifetime) or 5, 0.1, 30),
-		Visual = Handle,
+		Visual = Tool,
 		ForceVisible = true,
 		SpinSpeed = Module.ThrowSpin and Vector3.new(math.rad(-1080), 0, 0) or nil,
 		StickOnHit = StickOnHit,
