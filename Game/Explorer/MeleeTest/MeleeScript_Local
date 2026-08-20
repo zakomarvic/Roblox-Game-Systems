@@ -4,9 +4,12 @@ local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
 
 local Setting = require(Tool:WaitForChild("Setting"))
-local MeleeController = require(ReplicatedStorage.WeaponSystem.Modules:WaitForChild("MeleeController"))
-local MeleeHitbox = require(ReplicatedStorage.WeaponSystem.Modules:WaitForChild("MeleeHitbox"))
-local WeaponAnimation = require(ReplicatedStorage.WeaponSystem.Modules:WaitForChild("WeaponAnimation"))
+local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
+local Remotes = WeaponSystem:WaitForChild("Remotes")
+local MeleeRemote = Remotes:WaitForChild("Melee")
+local MeleeController = require(WeaponSystem.Modules:WaitForChild("MeleeController"))
+local MeleeHitbox = require(WeaponSystem.Modules:WaitForChild("MeleeHitbox"))
+local WeaponAnimation = require(WeaponSystem.Modules:WaitForChild("WeaponAnimation"))
 
 local Player = Players.LocalPlayer
 local Character
@@ -119,12 +122,14 @@ local function setup()
 		Module = Setting,
 		Hitbox = Hitbox,
 		OnStart = function()
+			MeleeRemote:FireServer("Start", Tool)
 			if Setting.AttackAnimationID ~= nil then
 				AnimationController:Play("AttackAnim", Setting.AttackAnimationSpeed or 1, 0.03)
 			end
 		end,
 		OnHit = function(Hit)
 			warn("[MeleeTest] HIT", Hit.TargetCharacter:GetFullName(), Hit.HitPart:GetFullName())
+			MeleeRemote:FireServer("Hit", Tool, Hit.TargetHumanoid, Hit.HitPart)
 		end,
 	})
 end
