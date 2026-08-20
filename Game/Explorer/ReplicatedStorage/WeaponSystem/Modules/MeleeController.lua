@@ -16,11 +16,11 @@ function MeleeController.new(Config)
 	self.HitTargets = {}
 	self.LastAttackTime = -math.huge
 	self.AttackEndTime = 0
+	self.PendingAttack = false
+	self.PendingDuration = nil
+	self.PendingToken = 0
 	self.Destroyed = false
 
-	-- Bind the wrapper callback once. MeleeHitbox owns the underlying
-	-- ShapecastHitbox:OnHit listener, so rebinding this on every swing
-	-- is unnecessary and could make callback lifecycle harder to reason about.
 	if self.Hitbox then
 		self.Hitbox.OnHit = function(RaycastResult, Segment)
 			self:_HandleHit(RaycastResult, Segment)
@@ -53,19 +53,54 @@ function MeleeController:IsActive()
 	return self.Active
 end
 
-function MeleeController:CanAttack()
+function MeleeController:_GetCooldown()
+	return math.max(0, self.Module.MeleeCooldown or self.Module.AttackCooldown or 0)
+end
+
+function MeleeController:_CanStartNow()
 	if self.Destroyed or self.Active then return false end
 	if not self.Character or not self.Humanoid or self.Humanoid.Health <= 0 then return false end
 	if not self.Hitbox then return false end
 	if self.Module.MeleeEnabled == false then return false end
-	local Cooldown = math.max(0, self.Module.MeleeCooldown or self.Module.AttackCooldown or 0)
-	return os.clock() - self.LastAttackTime >= Cooldown
+	return os.clock() - self.LastAttackTime >= self:_GetCooldown()
 end
 
-function MeleeController:Start()
-	if not self:CanAttack() then return false end
+function MeleeController:CanAttack()
+	return self:_CanStartNow()
+end
 
-	local Duration = math.max(0, self.Module.MeleeAttackDuration or self.Module.AttackDuration or 0)
+function MeleeController:_QueueAttack(Duration)
+	self.PendingAttack = true
+	self.PendingDuration = Duration
+	self.PendingToken += 1
+	local Token = self.PendingToken
+	local Remaining = math.max(0, self:_GetCooldown() - (os.clock() - self.LastAttackTime))
+
+	task.delay(Remaining, function()
+		if self.Destroyed or not self.PendingAttack or self.PendingToken ~= Token then return end
+		self.PendingAttack = false
+		local QueuedDuration = self.PendingDuration
+		self.PendingDuration = nil
+		self:Start(QueuedDuration)
+	end)
+end
+
+function MeleeController:Start(Duration)
+	if Duration == nil then
+		Duration = self.Module.MeleeAttackDuration or self.Module.AttackDuration or 0
+	end
+	Duration = math.max(0, Duration)
+
+	if not self:_CanStartNow() then
+		if not self.Destroyed and self.Module.MeleeEnabled ~= false and self.Character and self.Humanoid and self.Humanoid.Health > 0 and self.Hitbox then
+			self:_QueueAttack(Duration)
+		end
+		return false
+	end
+
+	self.PendingAttack = false
+	self.PendingDuration = nil
+	self.PendingToken += 1
 
 	self.Active = true
 	self.AttackId += 1
@@ -129,18 +164,26 @@ function MeleeController:Stop()
 	if self.Hitbox and self.Hitbox.Stop then self.Hitbox:Stop() end
 	if self.OnStop then self.OnStop(self.AttackId) end
 	self.HitTargets = {}
+
+	-- If the player clicked during the active swing, start the buffered
+	-- attack as soon as the cooldown has elapsed. Only one input is buffered.
+	if self.PendingAttack and not self.Destroyed then
+		local Remaining = math.max(0, self:_GetCooldown() - (os.clock() - self.LastAttackTime))
+		local Token = self.PendingToken
+		task.delay(Remaining, function()
+			if self.Destroyed or not self.PendingAttack or self.PendingToken ~= Token then return end
+			self.PendingAttack = false
+			local Duration = self.PendingDuration
+			self.PendingDuration = nil
+			self:Start(Duration)
+		end)
+	end
+
 	return true
 end
 
 function MeleeController:Attack(Duration)
-	if Duration ~= nil then
-		local PreviousDuration = self.Module.MeleeAttackDuration
-		self.Module.MeleeAttackDuration = Duration
-		local Result = self:Start()
-		self.Module.MeleeAttackDuration = PreviousDuration
-		return Result
-	end
-	return self:Start()
+	return self:Start(Duration)
 end
 
 function MeleeController:GetAttackId()
@@ -156,6 +199,9 @@ function MeleeController:Destroy()
 	if self.Destroyed then return end
 	self:Stop()
 	self.Destroyed = true
+	self.PendingAttack = false
+	self.PendingDuration = nil
+	self.PendingToken += 1
 	if self.Hitbox and self.Hitbox.Destroy then self.Hitbox:Destroy() end
 	self.Hitbox = nil
 	self.OnHit = nil
