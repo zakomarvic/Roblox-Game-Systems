@@ -1,0 +1,98 @@
+local Players = game:GetService("Players")
+local DataStoreService = game:GetService("DataStoreService")
+
+local Modules = script.Parent:WaitForChild("Modules")
+local CashService = require(Modules:WaitForChild("CashService"))
+
+local CashStore = DataStoreService:GetDataStore("PlayerEconomy_v1")
+
+local DEFAULT_CASH = 0
+local AUTOSAVE_INTERVAL = 60
+local MAX_RETRIES = 3
+
+local Saving = {}
+
+local function getKey(Player)
+	return "Player_" .. Player.UserId
+end
+
+local function load(Player)
+	local Data
+	for Attempt = 1, MAX_RETRIES do
+		local Success, Result = pcall(function()
+			return CashStore:GetAsync(getKey(Player))
+		end)
+		if Success then
+			Data = Result
+			break
+		end
+		task.wait(Attempt)
+	end
+
+	local Amount = DEFAULT_CASH
+	if type(Data) == "table" then
+		Amount = tonumber(Data.Cash) or DEFAULT_CASH
+	elseif type(Data) == "number" then
+		Amount = Data
+	end
+	CashService.GetOrCreate(Player, Amount)
+end
+
+local function save(Player)
+	if Saving[Player] then return false end
+	Saving[Player] = true
+
+	local Amount = CashService.Get(Player)
+	local Success = false
+	for Attempt = 1, MAX_RETRIES do
+		Success = pcall(function()
+			CashStore:UpdateAsync(getKey(Player), function(OldData)
+				local Data = type(OldData) == "table" and OldData or {}
+				Data.Cash = Amount
+				return Data
+			end)
+		end)
+		if Success then break end
+		task.wait(Attempt)
+	end
+
+	Saving[Player] = nil
+	return Success
+end
+
+Players.PlayerAdded:Connect(function(Player)
+	CashService.GetOrCreate(Player, DEFAULT_CASH)
+	load(Player)
+end)
+
+Players.PlayerRemoving:Connect(function(Player)
+	save(Player)
+	Saving[Player] = nil
+end)
+
+task.spawn(function()
+	while true do
+		task.wait(AUTOSAVE_INTERVAL)
+		for _, Player in ipairs(Players:GetPlayers()) do
+			task.spawn(save, Player)
+		end
+	end
+end)
+
+game:BindToClose(function()
+	local PlayerList = Players:GetPlayers()
+	local Remaining = #PlayerList
+	if Remaining == 0 then return end
+
+	for _, Player in ipairs(PlayerList) do
+		task.spawn(function()
+			save(Player)
+			Remaining -= 1
+		end)
+	end
+
+	local Deadline = os.clock() + 25
+	while Remaining > 0 and os.clock() < Deadline do
+		task.wait()
+	end
+end)
