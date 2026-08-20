@@ -131,9 +131,7 @@ function ProjectileController:_Step(DeltaTime)
 	for Id, Projectile in pairs(self.Projectiles) do
 		if Projectile.Destroyed then self.Projectiles[Id] = nil; continue end
 		Projectile.Age += DeltaTime
-		if Projectile.Age >= Projectile.MaxLifetime then
-			self:_Expire(Projectile); self.Projectiles[Id] = nil; continue
-		end
+		if Projectile.Age >= Projectile.MaxLifetime then self:_Expire(Projectile); self.Projectiles[Id] = nil; continue end
 		local OldPosition = Projectile.Position
 		Projectile.Velocity += Projectile.Gravity * DeltaTime
 		local NewPosition = OldPosition + Projectile.Velocity * DeltaTime
@@ -186,10 +184,7 @@ function ProjectileController:Fire(Origin, Direction, Settings)
 		Visual = nil, Rotation = Settings.Rotation or CFrame.identity, SpinSpeed = Settings.SpinSpeed, SpinAngle = Vector3.zero,
 	}
 	Projectile.Visual = self:_CreateVisual(Projectile, Settings)
-	if Settings.Visual and not Projectile.Visual then
-		warn("[ProjectileController] Failed to create projectile visual")
-		return nil
-	end
+	if Settings.Visual and not Projectile.Visual then warn("[ProjectileController] Failed to create projectile visual"); return nil end
 	self.Projectiles[Projectile.Id] = Projectile
 	self.ProjectileCreated:Fire(Projectile)
 	self:_EnsureConnection()
