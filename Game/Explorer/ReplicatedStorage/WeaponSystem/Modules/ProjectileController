@@ -24,8 +24,8 @@ end
 local function prepareVisual(Visual, ForceVisible)
 	if not Visual then return end
 	if Visual:IsA("Model") and not Visual.PrimaryPart then
-		local Primary = Visual:FindFirstChildWhichIsA("BasePart", true)
-		if Primary then Visual.PrimaryPart = Primary end
+		local PrimaryPart = Visual:FindFirstChildWhichIsA("BasePart", true)
+		if PrimaryPart then Visual.PrimaryPart = PrimaryPart end
 	end
 	for _, Descendant in ipairs(Visual:GetDescendants()) do
 		if Descendant:IsA("BasePart") then
@@ -55,10 +55,9 @@ local function prepareVisual(Visual, ForceVisible)
 	end
 end
 
-local function stickVisualToHit(Projectile, HitPart)
-	local Visual = Projectile.Visual
-	if not Visual or not Visual.Parent or not HitPart or not HitPart:IsA("BasePart") then return end
+local function getVisualParts(Visual)
 	local Parts = {}
+	if not Visual then return Parts end
 	if Visual:IsA("BasePart") then
 		table.insert(Parts, Visual)
 	else
@@ -66,18 +65,58 @@ local function stickVisualToHit(Projectile, HitPart)
 			if Descendant:IsA("BasePart") then table.insert(Parts, Descendant) end
 		end
 	end
-	for _, Part in ipairs(Parts) do
+	return Parts
+end
+
+local function anchorVisual(Projectile)
+	local Visual = Projectile.Visual
+	if not Visual or not Visual.Parent then return end
+
+	for _, Part in ipairs(getVisualParts(Visual)) do
+		for _, Child in ipairs(Part:GetChildren()) do
+			if Child:IsA("WeldConstraint") and Child.Name == "ProjectileStickWeld" then
+				Child:Destroy()
+			end
+		end
+		Part.Anchored = true
+		Part.CanCollide = false
+		Part.CanTouch = false
+		Part.CanQuery = false
+		Part.Massless = true
+	end
+
+	Projectile.StuckToPart = nil
+	if Projectile.StickConnection then
+		Projectile.StickConnection:Disconnect()
+		Projectile.StickConnection = nil
+	end
+end
+
+local function stickVisualToHit(Projectile, HitPart)
+	local Visual = Projectile.Visual
+	if not Visual or not Visual.Parent or not HitPart or not HitPart:IsA("BasePart") then return end
+
+	for _, Part in ipairs(getVisualParts(Visual)) do
 		Part.Anchored = false
 		Part.CanCollide = false
 		Part.CanTouch = false
 		Part.CanQuery = false
 		Part.Massless = true
+
 		local Weld = Instance.new("WeldConstraint")
 		Weld.Name = "ProjectileStickWeld"
 		Weld.Part0 = HitPart
 		Weld.Part1 = Part
 		Weld.Parent = Part
 	end
+
+	Projectile.StuckToPart = HitPart
+	if Projectile.StickConnection then Projectile.StickConnection:Disconnect() end
+	Projectile.StickConnection = HitPart.AncestryChanged:Connect(function(_, Parent)
+		if not Parent or not HitPart:IsDescendantOf(workspace) then
+			anchorVisual(Projectile)
+		end
+	end)
 end
 
 function ProjectileController.new(Settings)
@@ -141,8 +180,12 @@ function ProjectileController:_CreateVisual(Projectile, Settings)
 end
 
 function ProjectileController:_DestroyVisual(Projectile)
+	if Projectile and Projectile.StickConnection then
+		Projectile.StickConnection:Disconnect()
+		Projectile.StickConnection = nil
+	end
 	if Projectile and Projectile.Visual and Projectile.Visual.Parent then Projectile.Visual:Destroy() end
-	if Projectile then Projectile.Visual = nil end
+	if Projectile then Projectile.Visual = nil; Projectile.StuckToPart = nil end
 end
 
 function ProjectileController:_Step(DeltaTime)
@@ -210,6 +253,7 @@ function ProjectileController:Fire(Origin, Direction, Settings)
 		RaycastParams = Settings.RaycastParams or self.Settings.RaycastParams,
 		OnStep = Settings.OnStep, OnHit = Settings.OnHit, OnExpire = Settings.OnExpire, OnStuck = Settings.OnStuck, Data = Settings.Data,
 		Visual = nil, Rotation = Settings.Rotation or CFrame.identity, SpinSpeed = Settings.SpinSpeed, SpinAngle = Vector3.zero,
+		StuckToPart = nil, StickConnection = nil,
 	}
 	Projectile.Visual = self:_CreateVisual(Projectile, Settings)
 	if Settings.Visual and not Projectile.Visual then warn("[ProjectileController] Failed to create projectile visual"); return nil end
@@ -224,13 +268,8 @@ function ProjectileController:DestroyProjectile(Projectile)
 	Projectile.Destroyed = true
 	self:_DestroyVisual(Projectile)
 	local Id = Projectile.Id
-	if Id ~= nil then
-		self.Projectiles[Id] = nil
-	end
-	if next(self.Projectiles) == nil and self.Connection then
-		self.Connection:Disconnect()
-		self.Connection = nil
-	end
+	if Id ~= nil then self.Projectiles[Id] = nil end
+	if next(self.Projectiles) == nil and self.Connection then self.Connection:Disconnect(); self.Connection = nil end
 end
 
 function ProjectileController:GetActiveCount()
