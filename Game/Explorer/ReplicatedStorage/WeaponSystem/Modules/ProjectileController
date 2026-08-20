@@ -72,11 +72,11 @@ local function createDetachedCollisionBox(Projectile)
 	if Projectile.Visual:IsA("BasePart") then Size = Projectile.Visual.Size elseif Projectile.Visual:IsA("Model") then local _, BoundingSize = Projectile.Visual:GetBoundingBox(); Size = BoundingSize end
 	Size = Vector3.new(math.max(Size.X, 0.35), math.max(Size.Y, 0.35), math.max(Size.Z, 0.35))
 	local Box = Instance.new("Part")
-	Box.Name = "ThrownKnifeCollision"; Box.Size = Size + Vector3.new(0.15, 0.15, 0.15); Box.CFrame = Pivot; Box.Transparency = 1; Box.Anchored = false; Box.CanCollide = true; Box.CanTouch = false; Box.CanQuery = false; Box.Massless = true; Box.CastShadow = false
+	Box.Name = "ThrownProjectileCollision"; Box.Size = Size + Vector3.new(0.15, 0.15, 0.15); Box.CFrame = Pivot; Box.Transparency = 1; Box.Anchored = false; Box.CanCollide = true; Box.CanTouch = false; Box.CanQuery = false; Box.Massless = true; Box.CastShadow = false
 	Box.Parent = Projectile.Visual
 	Projectile.CollisionBox = Box
 	local Weld = Instance.new("WeldConstraint")
-	Weld.Name = "ThrownKnifeCollisionWeld"; Weld.Part0 = Box
+	Weld.Name = "ThrownProjectileCollisionWeld"; Weld.Part0 = Box
 	local Primary = Projectile.Visual:IsA("BasePart") and Projectile.Visual or Projectile.Visual.PrimaryPart or Projectile.Visual:FindFirstChildWhichIsA("BasePart", true)
 	if not Primary then Box:Destroy(); Projectile.CollisionBox = nil; return end
 	Weld.Part1 = Primary; Weld.Parent = Box
