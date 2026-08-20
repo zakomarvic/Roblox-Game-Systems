@@ -212,7 +212,6 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 			if TargetHumanoid and TargetHumanoid.Health > 0 and TargetHumanoid.Parent ~= Character then
 				local Damage = tonumber(Module.ThrowDamage) or tonumber(Module.BaseDamage) or 0
 				applyDamage(Player, TargetHumanoid, Damage)
-				warn("[MeleeDamageServer] THROW HIT", Player.Name, TargetHumanoid.Parent:GetFullName(), "damage", Damage)
 			end
 			if not StickOnHit and not ConsumeWeapon then setToolVisible(Tool, true) end
 		end,
@@ -298,7 +297,6 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid,
 		local Direction = TargetTorso.Position - Handle.Position
 		if Direction.Magnitude > 0 then TargetTorso.AssemblyLinearVelocity += Direction.Unit * Knockback end
 	end
-	warn("[MeleeDamageServer] HIT", Player.Name, TargetCharacter:GetFullName(), "damage", Damage)
 end)
 
 Players.PlayerRemoving:Connect(function(Player)
