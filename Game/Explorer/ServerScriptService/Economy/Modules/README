@@ -1,0 +1,21 @@
+# Economy Modules
+
+- `CashService` — authoritative carried-cash API for players.
+- `CashDrop` — creates a physical green cash pickup in the world. It is reusable by players, NPCs, destructibles, rewards, or any other system.
+- `EconomyDrop` — convenience helpers for dropping a player's carried cash or a fixed cash amount.
+
+## NPCs / destructibles
+
+Systems that have a fixed reward should call:
+
+```lua
+CashDrop.Drop(Position, CashAmount)
+```
+
+For a player death, use:
+
+```lua
+EconomyDrop.DropPlayerCash(Player, Position)
+```
+
+The player's carried cash is set to zero only when a positive cash drop is created successfully.
