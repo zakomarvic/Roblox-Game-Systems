@@ -41,6 +41,19 @@ local function getValidTarget(Player, TargetHumanoid, HitPart)
 	return TargetCharacter, TargetTorso
 end
 
+local function validateLineOfSight(Character, Tool, Handle, HitPart, TargetRoot)
+	local Offset = HitPart.Position - Handle.Position
+	if Offset.Magnitude <= 0 then return false end
+
+	local Params = RaycastParams.new()
+	Params.FilterType = Enum.RaycastFilterType.Exclude
+	Params.FilterDescendantsInstances = {Character, Tool}
+	Params.IgnoreWater = true
+
+	local Result = workspace:Raycast(Handle.Position, Offset, Params)
+	return not Result or Result.Instance:IsDescendantOf(TargetRoot)
+end
+
 local function createAttack(Player, Tool, Now, Cooldown, Duration)
 	local Last = LastAttacks[Player] and LastAttacks[Player][Tool] or -math.huge
 	if Now - Last < Cooldown then return nil end
@@ -87,19 +100,12 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetOrOrigin,
 	local HitPart = HitOrDirection
 	if typeof(HitPart) ~= "Instance" or not HitPart:IsA("BasePart") then return end
 
+	-- Player target.
 	local TargetCharacter, TargetTorso = getValidTarget(Player, TargetOrOrigin, HitPart)
 	if TargetCharacter then
 		if Attack.HitTargets[TargetOrOrigin] then return end
 		if (TargetTorso.Position - Handle.Position).Magnitude > math.max(10, Handle.Size.Magnitude + 6) then return end
-
-		local Params = RaycastParams.new()
-		Params.FilterType = Enum.RaycastFilterType.Exclude
-		Params.FilterDescendantsInstances = {Character, Tool}
-		Params.IgnoreWater = true
-		local Offset = HitPart.Position - Handle.Position
-		if Offset.Magnitude <= 0 then return end
-		local Result = workspace:Raycast(Handle.Position, Offset, Params)
-		if Result and not Result.Instance:IsDescendantOf(TargetCharacter) then return end
+		if not validateLineOfSight(Character, Tool, Handle, HitPart, TargetCharacter) then return end
 
 		Attack.HitTargets[TargetOrOrigin] = true
 		MeleeUtility.ApplyDamage(Player, TargetOrOrigin, tonumber(Module.BaseDamage) or 0, Debris)
@@ -112,21 +118,21 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetOrOrigin,
 		return
 	end
 
-	if not DestructibleService.IsDestructible(HitPart) then return end
-	if Attack.HitTargets[HitPart] then return end
-	if (HitPart.Position - Handle.Position).Magnitude > math.max(10, Handle.Size.Magnitude + 6) then return end
+	-- Physical/destructible target. The server resolves the tagged root from
+	-- the reported instance, so the client cannot choose an arbitrary object
+	-- that merely looks like a destructible.
+	local TargetRoot = DestructibleService.GetRoot(TargetOrOrigin) or DestructibleService.GetRoot(HitPart)
+	if not TargetRoot then return end
+	if Attack.HitTargets[TargetRoot] then return end
+	if not TargetRoot:IsDescendantOf(workspace) then return end
 
-	local Params = RaycastParams.new()
-	Params.FilterType = Enum.RaycastFilterType.Exclude
-	Params.FilterDescendantsInstances = {Character, Tool}
-	Params.IgnoreWater = true
-	local Offset = HitPart.Position - Handle.Position
-	if Offset.Magnitude <= 0 then return end
-	local Result = workspace:Raycast(Handle.Position, Offset, Params)
-	if Result and not Result.Instance:IsDescendantOf(HitPart.Parent) then return end
+	local TargetPart = HitPart:IsDescendantOf(TargetRoot) and HitPart or DestructibleService.GetHitPart(TargetRoot)
+	if not TargetPart then return end
+	if (TargetPart.Position - Handle.Position).Magnitude > math.max(10, Handle.Size.Magnitude + 6) then return end
+	if not validateLineOfSight(Character, Tool, Handle, TargetPart, TargetRoot) then return end
 
-	Attack.HitTargets[HitPart] = true
-	DestructibleService.Damage(HitPart, tonumber(Module.BaseDamage) or 0, Player)
+	Attack.HitTargets[TargetRoot] = true
+	DestructibleService.Damage(TargetRoot, tonumber(Module.BaseDamage) or 0, Player)
 end)
 
 Players.PlayerRemoving:Connect(function(Player)
