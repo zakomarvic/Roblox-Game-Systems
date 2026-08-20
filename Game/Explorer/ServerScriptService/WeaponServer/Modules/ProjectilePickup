@@ -1,7 +1,4 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
-local MeleeUtility = require(WeaponSystem.Modules:WaitForChild("MeleeUtility"))
+local MeleeUtility = require(script.Parent:WaitForChild("MeleeUtility"))
 
 local ProjectilePickup = {}
 
@@ -32,8 +29,6 @@ function ProjectilePickup.Setup(Player, Tool, PickupTemplate, Projectile, Settin
 		end
 		if PickupTemplate then
 			PickupTemplate.Parent = Parent
-			-- The template has now become the player's real recovered Tool.
-			-- Do not let Cleanup destroy it after the pickup succeeds.
 			PickupTemplate = nil
 			return true
 		end
@@ -63,11 +58,6 @@ function ProjectilePickup.Setup(Player, Tool, PickupTemplate, Projectile, Settin
 		task.delay(Lifetime, function()
 			if State.Claimed then return end
 			State.Claimed = true
-			if Tool and Tool.Parent then
-				MeleeUtility.SetToolVisible(Tool, true)
-				local Backpack = Player:FindFirstChildOfClass("Backpack")
-				if Backpack and Tool.Parent == Player.Character then Tool.Parent = Backpack end
-			end
 			Cleanup()
 		end)
 	end
