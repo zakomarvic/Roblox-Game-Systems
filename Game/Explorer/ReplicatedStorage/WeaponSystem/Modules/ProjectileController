@@ -155,8 +155,8 @@ function ProjectileController:_CreateVisual(Projectile, Settings)
 end
 
 function ProjectileController:_DestroyVisual(Projectile)
-	if Projectile.Visual and Projectile.Visual.Parent then Projectile.Visual:Destroy() end
-	Projectile.Visual = nil
+	if Projectile and Projectile.Visual and Projectile.Visual.Parent then Projectile.Visual:Destroy() end
+	if Projectile then Projectile.Visual = nil end
 end
 
 function ProjectileController:_Step(DeltaTime)
@@ -247,7 +247,14 @@ function ProjectileController:DestroyProjectile(Projectile)
 	if not Projectile or Projectile.Destroyed then return end
 	Projectile.Destroyed = true
 	self:_DestroyVisual(Projectile)
-	self.Projectiles[Projectile.Id] = nil
+	local Id = Projectile.Id
+	if Id ~= nil then
+		self.Projectiles[Id] = nil
+	end
+	if next(self.Projectiles) == nil and self.Connection then
+		self.Connection:Disconnect()
+		self.Connection = nil
+	end
 end
 
 function ProjectileController:GetActiveCount()
