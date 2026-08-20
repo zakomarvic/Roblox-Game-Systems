@@ -63,11 +63,16 @@ function ProjectilePickup.Setup(Player, Tool, PickupTemplate, Projectile, Settin
 		task.delay(Lifetime, function()
 			if State.Claimed then return end
 			State.Claimed = true
-			if Tool and Tool.Parent then
-				MeleeUtility.SetToolVisible(Tool, true)
-				local Backpack = Player:FindFirstChildOfClass("Backpack")
-				if Backpack and Tool.Parent == Player.Character then Tool.Parent = Backpack end
+
+			-- A non-consuming throw should return the weapon when its stuck
+			-- projectile expires. Consuming throws intentionally discard it.
+			if Settings.ThrowConsumesWeapon ~= true then
+				if GiveTool() then
+					Cleanup()
+					return
+				end
 			end
+
 			Cleanup()
 		end)
 	end
