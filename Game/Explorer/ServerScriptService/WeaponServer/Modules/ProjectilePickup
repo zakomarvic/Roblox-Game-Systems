@@ -1,0 +1,71 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
+local MeleeUtility = require(WeaponSystem.Modules:WaitForChild("MeleeUtility"))
+
+local ProjectilePickup = {}
+
+function ProjectilePickup.Setup(Player, Tool, PickupTemplate, Projectile, Settings, DestroyProjectile)
+	local Visual = Projectile and Projectile.Visual
+	local PromptPart = Visual and MeleeUtility.GetPromptPart(Visual)
+	if not PromptPart then return nil end
+
+	local Prompt = Instance.new("ProximityPrompt")
+	Prompt.Name = "ProjectilePickupPrompt"
+	Prompt.ActionText = Settings.PickupActionText or "Pick Up"
+	Prompt.ObjectText = Settings.PickupObjectText or Tool.Name or "Projectile"
+	Prompt.HoldDuration = tonumber(Settings.PickupHoldDuration) or 0.15
+	Prompt.MaxActivationDistance = tonumber(Settings.PickupDistance) or 10
+	Prompt.RequiresLineOfSight = Settings.PickupRequiresLineOfSight ~= false
+	Prompt.Parent = PromptPart
+
+	local State = {Claimed = false}
+
+	local function GiveTool()
+		local Parent = Player:FindFirstChildOfClass("Backpack") or Player.Character
+		if not Parent then return false end
+		if Tool and Tool.Parent then
+			MeleeUtility.SetToolVisible(Tool, true)
+			Tool.Parent = Parent
+			return true
+		end
+		if PickupTemplate then
+			PickupTemplate.Parent = Parent
+			return true
+		end
+		return false
+	end
+
+	local function Cleanup()
+		if Prompt.Parent then Prompt:Destroy() end
+		if PickupTemplate and PickupTemplate.Parent then PickupTemplate:Destroy() end
+	end
+
+	Prompt.Triggered:Connect(function(Picker)
+		if State.Claimed or Picker ~= Player then return end
+		if not Player.Parent or not Picker.Character then return end
+		State.Claimed = true
+		Prompt.Enabled = false
+		GiveTool()
+		Cleanup()
+		DestroyProjectile(Projectile)
+	end)
+
+	local Lifetime = math.max(0, tonumber(Settings.PickupLifetime or Settings.ThrowStickLifetime) or 30)
+	if Lifetime > 0 then
+		task.delay(Lifetime, function()
+			if State.Claimed then return end
+			State.Claimed = true
+			if Tool and Tool.Parent then
+				MeleeUtility.SetToolVisible(Tool, true)
+				local Backpack = Player:FindFirstChildOfClass("Backpack")
+				if Backpack and Tool.Parent == Player.Character then Tool.Parent = Backpack end
+			end
+			Cleanup()
+		end)
+	end
+
+	return State
+end
+
+return ProjectilePickup
