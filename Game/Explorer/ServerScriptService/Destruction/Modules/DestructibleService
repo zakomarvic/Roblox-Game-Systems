@@ -1,5 +1,4 @@
 local CollectionService = game:GetService("CollectionService")
-local Debris = game:GetService("Debris")
 
 local CashDrop = require(game.ServerScriptService.Economy.Modules:WaitForChild("CashDrop"))
 
@@ -45,6 +44,7 @@ end
 local function dropCash(State)
 	local Amount = math.max(0, math.floor(getNumber(State.Object, "CashDropValue", DEFAULT_CASH)))
 	if Amount <= 0 then return end
+
 	local Position
 	if State.Object:IsA("BasePart") then
 		Position = State.Object.Position
@@ -52,12 +52,16 @@ local function dropCash(State)
 		local Part = State.Object.PrimaryPart or State.Object:FindFirstChildWhichIsA("BasePart", true)
 		Position = Part and Part.Position
 	end
-	if Position then CashDrop.Drop(Position, Amount) end
+
+	if Position then
+		CashDrop.Drop(Position, Amount)
+	end
 end
 
 local function destroy(State)
 	if not State or State.Destroyed or State.Destroying then return end
 	State.Destroying = true
+	State.Destroyed = true
 	State.Health = 0
 	State.Object:SetAttribute("Health", 0)
 	dropCash(State)
@@ -103,10 +107,11 @@ function DestructibleService.Damage(Object, Amount, Attacker)
 
 	State.Health = math.max(0, State.Health - Damage)
 	Root:SetAttribute("Health", State.Health)
-	Root:SetAttribute("LastDamagerUserId", typeof(Attacker) == "Instance" and Attacker:IsA("Player") and Attacker.UserId or nil)
+	if typeof(Attacker) == "Instance" and Attacker:IsA("Player") then
+		Root:SetAttribute("LastDamagerUserId", Attacker.UserId)
+	end
 
 	if State.Health <= 0 then
-		State.Destroyed = true
 		destroy(State)
 		return true, 0
 	end
@@ -117,7 +122,6 @@ function DestructibleService.Destroy(Object)
 	local Root = getRoot(Object)
 	local State = Root and States[Root]
 	if State then
-		State.Destroyed = true
 		destroy(State)
 	end
 end
@@ -126,10 +130,13 @@ function DestructibleService.Initialize()
 	for _, Object in ipairs(CollectionService:GetTagged(TAG)) do
 		setup(Object)
 	end
+
 	CollectionService:GetInstanceAddedSignal(TAG):Connect(setup)
 	CollectionService:GetInstanceRemovedSignal(TAG):Connect(function(Object)
 		local Root = getRoot(Object)
-		if Root then States[Root] = nil end
+		if Root then
+			States[Root] = nil
+		end
 	end)
 end
 
