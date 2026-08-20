@@ -13,10 +13,10 @@ local function copyDefaults(Settings)
 	return Result
 end
 
-local function setProjectileCFrame(Visual, Position, Direction)
+local function setProjectileCFrame(Visual, Position, Direction, Rotation)
 	if not Visual then return end
 	local Look = Direction.Magnitude > 0 and Direction.Unit or Vector3.zAxis
-	local CFrameValue = CFrame.lookAt(Position, Position + Look)
+	local CFrameValue = CFrame.lookAt(Position, Position + Look) * (Rotation or CFrame.identity)
 	if Visual:IsA("Model") then Visual:PivotTo(CFrameValue)
 	elseif Visual:IsA("BasePart") then Visual.CFrame = CFrameValue end
 end
@@ -79,7 +79,7 @@ function ProjectileController:_CreateVisual(Projectile, Settings)
 			Visual.CanTouch = false
 			Visual.CanQuery = false
 		end
-		setProjectileCFrame(Visual, Projectile.Position, Projectile.Direction)
+		setProjectileCFrame(Visual, Projectile.Position, Projectile.Direction, Projectile.Rotation)
 		return Visual
 	end
 
@@ -102,7 +102,7 @@ function ProjectileController:_CreateVisual(Projectile, Settings)
 		local Primary = Visual:FindFirstChildWhichIsA("BasePart", true)
 		if Primary then Visual.PrimaryPart = Primary end
 	end
-	setProjectileCFrame(Visual, Projectile.Position, Projectile.Direction)
+	setProjectileCFrame(Visual, Projectile.Position, Projectile.Direction, Projectile.Rotation)
 	return Visual
 end
 
@@ -126,13 +126,19 @@ function ProjectileController:_Step(DeltaTime)
 		if Result then
 			Projectile.Position = Result.Position
 			Projectile.Velocity = Vector3.zero
-			setProjectileCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction)
+			if Projectile.SpinSpeed and Projectile.SpinSpeed.Magnitude > 0 then
+				Projectile.SpinAngle += Projectile.SpinSpeed * DeltaTime
+			end
+			setProjectileCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction, CFrame.Angles(Projectile.SpinAngle.X, Projectile.SpinAngle.Y, Projectile.SpinAngle.Z) * Projectile.Rotation)
 			self:_Hit(Projectile, Result)
 			self.Projectiles[Id] = nil
 		else
 			Projectile.Position = NewPosition
 			if Projectile.Velocity.Magnitude > 0 then Projectile.Direction = Projectile.Velocity.Unit end
-			setProjectileCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction)
+			if Projectile.SpinSpeed and Projectile.SpinSpeed.Magnitude > 0 then
+				Projectile.SpinAngle += Projectile.SpinSpeed * DeltaTime
+			end
+			setProjectileCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction, CFrame.Angles(Projectile.SpinAngle.X, Projectile.SpinAngle.Y, Projectile.SpinAngle.Z) * Projectile.Rotation)
 			if Projectile.OnStep then Projectile.OnStep(Projectile, DeltaTime) end
 		end
 	end
@@ -165,6 +171,9 @@ function ProjectileController:Fire(Origin, Direction, Settings)
 		MaxLifetime = Settings.MaxLifetime or self.Settings.MaxLifetime, Age = 0, Destroyed = false,
 		RaycastParams = Settings.RaycastParams or self.Settings.RaycastParams,
 		OnStep = Settings.OnStep, OnHit = Settings.OnHit, OnExpire = Settings.OnExpire, Data = Settings.Data, Visual = nil,
+		Rotation = Settings.Rotation or CFrame.identity,
+		SpinSpeed = Settings.SpinSpeed,
+		SpinAngle = Vector3.zero,
 	}
 	Projectile.Visual = self:_CreateVisual(Projectile, Settings)
 	self.Projectiles[Projectile.Id] = Projectile
