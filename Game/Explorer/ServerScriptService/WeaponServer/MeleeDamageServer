@@ -12,7 +12,7 @@ MeleeRemote.Name = "Melee"
 MeleeRemote.Sandboxed = true
 MeleeRemote.Parent = Remotes
 
-local MeleeUtility = require(WeaponSystem.Modules:WaitForChild("MeleeUtility"))
+local MeleeUtility = require(script.Parent.Modules:WaitForChild("MeleeUtility"))
 local ProjectileThrower = require(script.Parent.Modules:WaitForChild("ProjectileThrower"))
 local Thrower = ProjectileThrower.new()
 
