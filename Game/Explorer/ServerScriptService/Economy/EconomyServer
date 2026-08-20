@@ -3,6 +3,7 @@ local DataStoreService = game:GetService("DataStoreService")
 
 local Modules = script.Parent:WaitForChild("Modules")
 local CashService = require(Modules:WaitForChild("CashService"))
+local EconomyDrop = require(Modules:WaitForChild("EconomyDrop"))
 
 local CashStore = DataStoreService:GetDataStore("PlayerEconomy_v1")
 
@@ -11,6 +12,7 @@ local AUTOSAVE_INTERVAL = 60
 local MAX_RETRIES = 3
 
 local Saving = {}
+local DeathConnections = {}
 
 local function getKey(Player)
 	return "Player_" .. Player.UserId
@@ -46,7 +48,7 @@ local function save(Player)
 	local Success = false
 	for Attempt = 1, MAX_RETRIES do
 		Success = pcall(function()
-			CashStore:UpdateAsync(getKey(Player), function(OldData)
+			return CashStore:UpdateAsync(getKey(Player), function(OldData)
 				local Data = type(OldData) == "table" and OldData or {}
 				Data.Cash = Amount
 				return Data
@@ -60,12 +62,39 @@ local function save(Player)
 	return Success
 end
 
+local function setupDeathDrop(Player, Character)
+	if DeathConnections[Player] then
+		DeathConnections[Player]:Disconnect()
+		DeathConnections[Player] = nil
+	end
+
+	local Humanoid = Character:WaitForChild("Humanoid", 10)
+	if not Humanoid then return end
+
+	DeathConnections[Player] = Humanoid.Died:Connect(function()
+		local Root = Character:FindFirstChild("HumanoidRootPart")
+		if Root then
+			EconomyDrop.DropPlayerCash(Player, Root.Position)
+		end
+	end)
+end
+
 Players.PlayerAdded:Connect(function(Player)
 	CashService.GetOrCreate(Player, DEFAULT_CASH)
 	load(Player)
+	Player.CharacterAdded:Connect(function(Character)
+		setupDeathDrop(Player, Character)
+	end)
+	if Player.Character then
+		setupDeathDrop(Player, Player.Character)
+	end
 end)
 
 Players.PlayerRemoving:Connect(function(Player)
+	if DeathConnections[Player] then
+		DeathConnections[Player]:Disconnect()
+		DeathConnections[Player] = nil
+	end
 	save(Player)
 	Saving[Player] = nil
 end)
