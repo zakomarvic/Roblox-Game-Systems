@@ -13,30 +13,12 @@ MeleeRemote.Sandboxed = true
 MeleeRemote.Parent = Remotes
 
 local ProjectileController = require(WeaponSystem.Modules:WaitForChild("ProjectileController"))
+local MeleeUtility = require(WeaponSystem.Modules:WaitForChild("MeleeUtility"))
 local ProjectileSystem = ProjectileController.new()
 
 local ActiveAttacks = {}
 local LastAttacks = {}
 local LastThrows = {}
-
-local function getOwnedEquippedWeapon(Player, Tool)
-	if not Tool or not Tool:IsA("Tool") then return nil, nil end
-	local Character = Player.Character
-	if not Character or Tool.Parent ~= Character then return nil, nil end
-	local Setting = Tool:FindFirstChild("Setting")
-	if not Setting or not Setting:IsA("ModuleScript") then return nil, nil end
-	local Module = require(Setting)
-	if type(Module) ~= "table" or Module.WeaponType ~= "Melee" or Module.MeleeEnabled == false then return nil, nil end
-	return Tool, Module
-end
-
-local function getHumanoid(Character)
-	return Character and Character:FindFirstChildOfClass("Humanoid")
-end
-
-local function getTorso(Character)
-	return Character and (Character:FindFirstChild("HumanoidRootPart") or Character:FindFirstChild("Torso"))
-end
 
 local function clearAttack(Player, Tool)
 	local PlayerAttacks = ActiveAttacks[Player]
@@ -55,55 +37,14 @@ local function isValidTarget(Player, TargetHumanoid, HitPart)
 	if not TargetCharacter or not TargetCharacter:IsA("Model") or TargetCharacter == Character then return nil end
 	if TargetCharacter:FindFirstChildOfClass("Humanoid") ~= TargetHumanoid then return nil end
 	if not HitPart:IsDescendantOf(TargetCharacter) then return nil end
-	local TargetTorso = getTorso(TargetCharacter)
+	local TargetTorso = MeleeUtility.GetTorso(TargetCharacter)
 	if not TargetTorso then return nil end
 	return TargetCharacter, TargetTorso
 end
 
-local function setToolVisible(Tool, Visible)
-	if not Tool or not Tool.Parent then return end
-	for _, Descendant in ipairs(Tool:GetDescendants()) do
-		if Descendant:IsA("BasePart") or Descendant:IsA("Decal") or Descendant:IsA("Texture") then
-			if Visible then
-				local Original = Descendant:GetAttribute("MeleeThrowOriginalTransparency")
-				if Original ~= nil then
-					Descendant.Transparency = Original
-					Descendant:SetAttribute("MeleeThrowOriginalTransparency", nil)
-				end
-			else
-				if Descendant:GetAttribute("MeleeThrowOriginalTransparency") == nil then
-					Descendant:SetAttribute("MeleeThrowOriginalTransparency", Descendant.Transparency)
-				end
-				Descendant.Transparency = 1
-			end
-		end
-	end
-end
-
-local function applyDamage(Player, TargetHumanoid, Damage)
-	if Damage <= 0 then return end
-	local Creator = TargetHumanoid:FindFirstChild("creator")
-	if Creator then Creator:Destroy() end
-	Creator = Instance.new("ObjectValue")
-	Creator.Name = "creator"
-	Creator.Value = Player
-	Creator.Parent = TargetHumanoid
-	Debris:AddItem(Creator, 5)
-	TargetHumanoid:TakeDamage(Damage)
-end
-
-local function getPromptPart(Visual)
-	if Visual:IsA("BasePart") then return Visual end
-	if Visual:IsA("Model") then
-		if Visual.PrimaryPart then return Visual.PrimaryPart end
-		return Visual:FindFirstChildWhichIsA("BasePart", true)
-	end
-	return nil
-end
-
 local function returnOrGiveKnife(Player, Tool, PickupTemplate)
 	if Tool and Tool.Parent then
-		setToolVisible(Tool, true)
+		MeleeUtility.SetToolVisible(Tool, true)
 		Tool.Parent = Player:FindFirstChildOfClass("Backpack") or Player.Character
 		return Tool
 	end
@@ -115,7 +56,7 @@ end
 
 local function setupKnifePickup(Player, Tool, PickupTemplate, Projectile, Module)
 	local Visual = Projectile.Visual
-	local PromptPart = Visual and getPromptPart(Visual)
+	local PromptPart = Visual and MeleeUtility.GetPromptPart(Visual)
 	if not PromptPart then return end
 	local Prompt = Instance.new("ProximityPrompt")
 	Prompt.Name = "KnifePickupPrompt"
@@ -142,7 +83,7 @@ local function setupKnifePickup(Player, Tool, PickupTemplate, Projectile, Module
 			Claimed = true
 			if Prompt.Parent then Prompt:Destroy() end
 			if Tool and Tool.Parent then
-				setToolVisible(Tool, true)
+				MeleeUtility.SetToolVisible(Tool, true)
 				local Backpack = Player:FindFirstChildOfClass("Backpack")
 				if Backpack and Tool.Parent == Player.Character then Tool.Parent = Backpack end
 			end
@@ -154,7 +95,7 @@ end
 local function throwWeapon(Player, Tool, Origin, Direction, Module)
 	if Module.ThrowEnabled ~= true then return end
 	local Character = Player.Character
-	local Humanoid = getHumanoid(Character)
+	local Humanoid = MeleeUtility.GetHumanoid(Character)
 	local Handle = Tool:FindFirstChild("Handle")
 	if not Humanoid or Humanoid.Health <= 0 or not Handle or not Handle:IsA("BasePart") then return end
 	if typeof(Origin) ~= "Vector3" or typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return end
@@ -178,7 +119,16 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 	Params.FilterType = Enum.RaycastFilterType.Exclude
 	Params.FilterDescendantsInstances = {Character, Tool}
 	Params.IgnoreWater = true
-	setToolVisible(Tool, false)
+
+	-- A thrown knife is no longer equipped immediately after the server accepts the throw.
+	-- Keep only the detached projectile and, when sticking is enabled, its pickup template.
+	if StickOnHit then
+		Tool:Destroy()
+	else
+		MeleeUtility.SetToolVisible(Tool, false)
+		if ConsumeWeapon then Tool:Destroy() end
+	end
+
 	local Projectile = ProjectileSystem:Fire(ServerOrigin, ServerDirection, {
 		Speed = math.clamp(tonumber(Module.ThrowSpeed) or 120, 1, 1000),
 		Gravity = Module.ThrowGravity or Vector3.new(0, -workspace.Gravity * 0.35, 0),
@@ -198,42 +148,39 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 			end
 			if TargetHumanoid and TargetHumanoid.Health > 0 and TargetHumanoid.Parent ~= Character then
 				local Damage = tonumber(Module.ThrowDamage) or tonumber(Module.BaseDamage) or 0
-				applyDamage(Player, TargetHumanoid, Damage)
+				MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris)
 				if type(Module.ThrowOnCharacterHit) == "function" then
 					Module.ThrowOnCharacterHit(Thrown, Result, TargetHumanoid, TargetHumanoid.Parent)
 				end
 			elseif type(Module.ThrowOnSurfaceHit) == "function" then
 				Module.ThrowOnSurfaceHit(Thrown, Result, Result.Instance)
 			end
-			if not StickOnHit and not ConsumeWeapon then setToolVisible(Tool, true) end
+			if not StickOnHit and not ConsumeWeapon and Tool.Parent then MeleeUtility.SetToolVisible(Tool, true) end
 		end,
 		OnStuck = function(Thrown)
-			if ConsumeWeapon then Tool:Destroy() end
 			setupKnifePickup(Player, Tool, PickupTemplate, Thrown, Module)
 		end,
 		OnExpire = function()
-			if not ConsumeWeapon then setToolVisible(Tool, true) end
+			if not ConsumeWeapon and Tool.Parent then MeleeUtility.SetToolVisible(Tool, true) end
 			if PickupTemplate then PickupTemplate:Destroy(); PickupTemplate = nil end
 		end,
 	})
 	if not Projectile then
-		setToolVisible(Tool, true)
 		if PickupTemplate then PickupTemplate:Destroy() end
 		return
 	end
-	if ConsumeWeapon and not StickOnHit then Tool:Destroy() end
 end
 
 MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid, HitPart)
 	if type(Action) ~= "string" then return end
-	local OwnedTool, Module = getOwnedEquippedWeapon(Player, Tool)
+	local OwnedTool, Module = MeleeUtility.GetOwnedEquippedWeapon(Player, Tool)
 	if not OwnedTool then return end
 	if Action == "Throw" then
 		throwWeapon(Player, Tool, TargetHumanoid, HitPart, Module)
 		return
 	end
 	local Character = Player.Character
-	local Humanoid = getHumanoid(Character)
+	local Humanoid = MeleeUtility.GetHumanoid(Character)
 	local Handle = Tool:FindFirstChild("Handle")
 	if not Humanoid or Humanoid.Health <= 0 or not Handle or not Handle:IsA("BasePart") then return end
 	local Now = os.clock()
@@ -269,11 +216,11 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid,
 	if Result and not Result.Instance:IsDescendantOf(TargetCharacter) then return end
 	Attack.HitTargets[TargetHumanoid] = true
 	local Damage = tonumber(Module.BaseDamage) or 0
-	applyDamage(Player, TargetHumanoid, Damage)
+	MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris)
 	local Knockback = tonumber(Module.MeleeKnockback) or 0
 	if Knockback > 0 then
-		local Direction = TargetTorso.Position - Handle.Position
-		if Direction.Magnitude > 0 then TargetTorso.AssemblyLinearVelocity += Direction.Unit * Knockback end
+		local KnockDirection = TargetTorso.Position - Handle.Position
+		if KnockDirection.Magnitude > 0 then TargetTorso.AssemblyLinearVelocity += KnockDirection.Unit * Knockback end
 	end
 end)
 
