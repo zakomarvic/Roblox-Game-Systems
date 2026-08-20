@@ -1,0 +1,30 @@
+# Destruction
+
+Tag any `BasePart` or `Model` with the `Destructible` CollectionService tag.
+
+Supported attributes on the tagged object:
+
+- `MaxHealth` — starting health. Default: `100`.
+- `CashDropValue` — fixed cash dropped when destroyed. Default: `0`.
+- `RespawnTime` — seconds before the original object is cloned back. `0` means no respawn.
+
+The server initializes tagged objects automatically through `DestructionServer`.
+
+## Example
+
+A crate can be configured as:
+
+```text
+Tag: Destructible
+MaxHealth: 100
+CashDropValue: 50
+RespawnTime: 30
+```
+
+Weapons can damage it through:
+
+```lua
+DestructibleService.Damage(HitPart, Damage, Player)
+```
+
+When health reaches zero, the object is removed, its configured cash is dropped through the shared `CashDrop` module, and it optionally respawns.
