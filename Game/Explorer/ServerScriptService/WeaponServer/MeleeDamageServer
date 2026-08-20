@@ -9,6 +9,7 @@ Remotes.Parent = WeaponSystem
 
 local MeleeRemote = Remotes:FindFirstChild("Melee") or Instance.new("RemoteEvent")
 MeleeRemote.Name = "Melee"
+MeleeRemote.Sandboxed = true
 MeleeRemote.Parent = Remotes
 
 local ActiveAttacks = {}
