@@ -43,21 +43,30 @@ local function getDropPosition(Object)
 	return nil
 end
 
+local function getHitPart(Object)
+	if Object:IsA("BasePart") then return Object end
+	if Object:IsA("Model") then
+		return Object.PrimaryPart or Object:FindFirstChildWhichIsA("BasePart", true)
+	end
+	return nil
+end
+
 local function setup(Object)
 	local Root = getTaggedRoot(Object) or Object
 	if not Root or States[Root] then return States[Root] end
 
 	local MaxHealth = math.max(1, getNumber(Root, "MaxHealth", getNumber(Root, "Health", DEFAULT_HEALTH)))
+	local ExistingHealth = getNumber(Root, "Health", MaxHealth)
 	local State = {
 		Object = Root,
 		MaxHealth = MaxHealth,
-		Health = MaxHealth,
+		Health = math.clamp(ExistingHealth, 0, MaxHealth),
 		Destroyed = false,
 		Destroying = false,
 	}
 	States[Root] = State
 	Root:SetAttribute("MaxHealth", MaxHealth)
-	Root:SetAttribute("Health", MaxHealth)
+	Root:SetAttribute("Health", State.Health)
 	return State
 end
 
@@ -102,6 +111,15 @@ end
 
 function DestructibleService.Register(Object)
 	return setup(Object)
+end
+
+function DestructibleService.GetRoot(Object)
+	return getTaggedRoot(Object)
+end
+
+function DestructibleService.GetHitPart(Object)
+	local Root = getTaggedRoot(Object) or Object
+	return Root and getHitPart(Root) or nil
 end
 
 function DestructibleService.IsDestructible(Object)
