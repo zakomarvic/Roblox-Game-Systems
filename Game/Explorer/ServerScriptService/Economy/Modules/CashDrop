@@ -24,7 +24,7 @@ local function createPart(Position, Amount, Options)
 	Part.Material = Enum.Material.Neon
 	Part.Color = Options.Color or Color3.fromRGB(50, 205, 50)
 	Part.Anchored = false
-	Part.CanCollide = Options.CanCollide == true
+	Part.CanCollide = Options.CanCollide ~= false
 	Part.CanQuery = true
 	Part.CanTouch = true
 	Part:SetAttribute("CashAmount", Amount)
