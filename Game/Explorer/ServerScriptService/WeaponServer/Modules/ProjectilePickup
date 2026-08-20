@@ -13,7 +13,7 @@ function ProjectilePickup.Setup(Player, Tool, PickupTemplate, Projectile, Settin
 	local Prompt = Instance.new("ProximityPrompt")
 	Prompt.Name = "ProjectilePickupPrompt"
 	Prompt.ActionText = Settings.PickupActionText or "Pick Up"
-	Prompt.ObjectText = Settings.PickupObjectText or Tool.Name or "Projectile"
+	Prompt.ObjectText = Settings.PickupObjectText or (Tool and Tool.Name) or "Projectile"
 	Prompt.HoldDuration = math.max(0, tonumber(Settings.PickupHoldDuration) or 0.15)
 	Prompt.MaxActivationDistance = math.clamp(tonumber(Settings.PickupDistance) or 10, 1, 50)
 	Prompt.RequiresLineOfSight = Settings.PickupRequiresLineOfSight == true
@@ -32,6 +32,9 @@ function ProjectilePickup.Setup(Player, Tool, PickupTemplate, Projectile, Settin
 		end
 		if PickupTemplate then
 			PickupTemplate.Parent = Parent
+			-- The template has now become the player's real recovered Tool.
+			-- Do not let Cleanup destroy it after the pickup succeeds.
+			PickupTemplate = nil
 			return true
 		end
 		return false
