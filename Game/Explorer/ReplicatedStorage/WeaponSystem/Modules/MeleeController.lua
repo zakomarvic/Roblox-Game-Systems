@@ -107,17 +107,20 @@ function MeleeController:_HandleHit(RaycastResult, Segment)
 	if not self.Active or not RaycastResult then return end
 
 	local HitPart = RaycastResult.Instance
-	if not HitPart then return end
+	if not HitPart or not HitPart:IsA("BasePart") then return end
 
 	local TargetCharacter = HitPart:FindFirstAncestorOfClass("Model")
-	if not TargetCharacter or TargetCharacter == self.Character then return end
+	if TargetCharacter == self.Character then return end
 
-	local TargetHumanoid = TargetCharacter:FindFirstChildOfClass("Humanoid")
-	if not TargetHumanoid or TargetHumanoid.Health <= 0 then return end
+	local TargetHumanoid = TargetCharacter and TargetCharacter:FindFirstChildOfClass("Humanoid")
+	if TargetHumanoid and TargetHumanoid.Health <= 0 then return end
 
+	-- Keep one hit per humanoid/part during an attack. Non-character
+	-- objects (such as destructibles) are valid hit targets too.
+	local HitTarget = TargetHumanoid or HitPart
 	local HitOnce = self.Module.MeleeHitOnce
-	if HitOnce ~= false and self.HitTargets[TargetHumanoid] then return end
-	self.HitTargets[TargetHumanoid] = true
+	if HitOnce ~= false and self.HitTargets[HitTarget] then return end
+	self.HitTargets[HitTarget] = true
 
 	if self.OnHit then
 		self.OnHit({
