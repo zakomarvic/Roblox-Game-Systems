@@ -88,21 +88,61 @@ local function stickVisualToHit(Projectile, HitPart)
 	end
 end
 
-local function detachAndAnchor(Projectile)
-	if not Projectile.Visual or not Projectile.Visual.Parent then return end
-	for _, Part in ipairs(getVisualParts(Projectile.Visual)) do
-		for _, Child in ipairs(Part:GetChildren()) do
-			if Child:IsA("WeldConstraint") and Child.Name == "ProjectileStickWeld" then
-				Child:Destroy()
-			end
-		end
-		Part.Anchored = true
-		Part.CanCollide = false
-		Part.CanTouch = false
-		Part.CanQuery = false
-		Part.Massless = true
+local function getVisualPivot(Visual)
+	if not Visual or not Visual.Parent then return nil end
+	if Visual:IsA("Model") then return Visual:GetPivot() end
+	if Visual:IsA("BasePart") then return Visual.CFrame end
+	return nil
+end
+
+local function createDetachedCollisionBox(Projectile)
+	if Projectile.CollisionBox or not Projectile.Visual or not Projectile.Visual.Parent then return end
+
+	local Pivot = getVisualPivot(Projectile.Visual)
+	if not Pivot then return end
+
+	local Size = Vector3.new(1, 1, 1)
+	if Projectile.Visual:IsA("BasePart") then
+		Size = Projectile.Visual.Size
+	elseif Projectile.Visual:IsA("Model") then
+		local _, BoundingSize = Projectile.Visual:GetBoundingBox()
+		Size = BoundingSize
 	end
-	Projectile.StuckTo = nil
+	Size = Vector3.new(math.max(Size.X, 0.35), math.max(Size.Y, 0.35), math.max(Size.Z, 0.35))
+
+	local Box = Instance.new("Part")
+	Box.Name = "ThrownKnifeCollision"
+	Box.Size = Size + Vector3.new(0.15, 0.15, 0.15)
+	Box.CFrame = Pivot
+	Box.Transparency = 1
+	Box.Anchored = false
+	Box.CanCollide = true
+	Box.CanTouch = false
+	Box.CanQuery = false
+	Box.Massless = true
+	Box.CastShadow = false
+	Box.Parent = workspace
+	Projectile.CollisionBox = Box
+
+	local Weld = Instance.new("WeldConstraint")
+	Weld.Name = "ThrownKnifeCollisionWeld"
+	Weld.Part0 = Box
+	local Primary = Projectile.Visual:IsA("BasePart") and Projectile.Visual or Projectile.Visual.PrimaryPart or Projectile.Visual:FindFirstChildWhichIsA("BasePart", true)
+	if not Primary then
+		Box:Destroy()
+		Projectile.CollisionBox = nil
+		return
+	end
+	Weld.Part1 = Primary
+	Weld.Parent = Box
+
+	-- Give the collision box a moment to settle against the floor, then
+	-- anchor the entire knife assembly so it cannot fall through the map.
+	task.delay(1, function()
+		if Box.Parent and Projectile.CollisionBox == Box then
+			Box.Anchored = true
+		end
+	end)
 end
 
 function ProjectileController.new(Settings)
@@ -136,6 +176,7 @@ function ProjectileController:_ExcludeVisualFromRaycast(Projectile, Params)
 	local Excluded = {}
 	for _, Instance in ipairs(Params.FilterDescendantsInstances) do table.insert(Excluded, Instance) end
 	table.insert(Excluded, Projectile.Visual)
+	if Projectile.CollisionBox then table.insert(Excluded, Projectile.CollisionBox) end
 	Params.FilterDescendantsInstances = Excluded
 	return Params
 end
@@ -173,19 +214,32 @@ function ProjectileController:_CreateVisual(Projectile, Settings)
 end
 
 function ProjectileController:_DestroyVisual(Projectile)
-	if Projectile and Projectile.Visual and Projectile.Visual.Parent then Projectile.Visual:Destroy() end
-	if Projectile then Projectile.Visual = nil end
+	if not Projectile then return end
+	if Projectile.CollisionBox and Projectile.CollisionBox.Parent then Projectile.CollisionBox:Destroy() end
+	Projectile.CollisionBox = nil
+	if Projectile.Visual and Projectile.Visual.Parent then Projectile.Visual:Destroy() end
+	Projectile.Visual = nil
 end
 
 function ProjectileController:_Step(DeltaTime)
 	for Id, Projectile in pairs(self.Projectiles) do
-		if Projectile.Destroyed then self.Projectiles[Id] = nil; continue end
+		if Projectile.Destroyed then
+			self.Projectiles[Id] = nil
+			continue
+		end
+
 		if Projectile.Stuck then
+			if not Projectile.Visual or not Projectile.Visual.Parent then
+				self.Projectiles[Id] = nil
+				continue
+			end
 			if Projectile.StuckTo and not Projectile.StuckTo:IsDescendantOf(workspace) then
-				detachAndAnchor(Projectile)
+				Projectile.StuckTo = nil
+				createDetachedCollisionBox(Projectile)
 			end
 			continue
 		end
+
 		Projectile.Age += DeltaTime
 		if Projectile.Age >= Projectile.MaxLifetime then self:_Expire(Projectile); self.Projectiles[Id] = nil; continue end
 		local OldPosition = Projectile.Position
@@ -199,7 +253,7 @@ function ProjectileController:_Step(DeltaTime)
 			if Projectile.SpinSpeed and Projectile.SpinSpeed.Magnitude > 0 then Projectile.SpinAngle += Projectile.SpinSpeed * DeltaTime end
 			setVisualCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction, CFrame.Angles(Projectile.SpinAngle.X, Projectile.SpinAngle.Y, Projectile.SpinAngle.Z) * Projectile.Rotation)
 			self:_Hit(Projectile, Result)
-			self.Projectiles[Id] = nil
+			if not Projectile.Stuck then self.Projectiles[Id] = nil end
 		else
 			Projectile.Position = NewPosition
 			if Projectile.Velocity.Magnitude > 0 then Projectile.Direction = Projectile.Velocity.Unit end
@@ -258,6 +312,7 @@ function ProjectileController:Fire(Origin, Direction, Settings)
 		RaycastParams = Settings.RaycastParams or self.Settings.RaycastParams,
 		OnStep = Settings.OnStep, OnHit = Settings.OnHit, OnExpire = Settings.OnExpire, OnStuck = Settings.OnStuck, Data = Settings.Data,
 		Visual = nil, Rotation = Settings.Rotation or CFrame.identity, SpinSpeed = Settings.SpinSpeed, SpinAngle = Vector3.zero,
+		StuckTo = nil, CollisionBox = nil,
 	}
 	Projectile.Visual = self:_CreateVisual(Projectile, Settings)
 	if Settings.Visual and not Projectile.Visual then warn("[ProjectileController] Failed to create projectile visual"); return nil end
