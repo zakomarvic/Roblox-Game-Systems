@@ -55,6 +55,34 @@ local function prepareVisual(Visual, ForceVisible)
 	end
 end
 
+local function stickVisualToHit(Projectile, HitPart)
+	local Visual = Projectile.Visual
+	if not Visual or not Visual.Parent or not HitPart or not HitPart:IsA("BasePart") then return end
+
+	local Parts = {}
+	if Visual:IsA("BasePart") then
+		table.insert(Parts, Visual)
+	else
+		for _, Descendant in ipairs(Visual:GetDescendants()) do
+			if Descendant:IsA("BasePart") then table.insert(Parts, Descendant) end
+		end
+	end
+
+	for _, Part in ipairs(Parts) do
+		Part.Anchored = false
+		Part.CanCollide = false
+		Part.CanTouch = false
+		Part.CanQuery = false
+		Part.Massless = true
+
+		local Weld = Instance.new("WeldConstraint")
+		Weld.Name = "ProjectileStickWeld"
+		Weld.Part0 = HitPart
+		Weld.Part1 = Part
+		Weld.Parent = Part
+	end
+end
+
 function ProjectileController.new(Settings)
 	local self = setmetatable({}, ProjectileController)
 	self.Settings = copyDefaults(Settings)
@@ -130,6 +158,7 @@ end
 function ProjectileController:_Step(DeltaTime)
 	for Id, Projectile in pairs(self.Projectiles) do
 		if Projectile.Destroyed then self.Projectiles[Id] = nil; continue end
+		if Projectile.Stuck then continue end
 		Projectile.Age += DeltaTime
 		if Projectile.Age >= Projectile.MaxLifetime then self:_Expire(Projectile); self.Projectiles[Id] = nil; continue end
 		local OldPosition = Projectile.Position
@@ -143,7 +172,7 @@ function ProjectileController:_Step(DeltaTime)
 			if Projectile.SpinSpeed and Projectile.SpinSpeed.Magnitude > 0 then Projectile.SpinAngle += Projectile.SpinSpeed * DeltaTime end
 			setVisualCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction, CFrame.Angles(Projectile.SpinAngle.X, Projectile.SpinAngle.Y, Projectile.SpinAngle.Z) * Projectile.Rotation)
 			self:_Hit(Projectile, Result)
-			self.Projectiles[Id] = nil
+			if Projectile.Destroyed then self.Projectiles[Id] = nil end
 		else
 			Projectile.Position = NewPosition
 			if Projectile.Velocity.Magnitude > 0 then Projectile.Direction = Projectile.Velocity.Unit end
@@ -161,6 +190,15 @@ function ProjectileController:_Hit(Projectile, Result)
 		local Ok, ErrorMessage = xpcall(function() Projectile.OnHit(Projectile, Result) end, debug.traceback)
 		if not Ok then warn("[ProjectileController] OnHit ERROR:\n" .. tostring(ErrorMessage)) end
 	end
+
+	if Projectile.StickOnHit and Projectile.Visual and Projectile.Visual.Parent then
+		Projectile.Stuck = true
+		Projectile.Destroyed = false
+		stickVisualToHit(Projectile, Result.Instance)
+		self.ProjectileHit:Fire(Projectile, Result)
+		return
+	end
+
 	self:_DestroyVisual(Projectile)
 	self.ProjectileHit:Fire(Projectile, Result)
 end
@@ -178,7 +216,8 @@ function ProjectileController:Fire(Origin, Direction, Settings)
 	local Projectile = {
 		Id = {}, Origin = Origin, Position = Origin, Direction = Direction.Unit,
 		Velocity = Direction.Unit * (Settings.Speed or self.Settings.Speed), Gravity = Settings.Gravity or self.Settings.Gravity,
-		MaxLifetime = Settings.MaxLifetime or self.Settings.MaxLifetime, Age = 0, Destroyed = false,
+		MaxLifetime = Settings.MaxLifetime or self.Settings.MaxLifetime, Age = 0, Destroyed = false, Stuck = false,
+		StickOnHit = Settings.StickOnHit == true,
 		RaycastParams = Settings.RaycastParams or self.Settings.RaycastParams,
 		OnStep = Settings.OnStep, OnHit = Settings.OnHit, OnExpire = Settings.OnExpire, Data = Settings.Data,
 		Visual = nil, Rotation = Settings.Rotation or CFrame.identity, SpinSpeed = Settings.SpinSpeed, SpinAngle = Vector3.zero,
