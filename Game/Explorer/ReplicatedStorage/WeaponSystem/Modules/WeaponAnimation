@@ -53,12 +53,15 @@ function WeaponAnimation:_load()
 	local Animator = self.Animator
 	if not Animator then return end
 
-	local function load(Name, AnimationId, Enabled)
+	local function load(Name, AnimationId, Enabled, Priority)
 		if not Enabled or AnimationId == nil then return nil end
 		local Animation = GetAnimation(self.Tool, Name, AnimationId)
 		if not Animation then return nil end
 
 		local Track = Animator:LoadAnimation(Animation)
+		if Priority then
+			Track.Priority = Priority
+		end
 		self.Tracks[Name] = Track
 		print(string.format("[WeaponAnimation] Loaded %s on %s Animator=%s Priority=%s", Name, HumanoidLabel(self.Humanoid), Animator.Name, tostring(Track.Priority)))
 		Track.Stopped:Connect(function()
@@ -72,6 +75,7 @@ function WeaponAnimation:_load()
 	load("FireAnim", Module.FireAnimationID, Module.FireAnimationID ~= nil)
 	load("ReloadAnim", Module.ReloadAnimationID, Module.ReloadAnimationID ~= nil)
 	load("ShotgunClipinAnim", Module.ShotgunClipinAnimationID, Module.ShotgunClipinAnimationID ~= nil)
+	load("AttackAnim", Module.AttackAnimationID, Module.AttackAnimationID ~= nil, Enum.AnimationPriority.Action)
 end
 
 function WeaponAnimation:SetHumanoid(Humanoid)
@@ -86,6 +90,25 @@ end
 
 function WeaponAnimation:GetAll()
 	return self.Tracks
+end
+
+function WeaponAnimation:Play(Name, Speed, FadeTime)
+	local Track = self.Tracks[Name]
+	if not Track then return false end
+
+	if Track.IsPlaying then
+		Track:Stop(FadeTime or 0)
+	end
+
+	Track:Play(FadeTime or 0.05, 1, Speed or 1)
+	return true
+end
+
+function WeaponAnimation:Stop(Name, FadeTime)
+	local Track = self.Tracks[Name]
+	if not Track then return false end
+	Track:Stop(FadeTime or 0.05)
+	return true
 end
 
 function WeaponAnimation:StopAll()
