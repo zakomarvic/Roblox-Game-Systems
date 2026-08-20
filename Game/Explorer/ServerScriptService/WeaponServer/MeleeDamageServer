@@ -113,13 +113,16 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 	Params.FilterDescendantsInstances = {Character, Tool}
 	Params.IgnoreWater = true
 
-	-- Create the projectile before hiding the equipped weapon so the cloned
-	-- visual inherits the weapon's normal transparency.
+	-- Hide the equipped copy before the throw is replicated. The projectile
+	-- controller receives ForceVisible so its independent clone stays visible.
+	setToolVisible(Tool, false)
 	local Projectile = ProjectileSystem:Fire(ServerOrigin, ServerDirection, {
 		Speed = math.clamp(tonumber(Module.ThrowSpeed) or 120, 1, 1000),
 		Gravity = Module.ThrowGravity or Vector3.new(0, -workspace.Gravity * 0.35, 0),
 		MaxLifetime = math.clamp(tonumber(Module.ThrowLifetime) or 5, 0.1, 30),
 		Visual = Handle,
+		ForceVisible = true,
+		SpinSpeed = Module.ThrowSpin and Vector3.new(0, 0, math.rad(1080)) or nil,
 		RaycastParams = Params,
 		Data = {Player = Player, Tool = Tool},
 		OnHit = function(Thrown, Result)
@@ -140,11 +143,7 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 		end,
 	})
 
-	if Projectile then
-		setToolVisible(Tool, false)
-	else
-		setToolVisible(Tool, true)
-	end
+	if not Projectile then setToolVisible(Tool, true) end
 end
 
 MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid, HitPart)
