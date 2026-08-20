@@ -61,6 +61,7 @@ local function isValidTarget(Player, TargetHumanoid, HitPart)
 end
 
 local function setToolVisible(Tool, Visible)
+	if not Tool or not Tool.Parent then return end
 	for _, Descendant in ipairs(Tool:GetDescendants()) do
 		if Descendant:IsA("BasePart") or Descendant:IsA("Decal") or Descendant:IsA("Texture") then
 			if Visible then
@@ -113,6 +114,8 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 
 	local ServerOrigin = Origin
 	local ServerDirection = Direction.Unit
+	local ConsumeWeapon = Module.ThrowConsumesWeapon == true
+	local StickOnHit = Module.ThrowStick == true
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
 	Params.FilterDescendantsInstances = {Character, Tool}
@@ -126,6 +129,7 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 		Visual = Handle,
 		ForceVisible = true,
 		SpinSpeed = Module.ThrowSpin and Vector3.new(0, 0, math.rad(1080)) or nil,
+		StickOnHit = StickOnHit,
 		RaycastParams = Params,
 		Data = {Player = Player, Tool = Tool},
 		OnHit = function(Thrown, Result)
@@ -139,14 +143,21 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 				applyDamage(Player, TargetHumanoid, Damage)
 				warn("[MeleeDamageServer] THROW HIT", Player.Name, TargetHumanoid.Parent:GetFullName(), "damage", Damage)
 			end
-			setToolVisible(Tool, true)
+			if not ConsumeWeapon then setToolVisible(Tool, true) end
 		end,
 		OnExpire = function()
-			setToolVisible(Tool, true)
+			if not ConsumeWeapon then setToolVisible(Tool, true) end
 		end,
 	})
 
-	if not Projectile then setToolVisible(Tool, true) end
+	if not Projectile then
+		setToolVisible(Tool, true)
+		return
+	end
+
+	if ConsumeWeapon then
+		Tool:Destroy()
+	end
 end
 
 MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid, HitPart)
