@@ -99,6 +99,11 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 	if not Humanoid or Humanoid.Health <= 0 or not Handle or not Handle:IsA("BasePart") then return end
 	if typeof(Origin) ~= "Vector3" or typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return end
 
+	-- The client origin is only accepted when it is close to the server's
+	-- weapon position. This keeps the server authoritative while accounting
+	-- for the local Motor6D/grip transform used by the melee weapon.
+	if (Origin - Handle.Position).Magnitude > 8 then return end
+
 	local Now = os.clock()
 	local Cooldown = math.max(0, tonumber(Module.ThrowCooldown) or 1)
 	local Last = LastThrows[Player] and LastThrows[Player][Tool] or -math.huge
@@ -106,15 +111,13 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 	LastThrows[Player] = LastThrows[Player] or {}
 	LastThrows[Player][Tool] = Now
 
-	local ServerOrigin = Handle.Position
+	local ServerOrigin = Origin
 	local ServerDirection = Direction.Unit
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
 	Params.FilterDescendantsInstances = {Character, Tool}
 	Params.IgnoreWater = true
 
-	-- Hide the equipped copy before the throw is replicated. The projectile
-	-- controller receives ForceVisible so its independent clone stays visible.
 	setToolVisible(Tool, false)
 	local Projectile = ProjectileSystem:Fire(ServerOrigin, ServerDirection, {
 		Speed = math.clamp(tonumber(Module.ThrowSpeed) or 120, 1, 1000),
