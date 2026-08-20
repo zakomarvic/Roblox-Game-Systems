@@ -1,0 +1,68 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
+local MeleeUtility = require(WeaponSystem.Modules:WaitForChild("MeleeUtility"))
+
+local KnifePickup = {}
+
+function KnifePickup.Setup(Player, Tool, PickupTemplate, Projectile, Settings, DestroyProjectile)
+	local Visual = Projectile and Projectile.Visual
+	local PromptPart = Visual and MeleeUtility.GetPromptPart(Visual)
+	if not PromptPart then return nil end
+
+	local Prompt = Instance.new("ProximityPrompt")
+	Prompt.Name = "KnifePickupPrompt"
+	Prompt.ActionText = "Pick Up"
+	Prompt.ObjectText = "Knife"
+	Prompt.HoldDuration = 0.15
+	Prompt.MaxActivationDistance = 10
+	Prompt.RequiresLineOfSight = false
+	Prompt.Parent = PromptPart
+
+	local State = {Claimed = false}
+
+	local function GiveKnife()
+		if Tool and Tool.Parent then
+			MeleeUtility.SetToolVisible(Tool, true)
+			Tool.Parent = Player:FindFirstChildOfClass("Backpack") or Player.Character
+			return
+		end
+		if PickupTemplate then
+			PickupTemplate.Parent = Player:FindFirstChildOfClass("Backpack") or Player.Character
+		end
+	end
+
+	Prompt.Triggered:Connect(function(Picker)
+		if State.Claimed or Picker ~= Player then return end
+		if not Player.Parent or not Picker.Character then return end
+
+		State.Claimed = true
+		Prompt.Enabled = false
+		Prompt:Destroy()
+		GiveKnife()
+		DestroyProjectile(Projectile)
+	end)
+
+	local Lifetime = math.max(0, tonumber(Settings.ThrowStickLifetime) or 30)
+	if Lifetime > 0 then
+		task.delay(Lifetime, function()
+			if State.Claimed then return end
+			State.Claimed = true
+			if Prompt.Parent then Prompt:Destroy() end
+
+			if Tool and Tool.Parent then
+				MeleeUtility.SetToolVisible(Tool, true)
+				local Backpack = Player:FindFirstChildOfClass("Backpack")
+				if Backpack and Tool.Parent == Player.Character then Tool.Parent = Backpack end
+			end
+
+			if PickupTemplate then
+				PickupTemplate:Destroy()
+			end
+		end)
+	end
+
+	return State
+end
+
+return KnifePickup
