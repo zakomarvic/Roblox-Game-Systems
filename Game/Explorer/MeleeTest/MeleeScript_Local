@@ -2,6 +2,7 @@ local Tool = script.Parent
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
+local UserInputService = game:GetService("UserInputService")
 
 local Setting = require(Tool:WaitForChild("Setting"))
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
@@ -20,6 +21,8 @@ local Controller
 local AnimationController
 local CustomGrip
 local Equipped = false
+local Throwing = false
+local LastThrow = 0
 local OldAutoRotate = nil
 
 local function getCharacter()
@@ -33,15 +36,8 @@ local function removeDefaultGrip()
 	if not RightArm then return end
 
 	local DefaultGrip = RightArm:FindFirstChild("RightGrip")
-	if DefaultGrip then
-		DefaultGrip:Destroy()
-	end
-
-	if CustomGrip then
-		CustomGrip:Destroy()
-		CustomGrip = nil
-	end
-
+	if DefaultGrip then DefaultGrip:Destroy() end
+	if CustomGrip then CustomGrip:Destroy(); CustomGrip = nil end
 	if not Handle then return end
 
 	Handle.CanCollide = false
@@ -59,10 +55,7 @@ local function removeDefaultGrip()
 end
 
 local function clearGrip()
-	if CustomGrip then
-		CustomGrip:Destroy()
-		CustomGrip = nil
-	end
+	if CustomGrip then CustomGrip:Destroy(); CustomGrip = nil end
 end
 
 local function countDamagePoints()
@@ -73,6 +66,28 @@ local function countDamagePoints()
 		end
 	end
 	return Count
+end
+
+local function throwWeapon()
+	if not Equipped or not Setting.ThrowEnabled or Throwing or not Handle or not Humanoid then return end
+	if Humanoid.Health <= 0 then return end
+	local Now = os.clock()
+	if Now - LastThrow < (Setting.ThrowCooldown or 0) then return end
+	LastThrow = Now
+	Throwing = true
+
+	if Setting.ThrowAnimationID ~= nil then
+		AnimationController:Play("ThrowAnim", Setting.ThrowAnimationSpeed or 1, 0.03)
+	end
+
+	local Camera = workspace.CurrentCamera
+	if Camera then
+		MeleeRemote:FireServer("Throw", Tool, Handle.Position, Camera.CFrame.LookVector)
+	end
+
+	task.delay(0.15, function()
+		Throwing = false
+	end)
 end
 
 local function setup()
@@ -122,6 +137,7 @@ local function setup()
 		Module = Setting,
 		Hitbox = Hitbox,
 		OnStart = function()
+			if Throwing then return end
 			MeleeRemote:FireServer("Start", Tool)
 			if Setting.AttackAnimationID ~= nil then
 				AnimationController:Play("AttackAnim", Setting.AttackAnimationSpeed or 1, 0.03)
@@ -135,12 +151,10 @@ local function setup()
 end
 
 local function attack()
+	if Throwing then return end
 	if not Equipped or not Controller then return end
 	if not Setting.MeleeEnabled then return end
 	if Humanoid.Health <= 0 then return end
-
-	-- MeleeController is the single source of truth for attack cooldown/state.
-	-- Tool.Activated fires for each click; don't add a second debounce here.
 	Controller:Attack(Setting.AttackDuration)
 end
 
@@ -151,6 +165,7 @@ end)
 
 Tool.Unequipped:Connect(function()
 	Equipped = false
+	Throwing = false
 	if Controller then Controller:Destroy() end
 	if AnimationController then AnimationController:StopAll() end
 	Controller = nil
@@ -165,8 +180,13 @@ end)
 
 Tool.Activated:Connect(attack)
 
-Player.CharacterAdded:Connect(function()
-	if Equipped then
-		task.defer(setup)
+UserInputService.InputBegan:Connect(function(Input, GameProcessed)
+	if GameProcessed or not Equipped then return end
+	if Input.KeyCode == Setting.ThrowKey then
+		throwWeapon()
 	end
+end)
+
+Player.CharacterAdded:Connect(function()
+	if Equipped then task.defer(setup) end
 end)
