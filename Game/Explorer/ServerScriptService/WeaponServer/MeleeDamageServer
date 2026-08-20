@@ -14,6 +14,7 @@ MeleeRemote.Parent = Remotes
 
 local ProjectileController = require(WeaponSystem.Modules:WaitForChild("ProjectileController"))
 local MeleeUtility = require(WeaponSystem.Modules:WaitForChild("MeleeUtility"))
+local KnifePickup = require(script.Parent.Modules:WaitForChild("KnifePickup"))
 local ProjectileSystem = ProjectileController.new()
 
 local ActiveAttacks = {}
@@ -42,56 +43,6 @@ local function isValidTarget(Player, TargetHumanoid, HitPart)
 	return TargetCharacter, TargetTorso
 end
 
-local function returnOrGiveKnife(Player, Tool, PickupTemplate)
-	if Tool and Tool.Parent then
-		MeleeUtility.SetToolVisible(Tool, true)
-		Tool.Parent = Player:FindFirstChildOfClass("Backpack") or Player.Character
-		return Tool
-	end
-	if PickupTemplate then
-		PickupTemplate.Parent = Player:FindFirstChildOfClass("Backpack") or Player.Character
-		return PickupTemplate
-	end
-end
-
-local function setupKnifePickup(Player, Tool, PickupTemplate, Projectile, Module)
-	local Visual = Projectile.Visual
-	local PromptPart = Visual and MeleeUtility.GetPromptPart(Visual)
-	if not PromptPart then return end
-	local Prompt = Instance.new("ProximityPrompt")
-	Prompt.Name = "KnifePickupPrompt"
-	Prompt.ActionText = "Pick Up"
-	Prompt.ObjectText = "Knife"
-	Prompt.HoldDuration = 0.15
-	Prompt.MaxActivationDistance = 10
-	Prompt.RequiresLineOfSight = false
-	Prompt.Parent = PromptPart
-	local Claimed = false
-	Prompt.Triggered:Connect(function(Picker)
-		if Claimed or Picker ~= Player then return end
-		if not Player.Parent or not Picker.Character then return end
-		Claimed = true
-		Prompt.Enabled = false
-		Prompt:Destroy()
-		returnOrGiveKnife(Player, Tool, PickupTemplate)
-		ProjectileSystem:DestroyProjectile(Projectile)
-	end)
-	local Lifetime = math.max(0, tonumber(Module.ThrowStickLifetime) or 30)
-	if Lifetime > 0 then
-		task.delay(Lifetime, function()
-			if Claimed then return end
-			Claimed = true
-			if Prompt.Parent then Prompt:Destroy() end
-			if Tool and Tool.Parent then
-				MeleeUtility.SetToolVisible(Tool, true)
-				local Backpack = Player:FindFirstChildOfClass("Backpack")
-				if Backpack and Tool.Parent == Player.Character then Tool.Parent = Backpack end
-			end
-			if PickupTemplate then PickupTemplate:Destroy() end
-		end)
-	end
-end
-
 local function throwWeapon(Player, Tool, Origin, Direction, Module)
 	if Module.ThrowEnabled ~= true then return end
 	local Character = Player.Character
@@ -106,6 +57,7 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 	if Now - Last < Cooldown then return end
 	LastThrows[Player] = LastThrows[Player] or {}
 	LastThrows[Player][Tool] = Now
+
 	local ServerOrigin = Origin
 	local ServerDirection = Direction.Unit
 	local ConsumeWeapon = Module.ThrowConsumesWeapon == true
@@ -115,6 +67,7 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 		PickupTemplate = Tool:Clone()
 		PickupTemplate.Parent = nil
 	end
+
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
 	Params.FilterDescendantsInstances = {Character, Tool}
@@ -149,7 +102,9 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 			end
 		end,
 		OnStuck = function(Thrown)
-			setupKnifePickup(Player, Tool, PickupTemplate, Thrown, Module)
+			KnifePickup.Setup(Player, Tool, PickupTemplate, Thrown, Module, function(Projectile)
+				ProjectileSystem:DestroyProjectile(Projectile)
+			end)
 		end,
 		OnExpire = function()
 			if PickupTemplate then PickupTemplate:Destroy(); PickupTemplate = nil end
@@ -168,10 +123,12 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid,
 	if type(Action) ~= "string" then return end
 	local OwnedTool, Module = MeleeUtility.GetOwnedEquippedWeapon(Player, Tool)
 	if not OwnedTool then return end
+
 	if Action == "Throw" then
 		throwWeapon(Player, Tool, TargetHumanoid, HitPart, Module)
 		return
 	end
+
 	local Character = Player.Character
 	local Humanoid = MeleeUtility.GetHumanoid(Character)
 	local Handle = Tool:FindFirstChild("Handle")
@@ -179,6 +136,7 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid,
 	local Now = os.clock()
 	local Cooldown = math.max(0, tonumber(Module.AttackCooldown) or 0)
 	local Duration = math.clamp(tonumber(Module.AttackDuration) or 0, 0, 2)
+
 	if Action == "Start" then
 		local Last = LastAttacks[Player] and LastAttacks[Player][Tool] or -math.huge
 		if Now - Last < Cooldown then return end
@@ -188,6 +146,7 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid,
 		ActiveAttacks[Player][Tool] = {EndTime = Now + Duration, HitTargets = {}}
 		return
 	end
+
 	if Action ~= "Hit" then return end
 	local PlayerAttacks = ActiveAttacks[Player]
 	local Attack = PlayerAttacks and PlayerAttacks[Tool]
@@ -195,10 +154,12 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid,
 		clearAttack(Player, Tool)
 		return
 	end
+
 	local TargetCharacter, TargetTorso = isValidTarget(Player, TargetHumanoid, HitPart)
 	if not TargetCharacter or Attack.HitTargets[TargetHumanoid] then return end
 	local Distance = (TargetTorso.Position - Handle.Position).Magnitude
 	if Distance > math.max(10, Handle.Size.Magnitude + 6) then return end
+
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
 	Params.FilterDescendantsInstances = {Character, Tool}
@@ -207,9 +168,11 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid,
 	if Offset.Magnitude <= 0 then return end
 	local Result = workspace:Raycast(Handle.Position, Offset, Params)
 	if Result and not Result.Instance:IsDescendantOf(TargetCharacter) then return end
+
 	Attack.HitTargets[TargetHumanoid] = true
 	local Damage = tonumber(Module.BaseDamage) or 0
 	MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris)
+
 	local Knockback = tonumber(Module.MeleeKnockback) or 0
 	if Knockback > 0 then
 		local KnockDirection = TargetTorso.Position - Handle.Position
