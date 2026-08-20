@@ -17,6 +17,7 @@ local BulletEffects = require(WeaponSystem.Modules:WaitForChild("BulletEffects")
 local ExplosionEffects = require(WeaponSystem.Modules:WaitForChild("ExplosionEffects"))
 local ProjectileRecords = {}
 local ShotTimes = {}
+local ExplosionTimes = {}
 
 local function getOwnedWeapon(Player, Tool)
 	if not Tool or not Tool:IsA("Tool") then return nil, nil end
@@ -81,11 +82,12 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	local Tool, Module = getEquippedWeapon(Player)
 	if not Tool then return end
 
+	ShotTimes[Player] = ShotTimes[Player] or {}
 	local Now = os.clock()
-	local LastShot = ShotTimes[Player] or 0
+	local LastShot = ShotTimes[Player][Tool] or 0
 	local FireRate = math.max(tonumber(Module.FireRate) or 0, 0.03)
 	if Now - LastShot < FireRate then return end
-	ShotTimes[Player] = Now
+	ShotTimes[Player][Tool] = Now
 
 	local Start = (ShooterTorso.CFrame * CFrame.new(0, 1.5, 0)).Position
 	local Params = RaycastParams.new()
@@ -123,6 +125,13 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool, Clie
 	local Damage = tonumber(Module.ExplosionDamage) or 0
 	local Knockback = tonumber(Module.ExplosionKnockback) or 0
 	if Radius <= 0 or Damage <= 0 then return end
+
+	ExplosionTimes[Player] = ExplosionTimes[Player] or {}
+	local Now = os.clock()
+	local FireRate = math.max(tonumber(Module.FireRate) or 0, 0.03)
+	local LastExplosion = ExplosionTimes[Player][Tool] or 0
+	if Now - LastExplosion < FireRate then return end
+	ExplosionTimes[Player][Tool] = Now
 
 	local Record = ProjectileRecords[Player] and ProjectileRecords[Player][Tool]
 	local Origin = ClientOrigin
@@ -171,5 +180,6 @@ end)
 Players.PlayerRemoving:Connect(function(Player)
 	ProjectileRecords[Player] = nil
 	ShotTimes[Player] = nil
+	ExplosionTimes[Player] = nil
 	WeaponState.ClearPlayer(Player)
 end)
