@@ -113,7 +113,8 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 	Params.FilterDescendantsInstances = {Character, Tool}
 	Params.IgnoreWater = true
 
-	setToolVisible(Tool, false)
+	-- Create the projectile before hiding the equipped weapon so the cloned
+	-- visual inherits the weapon's normal transparency.
 	local Projectile = ProjectileSystem:Fire(ServerOrigin, ServerDirection, {
 		Speed = math.clamp(tonumber(Module.ThrowSpeed) or 120, 1, 1000),
 		Gravity = Module.ThrowGravity or Vector3.new(0, -workspace.Gravity * 0.35, 0),
@@ -139,7 +140,11 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 		end,
 	})
 
-	if not Projectile then setToolVisible(Tool, true) end
+	if Projectile then
+		setToolVisible(Tool, false)
+	else
+		setToolVisible(Tool, true)
+	end
 end
 
 MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid, HitPart)
