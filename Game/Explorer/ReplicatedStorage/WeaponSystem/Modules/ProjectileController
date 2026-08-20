@@ -24,8 +24,8 @@ end
 local function prepareVisual(Visual, ForceVisible)
 	if not Visual then return end
 	if Visual:IsA("Model") and not Visual.PrimaryPart then
-		local Primary = Visual:FindFirstChildWhichIsA("BasePart", true)
-		if Primary then Visual.PrimaryPart = Primary end
+		local Primary = Visual:FindFirstChild("Handle") or Visual:FindFirstChildWhichIsA("BasePart", true)
+		if Primary and Primary:IsA("BasePart") then Visual.PrimaryPart = Primary end
 	end
 	for _, Descendant in ipairs(Visual:GetDescendants()) do
 		if Descendant:IsA("BasePart") then
@@ -72,7 +72,8 @@ local function createDetachedCollisionBox(Projectile)
 	if Projectile.Visual:IsA("BasePart") then Size = Projectile.Visual.Size elseif Projectile.Visual:IsA("Model") then local _, BoundingSize = Projectile.Visual:GetBoundingBox(); Size = BoundingSize end
 	Size = Vector3.new(math.max(Size.X, 0.35), math.max(Size.Y, 0.35), math.max(Size.Z, 0.35))
 	local Box = Instance.new("Part")
-	Box.Name = "ThrownKnifeCollision"; Box.Size = Size + Vector3.new(0.15, 0.15, 0.15); Box.CFrame = Pivot; Box.Transparency = 1; Box.Anchored = false; Box.CanCollide = true; Box.CanTouch = false; Box.CanQuery = false; Box.Massless = true; Box.CastShadow = false; Box.Parent = workspace
+	Box.Name = "ThrownKnifeCollision"; Box.Size = Size + Vector3.new(0.15, 0.15, 0.15); Box.CFrame = Pivot; Box.Transparency = 1; Box.Anchored = false; Box.CanCollide = true; Box.CanTouch = false; Box.CanQuery = false; Box.Massless = true; Box.CastShadow = false
+	Box.Parent = Projectile.Visual
 	Projectile.CollisionBox = Box
 	local Weld = Instance.new("WeldConstraint")
 	Weld.Name = "ThrownKnifeCollisionWeld"; Weld.Part0 = Box
@@ -80,6 +81,14 @@ local function createDetachedCollisionBox(Projectile)
 	if not Primary then Box:Destroy(); Projectile.CollisionBox = nil; return end
 	Weld.Part1 = Primary; Weld.Parent = Box
 	task.delay(1, function() if Box.Parent and Projectile.CollisionBox == Box then Box.Anchored = true end end)
+end
+
+local function sanitizeToolClone(ToolClone)
+	for _, Descendant in ipairs(ToolClone:GetDescendants()) do
+		if Descendant:IsA("Script") or Descendant:IsA("LocalScript") or Descendant:IsA("ModuleScript") or Descendant:IsA("RemoteEvent") or Descendant:IsA("RemoteFunction") or Descendant:IsA("BindableEvent") or Descendant:IsA("BindableFunction") then
+			Descendant:Destroy()
+		end
+	end
 end
 
 function ProjectileController.new(Settings)
@@ -110,6 +119,18 @@ end
 
 function ProjectileController:_CreateVisual(Projectile, Settings)
 	local Source = Settings.Visual
+	if Source and Source:IsA("Tool") then
+		local ToolClone = Source:Clone()
+		sanitizeToolClone(ToolClone)
+		local Visual = Instance.new("Model")
+		Visual.Name = "ThrownProjectile"
+		for _, Child in ipairs(ToolClone:GetChildren()) do Child.Parent = Visual end
+		ToolClone:Destroy()
+		Visual.Parent = workspace
+		prepareVisual(Visual, Settings.ForceVisible == true)
+		setVisualCFrame(Visual, Projectile.Position, Projectile.Direction, Projectile.Rotation)
+		return Visual
+	end
 	if Source and Source:IsA("Instance") then local Visual = Source:Clone(); Visual.Name = "ThrownProjectile"; Visual.Parent = workspace; prepareVisual(Visual, Settings.ForceVisible == true); setVisualCFrame(Visual, Projectile.Position, Projectile.Direction, Projectile.Rotation); return Visual end
 	local ProjectileName = Settings.ProjectileName; if not ProjectileName then return nil end
 	local FolderName = Settings.ProjectileFolderName or self.Settings.ProjectileFolderName; local Folder = ReplicatedStorage:FindFirstChild(FolderName)
