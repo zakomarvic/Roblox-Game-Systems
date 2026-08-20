@@ -74,7 +74,7 @@ local function setupKnifePickup(Player, Tool, PickupTemplate, Projectile, Module
 		Prompt.Enabled = false
 		Prompt:Destroy()
 		returnOrGiveKnife(Player, Tool, PickupTemplate)
-		ProjectileController:DestroyProjectile(Projectile)
+		ProjectileSystem:DestroyProjectile(Projectile)
 	end)
 	local Lifetime = math.max(0, tonumber(Module.ThrowStickLifetime) or 30)
 	if Lifetime > 0 then
@@ -120,15 +120,7 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 	Params.FilterDescendantsInstances = {Character, Tool}
 	Params.IgnoreWater = true
 
-	-- A thrown knife is no longer equipped immediately after the server accepts the throw.
-	-- Keep only the detached projectile and, when sticking is enabled, its pickup template.
-	if StickOnHit then
-		Tool:Destroy()
-	else
-		MeleeUtility.SetToolVisible(Tool, false)
-		if ConsumeWeapon then Tool:Destroy() end
-	end
-
+	-- Fire() clones the full Tool synchronously. Keep the real Tool alive until that clone exists.
 	local Projectile = ProjectileSystem:Fire(ServerOrigin, ServerDirection, {
 		Speed = math.clamp(tonumber(Module.ThrowSpeed) or 120, 1, 1000),
 		Gravity = Module.ThrowGravity or Vector3.new(0, -workspace.Gravity * 0.35, 0),
@@ -155,13 +147,11 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 			elseif type(Module.ThrowOnSurfaceHit) == "function" then
 				Module.ThrowOnSurfaceHit(Thrown, Result, Result.Instance)
 			end
-			if not StickOnHit and not ConsumeWeapon and Tool.Parent then MeleeUtility.SetToolVisible(Tool, true) end
 		end,
 		OnStuck = function(Thrown)
 			setupKnifePickup(Player, Tool, PickupTemplate, Thrown, Module)
 		end,
 		OnExpire = function()
-			if not ConsumeWeapon and Tool.Parent then MeleeUtility.SetToolVisible(Tool, true) end
 			if PickupTemplate then PickupTemplate:Destroy(); PickupTemplate = nil end
 		end,
 	})
@@ -169,6 +159,9 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 		if PickupTemplate then PickupTemplate:Destroy() end
 		return
 	end
+
+	-- Remove the actual Tool only after the flying visual has been cloned successfully.
+	Tool:Destroy()
 end
 
 MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid, HitPart)
