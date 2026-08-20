@@ -1,0 +1,17 @@
+local CashDrop = require(script.Parent:WaitForChild("CashDrop"))
+local CashService = require(script.Parent:WaitForChild("CashService"))
+
+local EconomyDrop = {}
+
+function EconomyDrop.DropPlayerCash(Player, Position, Options)
+	local Amount = CashService.Get(Player)
+	if Amount <= 0 then return nil, 0 end
+	CashService.Set(Player, 0)
+	return CashDrop.Drop(Position, Amount, Options), Amount
+end
+
+function EconomyDrop.DropFixedCash(Position, Amount, Options)
+	return CashDrop.Drop(Position, Amount, Options)
+end
+
+return EconomyDrop

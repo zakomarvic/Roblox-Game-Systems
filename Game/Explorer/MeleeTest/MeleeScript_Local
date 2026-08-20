@@ -173,8 +173,9 @@ local function setup()
 			end
 		end,
 		OnHit = function(Hit)
-			warn("[MeleeTest] HIT", Hit.TargetCharacter:GetFullName(), Hit.HitPart:GetFullName())
-			MeleeRemote:FireServer("Hit", Tool, Hit.TargetHumanoid, Hit.HitPart)
+			local Target = Hit.TargetInstance or Hit.TargetHumanoid or Hit.TargetCharacter or Hit.HitPart
+			warn("[MeleeTest] HIT", Target:GetFullName(), Hit.HitPart:GetFullName())
+			MeleeRemote:FireServer("Hit", Tool, Target, Hit.HitPart)
 		end,
 	})
 end

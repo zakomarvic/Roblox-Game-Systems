@@ -1,0 +1,64 @@
+local Debris = game:GetService("Debris")
+
+local CashDrop = {}
+
+local DEFAULT_LIFETIME = 120
+local DEFAULT_PICKUP_DISTANCE = 10
+local DROP_FOLDER_NAME = "CashDrops"
+
+local function getDropFolder()
+	local Folder = workspace:FindFirstChild(DROP_FOLDER_NAME)
+	if Folder then return Folder end
+	Folder = Instance.new("Folder")
+	Folder.Name = DROP_FOLDER_NAME
+	Folder.Parent = workspace
+	return Folder
+end
+
+local function createPart(Position, Amount, Options)
+	local Part = Instance.new("Part")
+	Part.Name = "CashDrop"
+	Part.Size = Options.Size or Vector3.new(1, 0.35, 1)
+	Part.Position = Position + (Options.Offset or Vector3.new(0, 1.5, 0))
+	Part.Shape = Enum.PartType.Cylinder
+	Part.Material = Enum.Material.Neon
+	Part.Color = Options.Color or Color3.fromRGB(50, 205, 50)
+	Part.Anchored = false
+	Part.CanCollide = Options.CanCollide ~= false
+	Part.CanQuery = true
+	Part.CanTouch = true
+	Part:SetAttribute("CashAmount", Amount)
+	Part.Parent = getDropFolder()
+	return Part
+end
+
+function CashDrop.Drop(Position, Amount, Options)
+	Options = Options or {}
+	local Value = math.floor(tonumber(Amount) or 0)
+	if Value <= 0 or typeof(Position) ~= "Vector3" then return nil end
+
+	local Part = createPart(Position, Value, Options)
+	local Prompt = Instance.new("ProximityPrompt")
+	Prompt.Name = "CashPickupPrompt"
+	Prompt.ActionText = Options.ActionText or "Pick Up"
+	Prompt.ObjectText = Options.ObjectText or ("$" .. Value)
+	Prompt.HoldDuration = math.max(0, tonumber(Options.HoldDuration) or 0)
+	Prompt.MaxActivationDistance = math.max(1, tonumber(Options.PickupDistance) or DEFAULT_PICKUP_DISTANCE)
+	Prompt.RequiresLineOfSight = false
+	Prompt.Parent = Part
+
+	local Claimed = false
+	Prompt.Triggered:Connect(function(Player)
+		if Claimed or not Player.Parent then return end
+		Claimed = true
+		local CashService = require(script.Parent:WaitForChild("CashService"))
+		CashService.Add(Player, Value)
+		Part:Destroy()
+	end)
+
+	local Lifetime = math.max(0, tonumber(Options.Lifetime) or DEFAULT_LIFETIME)
+	if Lifetime > 0 then Debris:AddItem(Part, Lifetime) end
+	return Part
+end
+
+return CashDrop

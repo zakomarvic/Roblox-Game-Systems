@@ -72,8 +72,6 @@ function MeleeController:Start(Duration)
 	end
 	Duration = math.max(0, Duration)
 
-	-- Inputs received while an attack/cooldown is active are ignored.
-	-- There is intentionally no attack buffering.
 	if not self:_CanStartNow() then return false end
 
 	self.Active = true
@@ -107,17 +105,21 @@ function MeleeController:_HandleHit(RaycastResult, Segment)
 	if not self.Active or not RaycastResult then return end
 
 	local HitPart = RaycastResult.Instance
-	if not HitPart then return end
+	if not HitPart or not HitPart:IsA("BasePart") then return end
 
-	local TargetCharacter = HitPart:FindFirstAncestorOfClass("Model")
-	if not TargetCharacter or TargetCharacter == self.Character then return end
+	local TargetModel = HitPart:FindFirstAncestorOfClass("Model")
+	if TargetModel == self.Character then return end
 
-	local TargetHumanoid = TargetCharacter:FindFirstChildOfClass("Humanoid")
-	if not TargetHumanoid or TargetHumanoid.Health <= 0 then return end
+	local TargetHumanoid = TargetModel and TargetModel:FindFirstChildOfClass("Humanoid")
+	if TargetHumanoid and TargetHumanoid.Health <= 0 then return end
 
+	-- A melee hit can target either a Humanoid or a physical object.
+	-- For models without Humanoids, keep the model as the target so all
+	-- parts of a destructible count as the same target during one swing.
+	local TargetInstance = TargetHumanoid or TargetModel or HitPart
 	local HitOnce = self.Module.MeleeHitOnce
-	if HitOnce ~= false and self.HitTargets[TargetHumanoid] then return end
-	self.HitTargets[TargetHumanoid] = true
+	if HitOnce ~= false and self.HitTargets[TargetInstance] then return end
+	self.HitTargets[TargetInstance] = true
 
 	if self.OnHit then
 		self.OnHit({
@@ -125,8 +127,9 @@ function MeleeController:_HandleHit(RaycastResult, Segment)
 			HitPart = HitPart,
 			RaycastResult = RaycastResult,
 			Segment = Segment,
-			TargetCharacter = TargetCharacter,
+			TargetCharacter = TargetModel,
 			TargetHumanoid = TargetHumanoid,
+			TargetInstance = TargetInstance,
 		})
 	end
 end
