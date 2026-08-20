@@ -6,6 +6,7 @@ local CollectionService = game:GetService("CollectionService")
 local Setting = require(Tool:WaitForChild("Setting"))
 local MeleeController = require(ReplicatedStorage.WeaponSystem.Modules:WaitForChild("MeleeController"))
 local MeleeHitbox = require(ReplicatedStorage.WeaponSystem.Modules:WaitForChild("MeleeHitbox"))
+local WeaponAnimation = require(ReplicatedStorage.WeaponSystem.Modules:WaitForChild("WeaponAnimation"))
 
 local Player = Players.LocalPlayer
 local Character
@@ -13,6 +14,7 @@ local Humanoid
 local Handle
 local Hitbox
 local Controller
+local AnimationController
 local CustomGrip
 local Equipped = false
 local OldAutoRotate = nil
@@ -104,12 +106,23 @@ local function setup()
 		},
 	})
 
+	AnimationController = WeaponAnimation.new({
+		Tool = Tool,
+		Humanoid = Humanoid,
+		Module = Setting,
+	})
+
 	Controller = MeleeController.new({
 		Tool = Tool,
 		Character = Character,
 		Humanoid = Humanoid,
 		Module = Setting,
 		Hitbox = Hitbox,
+		OnStart = function()
+			if Setting.AttackAnimationID ~= nil then
+				AnimationController:Play("AttackAnim", Setting.AttackAnimationSpeed or 1, 0.03)
+			end
+		end,
 		OnHit = function(Hit)
 			warn("[MeleeTest] HIT", Hit.TargetCharacter:GetFullName(), Hit.HitPart:GetFullName())
 		end,
@@ -134,7 +147,9 @@ end)
 Tool.Unequipped:Connect(function()
 	Equipped = false
 	if Controller then Controller:Destroy() end
+	if AnimationController then AnimationController:StopAll() end
 	Controller = nil
+	AnimationController = nil
 	Hitbox = nil
 	clearGrip()
 	if Humanoid and Humanoid.Parent then
