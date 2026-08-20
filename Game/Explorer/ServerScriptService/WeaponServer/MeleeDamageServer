@@ -51,13 +51,13 @@ local function createAttack(Player, Tool, Now, Cooldown, Duration)
 	return Attack
 end
 
-MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid, HitPart)
+MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetOrOrigin, HitOrDirection)
 	if type(Action) ~= "string" then return end
 	local OwnedTool, Module = MeleeUtility.GetOwnedEquippedWeapon(Player, Tool)
 	if not OwnedTool then return end
 
 	if Action == "Throw" then
-		Thrower:Throw(Player, Tool, TargetHumanoid, HitPart, Module)
+		Thrower:Throw(Player, Tool, TargetOrOrigin, HitOrDirection, Module)
 		return
 	end
 
@@ -83,21 +83,21 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid,
 		return
 	end
 
-	local TargetCharacter, TargetTorso = getValidTarget(Player, TargetHumanoid, HitPart)
-	if not TargetCharacter or Attack.HitTargets[TargetHumanoid] then return end
+	local TargetCharacter, TargetTorso = getValidTarget(Player, TargetOrOrigin, HitOrDirection)
+	if not TargetCharacter or Attack.HitTargets[TargetOrOrigin] then return end
 	if (TargetTorso.Position - Handle.Position).Magnitude > math.max(10, Handle.Size.Magnitude + 6) then return end
 
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
 	Params.FilterDescendantsInstances = {Character, Tool}
 	Params.IgnoreWater = true
-	local Offset = HitPart.Position - Handle.Position
+	local Offset = HitOrDirection.Position - Handle.Position
 	if Offset.Magnitude <= 0 then return end
 	local Result = workspace:Raycast(Handle.Position, Offset, Params)
 	if Result and not Result.Instance:IsDescendantOf(TargetCharacter) then return end
 
-	Attack.HitTargets[TargetHumanoid] = true
-	MeleeUtility.ApplyDamage(Player, TargetHumanoid, tonumber(Module.BaseDamage) or 0, Debris)
+	Attack.HitTargets[TargetOrOrigin] = true
+	MeleeUtility.ApplyDamage(Player, TargetOrOrigin, tonumber(Module.BaseDamage) or 0, Debris)
 
 	local Knockback = tonumber(Module.MeleeKnockback) or 0
 	if Knockback > 0 then

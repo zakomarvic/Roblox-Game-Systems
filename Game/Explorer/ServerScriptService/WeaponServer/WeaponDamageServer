@@ -16,6 +16,8 @@ local WeaponState = require(WeaponSystem.Modules:WaitForChild("WeaponState"))
 local BulletEffects = require(WeaponSystem.Modules:WaitForChild("BulletEffects"))
 local ExplosionEffects = require(WeaponSystem.Modules:WaitForChild("ExplosionEffects"))
 local ProjectileRecords = {}
+local ShotTimes = {}
+local ExplosionTimes = {}
 
 local function getOwnedWeapon(Player, Tool)
 	if not Tool or not Tool:IsA("Tool") then return nil, nil end
@@ -54,15 +56,13 @@ ProjectileFired.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
 	if not OwnedTool or Module.ProjectileType ~= "Projectile" or Module.ExplosiveEnabled ~= true then return end
 	local Character = Player.Character
 	local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-	if not Humanoid or Humanoid.Health <= 0 or not getTorso(Character) then return end
+	local ShooterTorso = getTorso(Character)
+	if not Humanoid or Humanoid.Health <= 0 or not ShooterTorso then return end
+	if (Origin - (ShooterTorso.CFrame * CFrame.new(0, 1.5, 0)).Position).Magnitude > 8 then return end
 	local State = WeaponState.Get(Player, Tool)
 	if State and State.Reloading then return end
 	ProjectileRecords[Player] = ProjectileRecords[Player] or {}
-	ProjectileRecords[Player][Tool] = {
-		Time = os.clock(), Origin = Origin, Direction = Direction.Unit,
-		Speed = tonumber(Module.ProjectileSpeed) or 500,
-		Lifetime = tonumber(Module.ProjectileLifetime) or 10,
-	}
+	ProjectileRecords[Player][Tool] = {Time = os.clock(), Origin = Origin, Direction = Direction.Unit, Speed = tonumber(Module.ProjectileSpeed) or 500, Lifetime = tonumber(Module.ProjectileLifetime) or 10}
 end)
 
 InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso, HitPart, Direction)
@@ -77,8 +77,11 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	if not ShooterHumanoid or not ShooterTorso or ShooterHumanoid.Health <= 0 then return end
 	local Tool, Module = getEquippedWeapon(Player)
 	if not Tool then return end
-	local State = WeaponState.Get(Player, Tool)
-	if not State or State.Reloading or os.clock() - State.LastShot > 0.25 then return end
+	ShotTimes[Player] = ShotTimes[Player] or {}
+	local Now = os.clock()
+	local LastShot = ShotTimes[Player][Tool] or 0
+	local FireRate = math.max(tonumber(Module.FireRate) or 0, 0.03)
+	if Now - LastShot < FireRate then return end
 	local Start = (ShooterTorso.CFrame * CFrame.new(0, 1.5, 0)).Position
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
@@ -92,6 +95,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	if AlongShot <= 0 or AlongShot > 5000 or (HitPart.Position - (Start + Direction * AlongShot)).Magnitude > 8 then return end
 	local Damage = tonumber(Module.BaseDamage)
 	if not Damage or Damage <= 0 then return end
+	ShotTimes[Player][Tool] = Now
 	if HitPart.Name == "Head" and Module.HeadshotEnabled then Damage *= tonumber(Module.HeadshotDamageMultiplier) or 1 end
 	local Knockback = tonumber(Module.Knockback) or 0
 	local Lifesteal = tonumber(Module.Lifesteal) or 0
@@ -102,37 +106,44 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	if Module.FlamingBullet == true then BulletEffects.Apply("Incendiary", {Player=Player, Tool=Tool, Module=Module, TargetCharacter=TargetCharacter, TargetHumanoid=TargetHumanoid, TargetTorso=TargetTorso, HitPart=HitPart, Direction=Direction, Duration=Module.FlamingBulletDuration}) end
 end)
 
-Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool)
-	warn("[WeaponDamageServer] EXPLOSION EVENT RECEIVED", Player.Name, Position)
-	if typeof(Position) ~= "Vector3" or typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then warn("[WeaponDamageServer] Rejected: invalid arguments") return end
+Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool, ClientOrigin)
+	if typeof(Position) ~= "Vector3" or typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return end
 	local Character = Player.Character
 	local ShooterHumanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-	if not ShooterHumanoid or ShooterHumanoid.Health <= 0 or not getTorso(Character) then warn("[WeaponDamageServer] Rejected: shooter invalid") return end
+	local ShooterTorso = getTorso(Character)
+	if not ShooterHumanoid or ShooterHumanoid.Health <= 0 or not ShooterTorso then return end
 	local OwnedTool, Module = getOwnedWeapon(Player, Tool)
-	if not OwnedTool then warn("[WeaponDamageServer] Rejected: projectile tool is not owned by player") return end
-	if Module.ProjectileType ~= "Projectile" or Module.ExplosiveEnabled ~= true then warn("[WeaponDamageServer] Rejected: weapon is not explosive projectile") return end
-	local Records = ProjectileRecords[Player]
-	local Record = Records and Records[Tool]
-	if not Record then warn("[WeaponDamageServer] Rejected: no recent projectile record") return end
-	local Age = os.clock() - Record.Time
-	if Age > Record.Lifetime + 1 then warn("[WeaponDamageServer] Rejected: projectile record expired", Age) Records[Tool] = nil return end
+	if not OwnedTool or Module.ProjectileType ~= "Projectile" or Module.ExplosiveEnabled ~= true then return end
 	local Radius = tonumber(Module.ExplosionRadius) or 0
 	local Damage = tonumber(Module.ExplosionDamage) or 0
 	local Knockback = tonumber(Module.ExplosionKnockback) or 0
-	if Radius <= 0 or Damage <= 0 then warn("[WeaponDamageServer] Rejected: invalid explosion settings") return end
-	if (Position - Record.Origin).Magnitude > Record.Speed * Record.Lifetime + Radius then warn("[WeaponDamageServer] Rejected: explosion too far") return end
-	local AlongShot = (Position - Record.Origin):Dot(Record.Direction)
-	if AlongShot < -Radius then warn("[WeaponDamageServer] Rejected: explosion behind origin") return end
-	Records[Tool] = nil
+	if Radius <= 0 or Damage <= 0 then return end
+	ExplosionTimes[Player] = ExplosionTimes[Player] or {}
+	local Now = os.clock()
+	local FireRate = math.max(tonumber(Module.FireRate) or 0, 0.03)
+	local LastExplosion = ExplosionTimes[Player][Tool] or 0
+	if Now - LastExplosion < FireRate then return end
+	local Record = ProjectileRecords[Player] and ProjectileRecords[Player][Tool]
+	local Origin = ClientOrigin
+	local MaxLifetime = tonumber(Module.ProjectileLifetime) or 10
+	local Speed = tonumber(Module.ProjectileSpeed) or 500
+	if Record then
+		Origin = Record.Origin
+		if os.clock() - Record.Time > Record.Lifetime + 1 then Record = nil end
+	end
+	if typeof(Origin) ~= "Vector3" then return end
+	local ExpectedOrigin = (ShooterTorso.CFrame * CFrame.new(0, 1.5, 0)).Position
+	if (Origin - ExpectedOrigin).Magnitude > 8 then return end
+	if (Position - Origin).Magnitude > Speed * MaxLifetime + Radius then return end
+	ExplosionTimes[Player][Tool] = Now
+	if ProjectileRecords[Player] then ProjectileRecords[Player][Tool] = nil end
 	Direction = Direction.Unit
 	ExplosionEffects.Create(Position, {Radius = Radius, Tool = Tool})
-
 	local OverlapParams = OverlapParams.new()
 	OverlapParams.FilterType = Enum.RaycastFilterType.Exclude
 	OverlapParams.FilterDescendantsInstances = {Character, Tool}
 	local Parts = workspace:GetPartBoundsInRadius(Position, Radius, OverlapParams)
 	local Processed = {}
-	local HitCount = 0
 	for _, Part in ipairs(Parts) do
 		local TargetCharacter = Part:FindFirstAncestorOfClass("Model")
 		local TargetHumanoid = TargetCharacter and TargetCharacter:FindFirstChildOfClass("Humanoid")
@@ -145,17 +156,16 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool)
 				local Falloff = 1 - math.clamp(Distance / Radius, 0, 1)
 				local AppliedDamage = Damage * Falloff
 				local ExplosionDirection = Distance > 0 and Offset.Unit or Direction
-				HitCount += 1
-				warn("[WeaponDamageServer] Explosion target", TargetCharacter:GetFullName(), "damage", AppliedDamage)
 				if AppliedDamage > 0 then addCreator(TargetHumanoid, Player) TargetHumanoid:TakeDamage(AppliedDamage) end
 				if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += ExplosionDirection * (Knockback * Falloff) end
 			end
 		end
 	end
-	warn("[WeaponDamageServer] EXPLOSION COMPLETE; targets:", HitCount)
 end)
 
 Players.PlayerRemoving:Connect(function(Player)
 	ProjectileRecords[Player] = nil
+	ShotTimes[Player] = nil
+	ExplosionTimes[Player] = nil
 	WeaponState.ClearPlayer(Player)
 end)
