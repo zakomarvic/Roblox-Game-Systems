@@ -13,12 +13,41 @@ local function copyDefaults(Settings)
 	return Result
 end
 
-local function setProjectileCFrame(Visual, Position, Direction, Rotation)
-	if not Visual then return end
+local function setVisualCFrame(Visual, Position, Direction, Rotation)
+	if not Visual or not Visual.Parent then return end
 	local Look = Direction.Magnitude > 0 and Direction.Unit or Vector3.zAxis
 	local CFrameValue = CFrame.lookAt(Position, Position + Look) * (Rotation or CFrame.identity)
-	if Visual:IsA("Model") then Visual:PivotTo(CFrameValue)
-	elseif Visual:IsA("BasePart") then Visual.CFrame = CFrameValue end
+	if Visual:IsA("Model") then
+		Visual:PivotTo(CFrameValue)
+	elseif Visual:IsA("BasePart") then
+		Visual.CFrame = CFrameValue
+	end
+end
+
+local function prepareVisual(Visual)
+	if not Visual then return end
+	if Visual:IsA("Model") and not Visual.PrimaryPart then
+		local Primary = Visual:FindFirstChildWhichIsA("BasePart", true)
+		if Primary then Visual.PrimaryPart = Primary end
+	end
+	for _, Descendant in ipairs(Visual:GetDescendants()) do
+		if Descendant:IsA("BasePart") then
+			Descendant.Anchored = true
+			Descendant.CanCollide = false
+			Descendant.CanTouch = false
+			Descendant.CanQuery = false
+			Descendant.Massless = true
+			Descendant.LocalTransparencyModifier = 0
+		end
+	end
+	if Visual:IsA("BasePart") then
+		Visual.Anchored = true
+		Visual.CanCollide = false
+		Visual.CanTouch = false
+		Visual.CanQuery = false
+		Visual.Massless = true
+		Visual.LocalTransparencyModifier = 0
+	end
 end
 
 function ProjectileController.new(Settings)
@@ -60,26 +89,12 @@ function ProjectileController:_CreateVisual(Projectile, Settings)
 	local Source = Settings.Visual
 	if Source and Source:IsA("Instance") then
 		local Visual = Source:Clone()
+		Visual.Name = "ThrownProjectile"
 		Visual.Parent = workspace
-		if Visual:IsA("Model") and not Visual.PrimaryPart then
-			local Primary = Visual:FindFirstChildWhichIsA("BasePart", true)
-			if Primary then Visual.PrimaryPart = Primary end
-		end
-		for _, Descendant in ipairs(Visual:GetDescendants()) do
-			if Descendant:IsA("BasePart") then
-				Descendant.Anchored = true
-				Descendant.CanCollide = false
-				Descendant.CanTouch = false
-				Descendant.CanQuery = false
-			end
-		end
-		if Visual:IsA("BasePart") then
-			Visual.Anchored = true
-			Visual.CanCollide = false
-			Visual.CanTouch = false
-			Visual.CanQuery = false
-		end
-		setProjectileCFrame(Visual, Projectile.Position, Projectile.Direction, Projectile.Rotation)
+		prepareVisual(Visual)
+		-- Force the projectile to its launch position after it has been detached
+		-- from the Tool/character hierarchy.
+		setVisualCFrame(Visual, Projectile.Position, Projectile.Direction, Projectile.Rotation)
 		return Visual
 	end
 
@@ -97,12 +112,10 @@ function ProjectileController:_CreateVisual(Projectile, Settings)
 		return nil
 	end
 	local Visual = Template:Clone()
+	Visual.Name = "ThrownProjectile"
 	Visual.Parent = workspace
-	if Visual:IsA("Model") and not Visual.PrimaryPart then
-		local Primary = Visual:FindFirstChildWhichIsA("BasePart", true)
-		if Primary then Visual.PrimaryPart = Primary end
-	end
-	setProjectileCFrame(Visual, Projectile.Position, Projectile.Direction, Projectile.Rotation)
+	prepareVisual(Visual)
+	setVisualCFrame(Visual, Projectile.Position, Projectile.Direction, Projectile.Rotation)
 	return Visual
 end
 
@@ -116,20 +129,24 @@ function ProjectileController:_Step(DeltaTime)
 		if Projectile.Destroyed then self.Projectiles[Id] = nil; continue end
 		Projectile.Age += DeltaTime
 		if Projectile.Age >= Projectile.MaxLifetime then
-			self:_Expire(Projectile); self.Projectiles[Id] = nil; continue end
+			self:_Expire(Projectile)
+			self.Projectiles[Id] = nil
+			continue
+		end
+
 		local OldPosition = Projectile.Position
 		Projectile.Velocity += Projectile.Gravity * DeltaTime
 		local NewPosition = OldPosition + Projectile.Velocity * DeltaTime
 		local Travel = NewPosition - OldPosition
 		local Params = self:_ExcludeVisualFromRaycast(Projectile, self:_ResolveRaycastParams(Projectile))
 		local Result = workspace:Raycast(OldPosition, Travel, Params)
+
 		if Result then
 			Projectile.Position = Result.Position
-			Projectile.Velocity = Vector3.zero
 			if Projectile.SpinSpeed and Projectile.SpinSpeed.Magnitude > 0 then
 				Projectile.SpinAngle += Projectile.SpinSpeed * DeltaTime
 			end
-			setProjectileCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction, CFrame.Angles(Projectile.SpinAngle.X, Projectile.SpinAngle.Y, Projectile.SpinAngle.Z) * Projectile.Rotation)
+			setVisualCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction, CFrame.Angles(Projectile.SpinAngle.X, Projectile.SpinAngle.Y, Projectile.SpinAngle.Z) * Projectile.Rotation)
 			self:_Hit(Projectile, Result)
 			self.Projectiles[Id] = nil
 		else
@@ -138,7 +155,7 @@ function ProjectileController:_Step(DeltaTime)
 			if Projectile.SpinSpeed and Projectile.SpinSpeed.Magnitude > 0 then
 				Projectile.SpinAngle += Projectile.SpinSpeed * DeltaTime
 			end
-			setProjectileCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction, CFrame.Angles(Projectile.SpinAngle.X, Projectile.SpinAngle.Y, Projectile.SpinAngle.Z) * Projectile.Rotation)
+			setVisualCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction, CFrame.Angles(Projectile.SpinAngle.X, Projectile.SpinAngle.Y, Projectile.SpinAngle.Z) * Projectile.Rotation)
 			if Projectile.OnStep then Projectile.OnStep(Projectile, DeltaTime) end
 		end
 	end
@@ -170,12 +187,12 @@ function ProjectileController:Fire(Origin, Direction, Settings)
 		Velocity = Direction.Unit * (Settings.Speed or self.Settings.Speed), Gravity = Settings.Gravity or self.Settings.Gravity,
 		MaxLifetime = Settings.MaxLifetime or self.Settings.MaxLifetime, Age = 0, Destroyed = false,
 		RaycastParams = Settings.RaycastParams or self.Settings.RaycastParams,
-		OnStep = Settings.OnStep, OnHit = Settings.OnHit, OnExpire = Settings.OnExpire, Data = Settings.Data, Visual = nil,
-		Rotation = Settings.Rotation or CFrame.identity,
-		SpinSpeed = Settings.SpinSpeed,
-		SpinAngle = Vector3.zero,
+		OnStep = Settings.OnStep, OnHit = Settings.OnHit, OnExpire = Settings.OnExpire, Data = Settings.Data,
+		Visual = nil, Rotation = Settings.Rotation or CFrame.identity,
+		SpinSpeed = Settings.SpinSpeed, SpinAngle = Vector3.zero,
 	}
 	Projectile.Visual = self:_CreateVisual(Projectile, Settings)
+	if not Projectile.Visual then return nil end
 	self.Projectiles[Projectile.Id] = Projectile
 	self.ProjectileCreated:Fire(Projectile)
 	self:_EnsureConnection()
@@ -184,7 +201,9 @@ end
 
 function ProjectileController:DestroyProjectile(Projectile)
 	if not Projectile or Projectile.Destroyed then return end
-	Projectile.Destroyed = true; self:_DestroyVisual(Projectile); self.Projectiles[Projectile.Id] = nil
+	Projectile.Destroyed = true
+	self:_DestroyVisual(Projectile)
+	self.Projectiles[Projectile.Id] = nil
 end
 
 function ProjectileController:GetActiveCount()
