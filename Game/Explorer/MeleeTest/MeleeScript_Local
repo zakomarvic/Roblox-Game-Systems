@@ -82,7 +82,36 @@ local function throwWeapon()
 
 	local Camera = workspace.CurrentCamera
 	if Camera then
-		MeleeRemote:FireServer("Throw", Tool, Handle.Position, Camera.CFrame.LookVector)
+		local MousePosition = UserInputService:GetMouseLocation()
+		local Ray = Camera:ViewportPointToRay(MousePosition.X, MousePosition.Y)
+
+		local Params = RaycastParams.new()
+		Params.FilterType = Enum.RaycastFilterType.Exclude
+		Params.FilterDescendantsInstances = {Character, Tool}
+		Params.IgnoreWater = true
+
+		local Result = workspace:Raycast(
+			Ray.Origin,
+			Ray.Direction * 1000,
+			Params
+		)
+
+		local AimPoint
+
+		if Result then
+			AimPoint = Result.Position
+		else
+			AimPoint = Ray.Origin + Ray.Direction * 1000
+		end
+
+		local ThrowDirection = (AimPoint - Handle.Position).Unit
+
+		MeleeRemote:FireServer(
+			"Throw",
+			Tool,
+			Handle.Position,
+			ThrowDirection
+		)
 	end
 
 	task.delay(0.15, function()
