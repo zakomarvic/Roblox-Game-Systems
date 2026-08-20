@@ -185,7 +185,7 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 		MaxLifetime = math.clamp(tonumber(Module.ThrowLifetime) or 5, 0.1, 30),
 		Visual = Handle,
 		ForceVisible = true,
-		SpinSpeed = Module.ThrowSpin and Vector3.new(0, 0, math.rad(1080)) or nil,
+		SpinSpeed = Module.ThrowSpin and Vector3.new(math.rad(-1080), 0, 0) or nil,
 		StickOnHit = StickOnHit,
 		StickLifetime = Module.ThrowStickLifetime,
 		RaycastParams = Params,
