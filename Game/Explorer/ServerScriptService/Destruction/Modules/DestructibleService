@@ -1,0 +1,136 @@
+local CollectionService = game:GetService("CollectionService")
+local Debris = game:GetService("Debris")
+
+local CashDrop = require(game.ServerScriptService.Economy.Modules:WaitForChild("CashDrop"))
+
+local DestructibleService = {}
+
+local TAG = "Destructible"
+local DEFAULT_HEALTH = 100
+local DEFAULT_CASH = 0
+local DEFAULT_RESPAWN = 0
+
+local States = {}
+
+local function getRoot(Instance)
+	if not Instance then return nil end
+	if Instance:IsA("Model") or Instance:IsA("BasePart") then return Instance end
+	return Instance:FindFirstAncestorOfClass("Model") or Instance:FindFirstAncestorWhichIsA("BasePart")
+end
+
+local function getNumber(Object, AttributeName, Default)
+	local Value = Object:GetAttribute(AttributeName)
+	if Value == nil then return Default end
+	return tonumber(Value) or Default
+end
+
+local function setup(Object)
+	local Root = getRoot(Object)
+	if not Root or States[Root] then return States[Root] end
+
+	local MaxHealth = math.max(1, getNumber(Root, "MaxHealth", getNumber(Root, "Health", DEFAULT_HEALTH)))
+	local State = {
+		Object = Root,
+		MaxHealth = MaxHealth,
+		Health = MaxHealth,
+		Destroyed = false,
+		Destroying = false,
+	}
+	States[Root] = State
+	Root:SetAttribute("MaxHealth", MaxHealth)
+	Root:SetAttribute("Health", MaxHealth)
+	return State
+end
+
+local function dropCash(State)
+	local Amount = math.max(0, math.floor(getNumber(State.Object, "CashDropValue", DEFAULT_CASH)))
+	if Amount <= 0 then return end
+	local Position
+	if State.Object:IsA("BasePart") then
+		Position = State.Object.Position
+	elseif State.Object:IsA("Model") then
+		local Part = State.Object.PrimaryPart or State.Object:FindFirstChildWhichIsA("BasePart", true)
+		Position = Part and Part.Position
+	end
+	if Position then CashDrop.Drop(Position, Amount) end
+end
+
+local function destroy(State)
+	if not State or State.Destroyed or State.Destroying then return end
+	State.Destroying = true
+	State.Health = 0
+	State.Object:SetAttribute("Health", 0)
+	dropCash(State)
+
+	local Object = State.Object
+	local RespawnTime = math.max(0, getNumber(Object, "RespawnTime", DEFAULT_RESPAWN))
+	local Parent = Object.Parent
+	local Clone = RespawnTime > 0 and Object:Clone() or nil
+	if Clone then
+		Clone:SetAttribute("Health", State.MaxHealth)
+		Clone.Parent = nil
+	end
+
+	States[Object] = nil
+	Object:Destroy()
+
+	if Clone and Parent then
+		task.delay(RespawnTime, function()
+			if Parent.Parent then
+				Clone.Parent = Parent
+			end
+		end)
+	end
+end
+
+function DestructibleService.Register(Object)
+	return setup(Object)
+end
+
+function DestructibleService.IsDestructible(Object)
+	local Root = getRoot(Object)
+	return Root and CollectionService:HasTag(Root, TAG) or false
+end
+
+function DestructibleService.Damage(Object, Amount, Attacker)
+	local Root = getRoot(Object)
+	if not Root or not CollectionService:HasTag(Root, TAG) then return false, 0 end
+	local State = States[Root] or setup(Root)
+	if not State or State.Destroyed or State.Destroying then return false, 0 end
+
+	local Damage = math.max(0, tonumber(Amount) or 0)
+	if Damage <= 0 then return false, State.Health end
+
+	State.Health = math.max(0, State.Health - Damage)
+	Root:SetAttribute("Health", State.Health)
+	Root:SetAttribute("LastDamagerUserId", typeof(Attacker) == "Instance" and Attacker:IsA("Player") and Attacker.UserId or nil)
+
+	if State.Health <= 0 then
+		State.Destroyed = true
+		destroy(State)
+		return true, 0
+	end
+	return true, State.Health
+end
+
+function DestructibleService.Destroy(Object)
+	local Root = getRoot(Object)
+	local State = Root and States[Root]
+	if State then
+		State.Destroyed = true
+		destroy(State)
+	end
+end
+
+function DestructibleService.Initialize()
+	for _, Object in ipairs(CollectionService:GetTagged(TAG)) do
+		setup(Object)
+	end
+	CollectionService:GetInstanceAddedSignal(TAG):Connect(setup)
+	CollectionService:GetInstanceRemovedSignal(TAG):Connect(function(Object)
+		local Root = getRoot(Object)
+		if Root then States[Root] = nil end
+	end)
+end
+
+return DestructibleService
