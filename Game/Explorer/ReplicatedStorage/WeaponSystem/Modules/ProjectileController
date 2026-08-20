@@ -112,9 +112,21 @@ end
 function ProjectileController:_ExcludeVisualFromRaycast(Projectile, Params)
 	if not Projectile.Visual then return Params end
 	local Excluded = {}
-	for _, Instance in ipairs(Params.FilterDescendantsInstances) do table.insert(Excluded, Instance) end
-	table.insert(Excluded, Projectile.Visual); if Projectile.CollisionBox then table.insert(Excluded, Projectile.CollisionBox) end
-	Params.FilterDescendantsInstances = Excluded; return Params
+	local Seen = {}
+	for _, Instance in ipairs(Params.FilterDescendantsInstances) do
+		if not Seen[Instance] then
+			Seen[Instance] = true
+			table.insert(Excluded, Instance)
+		end
+	end
+	if not Seen[Projectile.Visual] then
+		table.insert(Excluded, Projectile.Visual)
+	end
+	if Projectile.CollisionBox and not Seen[Projectile.CollisionBox] then
+		table.insert(Excluded, Projectile.CollisionBox)
+	end
+	Params.FilterDescendantsInstances = Excluded
+	return Params
 end
 
 function ProjectileController:_CreateVisual(Projectile, Settings)
