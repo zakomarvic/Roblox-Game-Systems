@@ -12,14 +12,12 @@ MeleeRemote.Name = "Melee"
 MeleeRemote.Sandboxed = true
 MeleeRemote.Parent = Remotes
 
-local ProjectileController = require(WeaponSystem.Modules:WaitForChild("ProjectileController"))
 local MeleeUtility = require(WeaponSystem.Modules:WaitForChild("MeleeUtility"))
-local KnifePickup = require(script.Parent.Modules:WaitForChild("KnifePickup"))
-local ProjectileSystem = ProjectileController.new()
+local KnifeThrow = require(script.Parent.Modules:WaitForChild("KnifeThrow"))
+local KnifeThrower = KnifeThrow.new()
 
 local ActiveAttacks = {}
 local LastAttacks = {}
-local LastThrows = {}
 
 local function clearAttack(Player, Tool)
 	local PlayerAttacks = ActiveAttacks[Player]
@@ -43,89 +41,13 @@ local function isValidTarget(Player, TargetHumanoid, HitPart)
 	return TargetCharacter, TargetTorso
 end
 
-local function throwWeapon(Player, Tool, Origin, Direction, Module)
-	if Module.ThrowEnabled ~= true then return end
-	local Character = Player.Character
-	local Humanoid = MeleeUtility.GetHumanoid(Character)
-	local Handle = Tool:FindFirstChild("Handle")
-	if not Humanoid or Humanoid.Health <= 0 or not Handle or not Handle:IsA("BasePart") then return end
-	if typeof(Origin) ~= "Vector3" or typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return end
-	if (Origin - Handle.Position).Magnitude > 8 then return end
-	local Now = os.clock()
-	local Cooldown = math.max(0, tonumber(Module.ThrowCooldown) or 1)
-	local Last = LastThrows[Player] and LastThrows[Player][Tool] or -math.huge
-	if Now - Last < Cooldown then return end
-	LastThrows[Player] = LastThrows[Player] or {}
-	LastThrows[Player][Tool] = Now
-
-	local ServerOrigin = Origin
-	local ServerDirection = Direction.Unit
-	local ConsumeWeapon = Module.ThrowConsumesWeapon == true
-	local StickOnHit = Module.ThrowStick == true
-	local PickupTemplate = nil
-	if StickOnHit then
-		PickupTemplate = Tool:Clone()
-		PickupTemplate.Parent = nil
-	end
-
-	local Params = RaycastParams.new()
-	Params.FilterType = Enum.RaycastFilterType.Exclude
-	Params.FilterDescendantsInstances = {Character, Tool}
-	Params.IgnoreWater = true
-
-	-- Fire() clones the full Tool synchronously. Keep the real Tool alive until that clone exists.
-	local Projectile = ProjectileSystem:Fire(ServerOrigin, ServerDirection, {
-		Speed = math.clamp(tonumber(Module.ThrowSpeed) or 120, 1, 1000),
-		Gravity = Module.ThrowGravity or Vector3.new(0, -workspace.Gravity * 0.35, 0),
-		MaxLifetime = math.clamp(tonumber(Module.ThrowLifetime) or 5, 0.1, 30),
-		Visual = Tool,
-		ForceVisible = true,
-		SpinSpeed = Module.ThrowSpin and Vector3.new(math.rad(-1080), 0, 0) or nil,
-		StickOnHit = StickOnHit,
-		StickLifetime = Module.ThrowStickLifetime,
-		RaycastParams = Params,
-		Data = {Player = Player, Tool = Tool},
-		OnHit = function(Thrown, Result)
-			local TargetHumanoid
-			if Result.Instance then
-				local Model = Result.Instance:FindFirstAncestorOfClass("Model")
-				TargetHumanoid = Model and Model:FindFirstChildOfClass("Humanoid")
-			end
-			if TargetHumanoid and TargetHumanoid.Health > 0 and TargetHumanoid.Parent ~= Character then
-				local Damage = tonumber(Module.ThrowDamage) or tonumber(Module.BaseDamage) or 0
-				MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris)
-				if type(Module.ThrowOnCharacterHit) == "function" then
-					Module.ThrowOnCharacterHit(Thrown, Result, TargetHumanoid, TargetHumanoid.Parent)
-				end
-			elseif type(Module.ThrowOnSurfaceHit) == "function" then
-				Module.ThrowOnSurfaceHit(Thrown, Result, Result.Instance)
-			end
-		end,
-		OnStuck = function(Thrown)
-			KnifePickup.Setup(Player, Tool, PickupTemplate, Thrown, Module, function(Projectile)
-				ProjectileSystem:DestroyProjectile(Projectile)
-			end)
-		end,
-		OnExpire = function()
-			if PickupTemplate then PickupTemplate:Destroy(); PickupTemplate = nil end
-		end,
-	})
-	if not Projectile then
-		if PickupTemplate then PickupTemplate:Destroy() end
-		return
-	end
-
-	-- Remove the actual Tool only after the flying visual has been cloned successfully.
-	Tool:Destroy()
-end
-
 MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid, HitPart)
 	if type(Action) ~= "string" then return end
 	local OwnedTool, Module = MeleeUtility.GetOwnedEquippedWeapon(Player, Tool)
 	if not OwnedTool then return end
 
 	if Action == "Throw" then
-		throwWeapon(Player, Tool, TargetHumanoid, HitPart, Module)
+		KnifeThrower:Throw(Player, Tool, TargetHumanoid, HitPart, Module)
 		return
 	end
 
@@ -183,5 +105,5 @@ end)
 Players.PlayerRemoving:Connect(function(Player)
 	ActiveAttacks[Player] = nil
 	LastAttacks[Player] = nil
-	LastThrows[Player] = nil
+	KnifeThrower:RemovePlayer(Player)
 end)
