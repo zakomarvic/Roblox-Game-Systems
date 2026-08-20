@@ -112,7 +112,7 @@ function CharacterRagdoll:_SetServerNetworkOwnership(owner)
 	end
 
 	for _, part in ipairs(self.Character:GetDescendants()) do
-		if part:IsA("BasePart") then
+		if part:IsA("BasePart") and part:IsDescendantOf(workspace) then
 			if owner == nil then
 				part:SetNetworkOwner(nil)
 			else
