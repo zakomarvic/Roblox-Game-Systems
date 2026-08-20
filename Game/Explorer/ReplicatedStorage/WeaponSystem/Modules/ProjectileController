@@ -1,5 +1,6 @@
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Debris = game:GetService("Debris")
 
 local ProjectileController = {}
 ProjectileController.__index = ProjectileController
@@ -52,6 +53,37 @@ local function prepareVisual(Visual, ForceVisible)
 			Visual.Transparency = 0
 			Visual.LocalTransparencyModifier = 0
 		end
+	end
+end
+
+local function getVisualParts(Visual)
+	local Parts = {}
+	if Visual:IsA("BasePart") then
+		table.insert(Parts, Visual)
+	else
+		for _, Descendant in ipairs(Visual:GetDescendants()) do
+			if Descendant:IsA("BasePart") then table.insert(Parts, Descendant) end
+		end
+	end
+	return Parts
+end
+
+local function stickVisualToHit(Projectile, HitPart)
+	local Visual = Projectile.Visual
+	if not Visual or not Visual.Parent or not HitPart or not HitPart:IsA("BasePart") then return end
+
+	for _, Part in ipairs(getVisualParts(Visual)) do
+		Part.Anchored = false
+		Part.CanCollide = false
+		Part.CanTouch = false
+		Part.CanQuery = false
+		Part.Massless = true
+
+		local Weld = Instance.new("WeldConstraint")
+		Weld.Name = "ProjectileStickWeld"
+		Weld.Part0 = HitPart
+		Weld.Part1 = Part
+		Weld.Parent = Part
 	end
 end
 
@@ -161,6 +193,25 @@ function ProjectileController:_Hit(Projectile, Result)
 		local Ok, ErrorMessage = xpcall(function() Projectile.OnHit(Projectile, Result) end, debug.traceback)
 		if not Ok then warn("[ProjectileController] OnHit ERROR:\n" .. tostring(ErrorMessage)) end
 	end
+
+	if Projectile.StickOnHit and Projectile.Visual and Projectile.Visual.Parent then
+		Projectile.Stuck = true
+		Projectile.Destroyed = false
+		stickVisualToHit(Projectile, Result.Instance)
+
+		if Projectile.StickLifetime and Projectile.StickLifetime > 0 then
+			Debris:AddItem(Projectile.Visual, Projectile.StickLifetime)
+		end
+
+		if Projectile.OnStuck then
+			local Ok, ErrorMessage = xpcall(function() Projectile.OnStuck(Projectile, Result) end, debug.traceback)
+			if not Ok then warn("[ProjectileController] OnStuck ERROR:\n" .. tostring(ErrorMessage)) end
+		end
+
+		self.ProjectileHit:Fire(Projectile, Result)
+		return
+	end
+
 	self:_DestroyVisual(Projectile)
 	self.ProjectileHit:Fire(Projectile, Result)
 end
@@ -178,9 +229,10 @@ function ProjectileController:Fire(Origin, Direction, Settings)
 	local Projectile = {
 		Id = {}, Origin = Origin, Position = Origin, Direction = Direction.Unit,
 		Velocity = Direction.Unit * (Settings.Speed or self.Settings.Speed), Gravity = Settings.Gravity or self.Settings.Gravity,
-		MaxLifetime = Settings.MaxLifetime or self.Settings.MaxLifetime, Age = 0, Destroyed = false,
+		MaxLifetime = Settings.MaxLifetime or self.Settings.MaxLifetime, Age = 0, Destroyed = false, Stuck = false,
+		StickOnHit = Settings.StickOnHit == true, StickLifetime = Settings.StickLifetime,
 		RaycastParams = Settings.RaycastParams or self.Settings.RaycastParams,
-		OnStep = Settings.OnStep, OnHit = Settings.OnHit, OnExpire = Settings.OnExpire, Data = Settings.Data,
+		OnStep = Settings.OnStep, OnHit = Settings.OnHit, OnExpire = Settings.OnExpire, OnStuck = Settings.OnStuck, Data = Settings.Data,
 		Visual = nil, Rotation = Settings.Rotation or CFrame.identity, SpinSpeed = Settings.SpinSpeed, SpinAngle = Vector3.zero,
 	}
 	Projectile.Visual = self:_CreateVisual(Projectile, Settings)

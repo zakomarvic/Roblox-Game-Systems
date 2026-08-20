@@ -34,6 +34,9 @@ local Setting = {
 	ThrowLifetime = 5;
 	ThrowDamage = 50;
 	ThrowSpin = true;
+	ThrowStick = true;
+	ThrowStickLifetime = 30;
+	ThrowConsumesWeapon = false;
 	
 	--==================================================
 	-- ANIMATION

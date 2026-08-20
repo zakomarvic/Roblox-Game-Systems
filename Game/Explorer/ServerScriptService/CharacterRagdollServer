@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local CharacterSystem = ReplicatedStorage:WaitForChild("CharacterSystem")
 local Modules = CharacterSystem:WaitForChild("Modules")
@@ -14,6 +15,7 @@ end
 
 local ActiveRagdolls = {}
 local RagdollTimers = {}
+local CharacterConnections = {}
 
 local function getRagdoll(Character)
 	local Ragdoll = ActiveRagdolls[Character]
@@ -26,6 +28,19 @@ end
 
 local function cancelTimer(Character)
 	RagdollTimers[Character] = (RagdollTimers[Character] or 0) + 1
+end
+
+local function cleanupCharacter(Character)
+	cancelTimer(Character)
+
+	local Ragdoll = ActiveRagdolls[Character]
+	if Ragdoll then
+		Ragdoll:Destroy()
+		ActiveRagdolls[Character] = nil
+	end
+
+	RagdollTimers[Character] = nil
+	CharacterConnections[Character] = nil
 end
 
 local function scheduleRecovery(Character, Duration)
@@ -58,7 +73,16 @@ local function scheduleRecovery(Character, Duration)
 end
 
 local function setupCharacter(Character)
-	local Humanoid = Character:WaitForChild("Humanoid")
+	if not Character or not Character:IsA("Model") or CharacterConnections[Character] then
+		return
+	end
+
+	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+	if not Humanoid then
+		return
+	end
+
+	CharacterConnections[Character] = true
 	Humanoid.BreakJointsOnDeath = false
 	Humanoid.RequiresNeck = false
 
@@ -69,6 +93,12 @@ local function setupCharacter(Character)
 		local Player = Players:GetPlayerFromCharacter(Character)
 		if Player then
 			Remote:FireClient(Player, true)
+		end
+	end)
+
+	Character.AncestryChanged:Connect(function(_, Parent)
+		if Parent == nil then
+			cleanupCharacter(Character)
 		end
 	end)
 end
@@ -89,19 +119,26 @@ for _, Player in ipairs(Players:GetPlayers()) do
 	setupPlayer(Player)
 end
 
+for _, Instance in ipairs(Workspace:GetDescendants()) do
+	if Instance:IsA("Humanoid") and Instance.Parent and Instance.Parent:IsA("Model") then
+		setupCharacter(Instance.Parent)
+	end
+end
+
+Workspace.DescendantAdded:Connect(function(Instance)
+	if Instance:IsA("Humanoid") then
+		local Character = Instance.Parent
+		if Character and Character:IsA("Model") then
+			task.defer(setupCharacter, Character)
+		end
+	end
+end)
+
 Players.PlayerAdded:Connect(setupPlayer)
 
 Players.PlayerRemoving:Connect(function(Player)
 	if Player.Character then
-		cancelTimer(Player.Character)
-
-		local Ragdoll = ActiveRagdolls[Player.Character]
-		if Ragdoll then
-			Ragdoll:Destroy()
-			ActiveRagdolls[Player.Character] = nil
-		end
-
-		RagdollTimers[Player.Character] = nil
+		cleanupCharacter(Player.Character)
 	end
 end)
 

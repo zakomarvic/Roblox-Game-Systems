@@ -61,6 +61,7 @@ local function isValidTarget(Player, TargetHumanoid, HitPart)
 end
 
 local function setToolVisible(Tool, Visible)
+	if not Tool or not Tool.Parent then return end
 	for _, Descendant in ipairs(Tool:GetDescendants()) do
 		if Descendant:IsA("BasePart") or Descendant:IsA("Decal") or Descendant:IsA("Texture") then
 			if Visible then
@@ -91,6 +92,69 @@ local function applyDamage(Player, TargetHumanoid, Damage)
 	TargetHumanoid:TakeDamage(Damage)
 end
 
+local function getPromptPart(Visual)
+	if Visual:IsA("BasePart") then return Visual end
+	if Visual:IsA("Model") then
+		if Visual.PrimaryPart then return Visual.PrimaryPart end
+		return Visual:FindFirstChildWhichIsA("BasePart", true)
+	end
+	return nil
+end
+
+local function returnOrGiveKnife(Player, Tool, PickupTemplate)
+	if Tool and Tool.Parent then
+		setToolVisible(Tool, true)
+		Tool.Parent = Player:FindFirstChildOfClass("Backpack") or Player.Character
+		return Tool
+	end
+
+	if PickupTemplate then
+		PickupTemplate.Parent = Player:FindFirstChildOfClass("Backpack") or Player.Character
+		return PickupTemplate
+	end
+end
+
+local function setupKnifePickup(Player, Tool, PickupTemplate, Projectile, Module)
+	local Visual = Projectile.Visual
+	local PromptPart = Visual and getPromptPart(Visual)
+	if not PromptPart then return end
+
+	local Prompt = Instance.new("ProximityPrompt")
+	Prompt.Name = "KnifePickupPrompt"
+	Prompt.ActionText = "Pick Up"
+	Prompt.ObjectText = "Knife"
+	Prompt.HoldDuration = 0.15
+	Prompt.MaxActivationDistance = 10
+	Prompt.RequiresLineOfSight = false
+	Prompt.Parent = PromptPart
+
+	local Claimed = false
+	Prompt.Triggered:Connect(function(Picker)
+		if Claimed or Picker ~= Player then return end
+		if not Player.Parent or not Picker.Character then return end
+		Claimed = true
+		Prompt.Enabled = false
+		Prompt:Destroy()
+		returnOrGiveKnife(Player, Tool, PickupTemplate)
+		ProjectileController:DestroyProjectile(Projectile)
+	end)
+
+	local Lifetime = math.max(0, tonumber(Module.ThrowStickLifetime) or 30)
+	if Lifetime > 0 then
+		task.delay(Lifetime, function()
+			if Claimed then return end
+			Claimed = true
+			if Prompt.Parent then Prompt:Destroy() end
+			if Tool and Tool.Parent then
+				setToolVisible(Tool, true)
+				local Backpack = Player:FindFirstChildOfClass("Backpack")
+				if Backpack and Tool.Parent == Player.Character then Tool.Parent = Backpack end
+			end
+			if PickupTemplate then PickupTemplate:Destroy() end
+		end)
+	end
+end
+
 local function throwWeapon(Player, Tool, Origin, Direction, Module)
 	if Module.ThrowEnabled ~= true then return end
 	local Character = Player.Character
@@ -113,6 +177,15 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 
 	local ServerOrigin = Origin
 	local ServerDirection = Direction.Unit
+	local ConsumeWeapon = Module.ThrowConsumesWeapon == true
+	local StickOnHit = Module.ThrowStick == true
+	local PickupTemplate = nil
+
+	if StickOnHit then
+		PickupTemplate = Tool:Clone()
+		PickupTemplate.Parent = nil
+	end
+
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
 	Params.FilterDescendantsInstances = {Character, Tool}
@@ -126,6 +199,8 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 		Visual = Handle,
 		ForceVisible = true,
 		SpinSpeed = Module.ThrowSpin and Vector3.new(0, 0, math.rad(1080)) or nil,
+		StickOnHit = StickOnHit,
+		StickLifetime = Module.ThrowStickLifetime,
 		RaycastParams = Params,
 		Data = {Player = Player, Tool = Tool},
 		OnHit = function(Thrown, Result)
@@ -139,14 +214,29 @@ local function throwWeapon(Player, Tool, Origin, Direction, Module)
 				applyDamage(Player, TargetHumanoid, Damage)
 				warn("[MeleeDamageServer] THROW HIT", Player.Name, TargetHumanoid.Parent:GetFullName(), "damage", Damage)
 			end
-			setToolVisible(Tool, true)
+			if not StickOnHit and not ConsumeWeapon then setToolVisible(Tool, true) end
+		end,
+		OnStuck = function(Thrown)
+			if ConsumeWeapon then
+				Tool:Destroy()
+			end
+			setupKnifePickup(Player, Tool, PickupTemplate, Thrown, Module)
 		end,
 		OnExpire = function()
-			setToolVisible(Tool, true)
+			if not ConsumeWeapon then setToolVisible(Tool, true) end
+			if PickupTemplate then PickupTemplate:Destroy(); PickupTemplate = nil end
 		end,
 	})
 
-	if not Projectile then setToolVisible(Tool, true) end
+	if not Projectile then
+		setToolVisible(Tool, true)
+		if PickupTemplate then PickupTemplate:Destroy() end
+		return
+	end
+
+	if ConsumeWeapon and not StickOnHit then
+		Tool:Destroy()
+	end
 end
 
 MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetHumanoid, HitPart)
