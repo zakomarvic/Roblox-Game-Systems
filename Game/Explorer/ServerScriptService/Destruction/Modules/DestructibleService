@@ -11,10 +11,19 @@ local DEFAULT_RESPAWN = 0
 
 local States = {}
 
-local function getRoot(Instance)
+local function getTaggedRoot(Instance)
 	if not Instance then return nil end
-	if Instance:IsA("Model") or Instance:IsA("BasePart") then return Instance end
-	return Instance:FindFirstAncestorOfClass("Model") or Instance:FindFirstAncestorWhichIsA("BasePart")
+	if CollectionService:HasTag(Instance, TAG) then return Instance end
+
+	local Current = Instance.Parent
+	while Current and Current ~= workspace do
+		if CollectionService:HasTag(Current, TAG) then
+			return Current
+		end
+		Current = Current.Parent
+	end
+
+	return nil
 end
 
 local function getNumber(Object, AttributeName, Default)
@@ -23,8 +32,19 @@ local function getNumber(Object, AttributeName, Default)
 	return tonumber(Value) or Default
 end
 
+local function getDropPosition(Object)
+	if Object:IsA("BasePart") then
+		return Object.Position
+	end
+	if Object:IsA("Model") then
+		local Part = Object.PrimaryPart or Object:FindFirstChildWhichIsA("BasePart", true)
+		return Part and Part.Position
+	end
+	return nil
+end
+
 local function setup(Object)
-	local Root = getRoot(Object)
+	local Root = getTaggedRoot(Object) or Object
 	if not Root or States[Root] then return States[Root] end
 
 	local MaxHealth = math.max(1, getNumber(Root, "MaxHealth", getNumber(Root, "Health", DEFAULT_HEALTH)))
@@ -45,14 +65,7 @@ local function dropCash(State)
 	local Amount = math.max(0, math.floor(getNumber(State.Object, "CashDropValue", DEFAULT_CASH)))
 	if Amount <= 0 then return end
 
-	local Position
-	if State.Object:IsA("BasePart") then
-		Position = State.Object.Position
-	elseif State.Object:IsA("Model") then
-		local Part = State.Object.PrimaryPart or State.Object:FindFirstChildWhichIsA("BasePart", true)
-		Position = Part and Part.Position
-	end
-
+	local Position = getDropPosition(State.Object)
 	if Position then
 		CashDrop.Drop(Position, Amount)
 	end
@@ -92,13 +105,12 @@ function DestructibleService.Register(Object)
 end
 
 function DestructibleService.IsDestructible(Object)
-	local Root = getRoot(Object)
-	return Root and CollectionService:HasTag(Root, TAG) or false
+	return getTaggedRoot(Object) ~= nil
 end
 
 function DestructibleService.Damage(Object, Amount, Attacker)
-	local Root = getRoot(Object)
-	if not Root or not CollectionService:HasTag(Root, TAG) then return false, 0 end
+	local Root = getTaggedRoot(Object)
+	if not Root then return false, 0 end
 	local State = States[Root] or setup(Root)
 	if not State or State.Destroyed or State.Destroying then return false, 0 end
 
@@ -119,7 +131,7 @@ function DestructibleService.Damage(Object, Amount, Attacker)
 end
 
 function DestructibleService.Destroy(Object)
-	local Root = getRoot(Object)
+	local Root = getTaggedRoot(Object)
 	local State = Root and States[Root]
 	if State then
 		destroy(State)
@@ -133,10 +145,8 @@ function DestructibleService.Initialize()
 
 	CollectionService:GetInstanceAddedSignal(TAG):Connect(setup)
 	CollectionService:GetInstanceRemovedSignal(TAG):Connect(function(Object)
-		local Root = getRoot(Object)
-		if Root then
-			States[Root] = nil
-		end
+		local Root = getTaggedRoot(Object) or Object
+		States[Root] = nil
 	end)
 end
 
