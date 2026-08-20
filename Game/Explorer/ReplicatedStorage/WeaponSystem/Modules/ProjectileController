@@ -72,6 +72,7 @@ local function stickVisualToHit(Projectile, HitPart)
 	local Visual = Projectile.Visual
 	if not Visual or not Visual.Parent or not HitPart or not HitPart:IsA("BasePart") then return end
 
+	Projectile.StuckTo = HitPart
 	for _, Part in ipairs(getVisualParts(Visual)) do
 		Part.Anchored = false
 		Part.CanCollide = false
@@ -85,6 +86,23 @@ local function stickVisualToHit(Projectile, HitPart)
 		Weld.Part1 = Part
 		Weld.Parent = Part
 	end
+end
+
+local function detachAndAnchor(Projectile)
+	if not Projectile.Visual or not Projectile.Visual.Parent then return end
+	for _, Part in ipairs(getVisualParts(Projectile.Visual)) do
+		for _, Child in ipairs(Part:GetChildren()) do
+			if Child:IsA("WeldConstraint") and Child.Name == "ProjectileStickWeld" then
+				Child:Destroy()
+			end
+		end
+		Part.Anchored = true
+		Part.CanCollide = false
+		Part.CanTouch = false
+		Part.CanQuery = false
+		Part.Massless = true
+	end
+	Projectile.StuckTo = nil
 end
 
 function ProjectileController.new(Settings)
@@ -162,6 +180,12 @@ end
 function ProjectileController:_Step(DeltaTime)
 	for Id, Projectile in pairs(self.Projectiles) do
 		if Projectile.Destroyed then self.Projectiles[Id] = nil; continue end
+		if Projectile.Stuck then
+			if Projectile.StuckTo and not Projectile.StuckTo:IsDescendantOf(workspace) then
+				detachAndAnchor(Projectile)
+			end
+			continue
+		end
 		Projectile.Age += DeltaTime
 		if Projectile.Age >= Projectile.MaxLifetime then self:_Expire(Projectile); self.Projectiles[Id] = nil; continue end
 		local OldPosition = Projectile.Position
