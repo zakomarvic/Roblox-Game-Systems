@@ -57,6 +57,32 @@ function ProjectileController:_ExcludeVisualFromRaycast(Projectile, Params)
 end
 
 function ProjectileController:_CreateVisual(Projectile, Settings)
+	local Source = Settings.Visual
+	if Source and Source:IsA("Instance") then
+		local Visual = Source:Clone()
+		Visual.Parent = workspace
+		if Visual:IsA("Model") and not Visual.PrimaryPart then
+			local Primary = Visual:FindFirstChildWhichIsA("BasePart", true)
+			if Primary then Visual.PrimaryPart = Primary end
+		end
+		for _, Descendant in ipairs(Visual:GetDescendants()) do
+			if Descendant:IsA("BasePart") then
+				Descendant.Anchored = true
+				Descendant.CanCollide = false
+				Descendant.CanTouch = false
+				Descendant.CanQuery = false
+			end
+		end
+		if Visual:IsA("BasePart") then
+			Visual.Anchored = true
+			Visual.CanCollide = false
+			Visual.CanTouch = false
+			Visual.CanQuery = false
+		end
+		setProjectileCFrame(Visual, Projectile.Position, Projectile.Direction)
+		return Visual
+	end
+
 	local ProjectileName = Settings.ProjectileName
 	if not ProjectileName then return nil end
 	local FolderName = Settings.ProjectileFolderName or self.Settings.ProjectileFolderName
@@ -90,9 +116,7 @@ function ProjectileController:_Step(DeltaTime)
 		if Projectile.Destroyed then self.Projectiles[Id] = nil; continue end
 		Projectile.Age += DeltaTime
 		if Projectile.Age >= Projectile.MaxLifetime then
-			warn(("[ProjectileController] EXPIRED after %.2fs"):format(Projectile.Age))
-			self:_Expire(Projectile); self.Projectiles[Id] = nil; continue
-		end
+			self:_Expire(Projectile); self.Projectiles[Id] = nil; continue end
 		local OldPosition = Projectile.Position
 		Projectile.Velocity += Projectile.Gravity * DeltaTime
 		local NewPosition = OldPosition + Projectile.Velocity * DeltaTime
@@ -103,7 +127,6 @@ function ProjectileController:_Step(DeltaTime)
 			Projectile.Position = Result.Position
 			Projectile.Velocity = Vector3.zero
 			setProjectileCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction)
-			warn(("[ProjectileController] HIT %s at %s"):format(Result.Instance:GetFullName(), tostring(Result.Position)))
 			self:_Hit(Projectile, Result)
 			self.Projectiles[Id] = nil
 		else
@@ -118,12 +141,9 @@ end
 
 function ProjectileController:_Hit(Projectile, Result)
 	Projectile.Destroyed = true
-	warn("[ProjectileController] CALLING OnHit", Projectile.Data and Projectile.Data.Tool and Projectile.Data.Tool:GetFullName() or "NoTool")
 	if Projectile.OnHit then
 		local Ok, ErrorMessage = xpcall(function() Projectile.OnHit(Projectile, Result) end, debug.traceback)
 		if not Ok then warn("[ProjectileController] OnHit ERROR:\n" .. tostring(ErrorMessage)) end
-	else
-		warn("[ProjectileController] OnHit callback is NIL")
 	end
 	self:_DestroyVisual(Projectile)
 	self.ProjectileHit:Fire(Projectile, Result)
