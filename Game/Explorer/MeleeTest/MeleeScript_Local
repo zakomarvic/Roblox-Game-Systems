@@ -15,7 +15,6 @@ local Hitbox
 local Controller
 local CustomGrip
 local Equipped = false
-local LastAttack = 0
 local OldAutoRotate = nil
 
 local function getCharacter()
@@ -120,10 +119,10 @@ end
 local function attack()
 	if not Equipped or not Controller then return end
 	if not Setting.MeleeEnabled then return end
-	if os.clock() - LastAttack < Setting.AttackCooldown then return end
 	if Humanoid.Health <= 0 then return end
 
-	LastAttack = os.clock()
+	-- MeleeController is the single source of truth for attack cooldown/state.
+	-- Tool.Activated fires for each click; don't add a second debounce here.
 	Controller:Attack(Setting.AttackDuration)
 end
 
