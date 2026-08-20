@@ -97,7 +97,7 @@ function WeaponFire:_FireProjectile(Start, Direction, ShootingHandle)
 		OnHit = function(Projectile, Result)
 			local DirectionAtImpact = Projectile.Velocity.Magnitude > 0 and Projectile.Velocity.Unit or Direction
 			if Module.ExplosiveEnabled == true then
-				Explosion:FireServer(Result.Position, DirectionAtImpact, self.Tool)
+				Explosion:FireServer(Result.Position, DirectionAtImpact, self.Tool, Start)
 			else
 				local Hit = Result.Instance
 				local TargetModel = Hit and Hit:FindFirstAncestorOfClass("Model")
