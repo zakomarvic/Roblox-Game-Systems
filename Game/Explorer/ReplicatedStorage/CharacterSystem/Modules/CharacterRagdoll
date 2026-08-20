@@ -107,12 +107,12 @@ function CharacterRagdoll:_DestroyConstraints()
 end
 
 function CharacterRagdoll:_SetServerNetworkOwnership(owner)
-	if not RunService:IsServer() then
+	if not RunService:IsServer() or not self.Character or not self.Character:IsDescendantOf(workspace) then
 		return
 	end
 
 	for _, part in ipairs(self.Character:GetDescendants()) do
-		if part:IsA("BasePart") then
+		if part:IsA("BasePart") and part:IsDescendantOf(workspace) then
 			if owner == nil then
 				part:SetNetworkOwner(nil)
 			else
