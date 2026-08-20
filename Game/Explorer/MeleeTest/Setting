@@ -24,12 +24,26 @@ local Setting = {
 	MeleeKnockback = 20;
 	
 	--==================================================
+	-- THROWING
+	--==================================================
+	ThrowEnabled = true;
+	ThrowKey = Enum.KeyCode.Q;
+	ThrowCooldown = 1;
+	ThrowSpeed = 120;
+	ThrowGravity = Vector3.new(0, -workspace.Gravity * 0.35, 0);
+	ThrowLifetime = 5;
+	ThrowDamage = 50;
+	ThrowSpin = true;
+	
+	--==================================================
 	-- ANIMATION
 	--==================================================
 	IdleAnimationID = nil;
 	IdleAnimationSpeed = 1;
 	AttackAnimationID = nil;
 	AttackAnimationSpeed = 1;
+	ThrowAnimationID = nil;
+	ThrowAnimationSpeed = 1;
 	
 	--==================================================
 	-- AUDIO
