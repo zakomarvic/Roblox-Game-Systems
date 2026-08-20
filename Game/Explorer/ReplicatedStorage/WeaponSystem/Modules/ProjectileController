@@ -1,6 +1,5 @@
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Debris = game:GetService("Debris")
 
 local ProjectileController = {}
 ProjectileController.__index = ProjectileController
@@ -56,7 +55,9 @@ local function prepareVisual(Visual, ForceVisible)
 	end
 end
 
-local function getVisualParts(Visual)
+local function stickVisualToHit(Projectile, HitPart)
+	local Visual = Projectile.Visual
+	if not Visual or not Visual.Parent or not HitPart or not HitPart:IsA("BasePart") then return end
 	local Parts = {}
 	if Visual:IsA("BasePart") then
 		table.insert(Parts, Visual)
@@ -65,20 +66,12 @@ local function getVisualParts(Visual)
 			if Descendant:IsA("BasePart") then table.insert(Parts, Descendant) end
 		end
 	end
-	return Parts
-end
-
-local function stickVisualToHit(Projectile, HitPart)
-	local Visual = Projectile.Visual
-	if not Visual or not Visual.Parent or not HitPart or not HitPart:IsA("BasePart") then return end
-
-	for _, Part in ipairs(getVisualParts(Visual)) do
+	for _, Part in ipairs(Parts) do
 		Part.Anchored = false
 		Part.CanCollide = false
 		Part.CanTouch = false
 		Part.CanQuery = false
 		Part.Massless = true
-
 		local Weld = Instance.new("WeldConstraint")
 		Weld.Name = "ProjectileStickWeld"
 		Weld.Part0 = HitPart
@@ -132,20 +125,13 @@ function ProjectileController:_CreateVisual(Projectile, Settings)
 		setVisualCFrame(Visual, Projectile.Position, Projectile.Direction, Projectile.Rotation)
 		return Visual
 	end
-
 	local ProjectileName = Settings.ProjectileName
 	if not ProjectileName then return nil end
 	local FolderName = Settings.ProjectileFolderName or self.Settings.ProjectileFolderName
 	local Folder = ReplicatedStorage:FindFirstChild(FolderName)
-	if not Folder then
-		warn(("ProjectileController: ReplicatedStorage.%s does not exist"):format(FolderName))
-		return nil
-	end
+	if not Folder then warn(("ProjectileController: ReplicatedStorage.%s does not exist"):format(FolderName)); return nil end
 	local Template = Folder:FindFirstChild(ProjectileName)
-	if not Template then
-		warn(("ProjectileController: projectile '%s' was not found in ReplicatedStorage.%s"):format(ProjectileName, FolderName))
-		return nil
-	end
+	if not Template then warn(("ProjectileController: projectile '%s' was not found in ReplicatedStorage.%s"):format(ProjectileName, FolderName)); return nil end
 	local Visual = Template:Clone()
 	Visual.Name = "ThrownProjectile"
 	Visual.Parent = workspace
@@ -155,13 +141,14 @@ function ProjectileController:_CreateVisual(Projectile, Settings)
 end
 
 function ProjectileController:_DestroyVisual(Projectile)
-	if Projectile.Visual and Projectile.Visual.Parent then Projectile.Visual:Destroy() end
-	Projectile.Visual = nil
+	if Projectile and Projectile.Visual and Projectile.Visual.Parent then Projectile.Visual:Destroy() end
+	if Projectile then Projectile.Visual = nil end
 end
 
 function ProjectileController:_Step(DeltaTime)
 	for Id, Projectile in pairs(self.Projectiles) do
 		if Projectile.Destroyed then self.Projectiles[Id] = nil; continue end
+		if Projectile.Stuck then continue end
 		Projectile.Age += DeltaTime
 		if Projectile.Age >= Projectile.MaxLifetime then self:_Expire(Projectile); self.Projectiles[Id] = nil; continue end
 		local OldPosition = Projectile.Position
@@ -175,7 +162,7 @@ function ProjectileController:_Step(DeltaTime)
 			if Projectile.SpinSpeed and Projectile.SpinSpeed.Magnitude > 0 then Projectile.SpinAngle += Projectile.SpinSpeed * DeltaTime end
 			setVisualCFrame(Projectile.Visual, Projectile.Position, Projectile.Direction, CFrame.Angles(Projectile.SpinAngle.X, Projectile.SpinAngle.Y, Projectile.SpinAngle.Z) * Projectile.Rotation)
 			self:_Hit(Projectile, Result)
-			self.Projectiles[Id] = nil
+			if Projectile.Destroyed then self.Projectiles[Id] = nil end
 		else
 			Projectile.Position = NewPosition
 			if Projectile.Velocity.Magnitude > 0 then Projectile.Direction = Projectile.Velocity.Unit end
@@ -193,25 +180,14 @@ function ProjectileController:_Hit(Projectile, Result)
 		local Ok, ErrorMessage = xpcall(function() Projectile.OnHit(Projectile, Result) end, debug.traceback)
 		if not Ok then warn("[ProjectileController] OnHit ERROR:\n" .. tostring(ErrorMessage)) end
 	end
-
 	if Projectile.StickOnHit and Projectile.Visual and Projectile.Visual.Parent then
 		Projectile.Stuck = true
 		Projectile.Destroyed = false
 		stickVisualToHit(Projectile, Result.Instance)
-
-		if Projectile.StickLifetime and Projectile.StickLifetime > 0 then
-			Debris:AddItem(Projectile.Visual, Projectile.StickLifetime)
-		end
-
-		if Projectile.OnStuck then
-			local Ok, ErrorMessage = xpcall(function() Projectile.OnStuck(Projectile, Result) end, debug.traceback)
-			if not Ok then warn("[ProjectileController] OnStuck ERROR:\n" .. tostring(ErrorMessage)) end
-		end
-
+		if Projectile.OnStuck then Projectile.OnStuck(Projectile, Result) end
 		self.ProjectileHit:Fire(Projectile, Result)
 		return
 	end
-
 	self:_DestroyVisual(Projectile)
 	self.ProjectileHit:Fire(Projectile, Result)
 end
@@ -247,7 +223,14 @@ function ProjectileController:DestroyProjectile(Projectile)
 	if not Projectile or Projectile.Destroyed then return end
 	Projectile.Destroyed = true
 	self:_DestroyVisual(Projectile)
-	self.Projectiles[Projectile.Id] = nil
+	local Id = Projectile.Id
+	if Id ~= nil then
+		self.Projectiles[Id] = nil
+	end
+	if next(self.Projectiles) == nil and self.Connection then
+		self.Connection:Disconnect()
+		self.Connection = nil
+	end
 end
 
 function ProjectileController:GetActiveCount()
