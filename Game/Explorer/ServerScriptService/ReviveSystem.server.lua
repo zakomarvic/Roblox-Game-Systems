@@ -315,8 +315,8 @@ local function completeRevive(player, prompt)
 		local track = playNPCAnimation(targetCharacter, "DownedSelfRevive")
 		if track then
 			track.Ended:Once(function()
-				if character and character.Parent then
-					stopNPCAnimation(character, "DownedSelfRevive")
+				if targetCharacter.Parent then
+					stopNPCAnimation(targetCharacter, "DownedSelfRevive")
 				end
 			end)
 		end
