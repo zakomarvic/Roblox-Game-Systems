@@ -12,7 +12,7 @@ local ProjectileFired = Remotes:FindFirstChild("ProjectileFired") or Instance.ne
 ProjectileFired.Name = "ProjectileFired"
 ProjectileFired.Parent = Remotes
 
-local WeaponState = require(game.ServerScriptService.WeaponSystem.Combat:WaitForChild("WeaponStateService"))
+local WeaponState = require(game.ServerScriptService.WeaponSystem.Services:WaitForChild("WeaponStateService"))
 local BulletEffects = require(WeaponSystem.Effects:WaitForChild("BulletEffects"))
 local ExplosionEffects = require(WeaponSystem.Effects:WaitForChild("ExplosionEffects"))
 local ProjectileRecords = {}
