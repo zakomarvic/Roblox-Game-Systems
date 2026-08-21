@@ -1,0 +1,5 @@
+local Rewards = {
+	PlayerKill = 100,
+}
+
+return Rewards
