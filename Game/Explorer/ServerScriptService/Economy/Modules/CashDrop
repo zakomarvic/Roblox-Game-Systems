@@ -5,6 +5,7 @@ local CashDrop = {}
 
 local DEFAULT_LIFETIME = 120
 local DEFAULT_PICKUP_DISTANCE = 10
+local DEFAULT_GROUND_OFFSET = 0.15
 local DEFAULT_FLOAT_HEIGHT = 0.2
 local DEFAULT_FLOAT_SPEED = 2
 local DROP_FOLDER_NAME = "CashDrops"
@@ -30,10 +31,11 @@ local function getGroundPosition(Position, Size, Options)
 	Params.FilterDescendantsInstances = Ignore
 
 	local Result = workspace:Raycast(Position + Vector3.new(0, 10, 0), Vector3.new(0, -100, 0), Params)
+	local GroundOffset = tonumber(Options.GroundOffset) or DEFAULT_GROUND_OFFSET
 	if Result then
-		return Result.Position + Vector3.new(0, Size.Y * 0.5, 0)
+		return Result.Position + Vector3.new(0, Size.Y * 0.5 + GroundOffset, 0)
 	end
-	return Position + Vector3.new(0, 1.5, 0)
+	return Position + Vector3.new(0, Size.Y * 0.5 + GroundOffset, 0)
 end
 
 local function createPart(Position, Amount, Options)
