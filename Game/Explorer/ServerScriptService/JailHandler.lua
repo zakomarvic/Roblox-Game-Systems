@@ -110,7 +110,6 @@ end
 
 local function readStoredJailData(result)
 	if type(result) == "number" then
-		-- Backwards compatibility with the old datastore format.
 		return math.max(0, math.floor(result)), nil
 	end
 
@@ -205,6 +204,15 @@ local function startJailTimer(player, previousTeamName)
 	end)
 end
 
+local function isCop(player)
+	return player.Team and player.Team.Name == "Cops"
+end
+
+local function isDowned(player)
+	local character = player.Character
+	return character and character:GetAttribute("Downed") == true
+end
+
 Players.PlayerAdded:Connect(function(player)
 	local _, jailTime = getJailData(player)
 
@@ -268,6 +276,11 @@ game:BindToClose(function()
 end)
 
 JailEvent.OnServerEvent:Connect(function(player, target, time)
+	if not isCop(player) then
+		warn(player.Name .. " attempted to jail a player without the Cops role")
+		return
+	end
+
 	local targetPlayer
 
 	if typeof(target) == "Instance" then
@@ -284,6 +297,11 @@ JailEvent.OnServerEvent:Connect(function(player, target, time)
 	end
 
 	if targetPlayer == player then
+		return
+	end
+
+	if not isDowned(targetPlayer) then
+		warn(player.Name .. " attempted to jail " .. targetPlayer.Name .. " while they were not downed")
 		return
 	end
 
