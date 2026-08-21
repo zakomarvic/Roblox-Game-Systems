@@ -1,125 +1,21 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
-local WeaponState = require(WeaponSystem.Modules:WaitForChild("WeaponState"))
-
-WeaponEffects.OnServerEvent:Connect(function(Player, Tool, Effect, ...)
-	if not Player or not Tool or not Tool:IsA("Tool") then
+local WeaponState = require(game.ServerScriptService.WeaponSystem.Combat:WaitForChild("WeaponStateService"))
+WeaponEffects.OnServerEvent:Connect(function(Player,Tool,Effect,...)
+	if not Player or not Tool or not Tool:IsA("Tool") or Tool.Parent~=Player.Character then return end
+	if Effect=="Bullet" then
+		local Args={...}; local ShootingHandle=Args[1]; local MuzzleOffset=Args[2]; local EndPos=Args[3]; local MuzzleEffect=Args[4]; local HitEffect=Args[5]; local HitSound=Args[6]; local ExplosiveData=Args[7]; local BulletData=Args[8]; local VisualizeExplosion=Args[9]; local VisualizeEnabled=Args[10]
+		if not ShootingHandle or not ShootingHandle:IsA("BasePart") or (ShootingHandle~=Tool:FindFirstChild("Handle") and ShootingHandle~=Tool:FindFirstChild("Handle2")) or typeof(EndPos)~="Vector3" or (EndPos-ShootingHandle.Position).Magnitude>5000 then return end
+		for _,OtherPlayer in ipairs(Players:GetPlayers()) do if OtherPlayer~=Player then WeaponEffects:FireClient(OtherPlayer,"Bullet",Player,Tool,ShootingHandle,MuzzleOffset,EndPos,MuzzleEffect,HitEffect,HitSound,ExplosiveData,BulletData,VisualizeExplosion,VisualizeEnabled) end end
 		return
 	end
-
-	if Tool.Parent ~= Player.Character then
-		return
+	if Effect=="Reload" then
+		if not WeaponState.TryReload(Player,Tool) then return end; local Handle=Tool:FindFirstChild("Handle"); local Mag=Tool:FindFirstChild("Mag"); if not Handle or not Mag then return end; local LoadSound=Handle:FindFirstChild("load"); if LoadSound then LoadSound:Play() end; local MagClone=Mag:Clone(); Mag.Transparency=1; MagClone.Parent=workspace; MagClone:BreakJoints(); MagClone.Position=Mag.Position; task.wait(0.8); if Mag and Mag.Parent then Mag.Transparency=0 end; task.delay(5,function() if MagClone and MagClone.Parent then MagClone:Destroy() end end); return
 	end
-
-	if Effect == "Bullet" then
-		local Args = {...}
-		local ShootingHandle = Args[1]
-		local MuzzleOffset = Args[2]
-		local EndPos = Args[3]
-		local MuzzleEffect = Args[4]
-		local HitEffect = Args[5]
-		local HitSound = Args[6]
-		local ExplosiveData = Args[7]
-		local BulletData = Args[8]
-		local VisualizeExplosion = Args[9]
-		local VisualizeEnabled = Args[10]
-
-		if not ShootingHandle or not ShootingHandle:IsA("BasePart") then
-			return
-		end
-		if ShootingHandle ~= Tool:FindFirstChild("Handle") and ShootingHandle ~= Tool:FindFirstChild("Handle2") then
-			return
-		end
-		if typeof(EndPos) ~= "Vector3" or (EndPos - ShootingHandle.Position).Magnitude > 5000 then
-			return
-		end
-
-		for _, OtherPlayer in ipairs(Players:GetPlayers()) do
-			if OtherPlayer ~= Player then
-				WeaponEffects:FireClient(
-					OtherPlayer,
-					"Bullet",
-					Player,
-					Tool,
-					ShootingHandle,
-					MuzzleOffset,
-					EndPos,
-					MuzzleEffect,
-					HitEffect,
-					HitSound,
-					ExplosiveData,
-					BulletData,
-					VisualizeExplosion,
-					VisualizeEnabled
-				)
-			end
-		end
-		return
-	end
-
-	if Effect == "Reload" then
-		local Accepted = WeaponState.TryReload(Player, Tool)
-		if not Accepted then
-			return
-		end
-
-		local Handle = Tool:FindFirstChild("Handle")
-		local Mag = Tool:FindFirstChild("Mag")
-		if not Handle or not Mag then
-			return
-		end
-
-		local LoadSound = Handle:FindFirstChild("load")
-		if LoadSound then
-			LoadSound:Play()
-		end
-
-		local MagClone = Mag:Clone()
-		Mag.Transparency = 1
-		MagClone.Parent = workspace
-		MagClone:BreakJoints()
-		MagClone.Position = Mag.Position
-
-		task.wait(0.8)
-
-		if Mag and Mag.Parent then
-			Mag.Transparency = 0
-		end
-
-		task.delay(5, function()
-			if MagClone and MagClone.Parent then
-				MagClone:Destroy()
-			end
-		end)
-		return
-	end
-
-	if Effect ~= "Fire" then
-		return
-	end
-
-	local Accepted = WeaponState.TryFire(Player, Tool)
-	if not Accepted then
-		return
-	end
-
-	for _, OtherPlayer in ipairs(Players:GetPlayers()) do
-		if OtherPlayer ~= Player then
-			WeaponEffects:FireClient(
-				OtherPlayer,
-				"Fire",
-				Player,
-				Tool,
-				Tool:FindFirstChild("Handle")
-			)
-		end
-	end
+	if Effect~="Fire" then return end; if not WeaponState.TryFire(Player,Tool) then return end
+	for _,OtherPlayer in ipairs(Players:GetPlayers()) do if OtherPlayer~=Player then WeaponEffects:FireClient(OtherPlayer,"Fire",Player,Tool,Tool:FindFirstChild("Handle")) end end
 end)
-
-game.Players.PlayerRemoving:Connect(function(Player)
-	WeaponState.ClearPlayer(Player)
-end)
+Players.PlayerRemoving:Connect(function(Player) WeaponState.ClearPlayer(Player) end)
