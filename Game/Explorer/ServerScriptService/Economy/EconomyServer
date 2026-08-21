@@ -14,6 +14,7 @@ local MAX_RETRIES = 3
 
 local Saving = {}
 local DeathConnections = {}
+local NPCDeathConnections = {}
 
 local function getKey(Player)
 	return "Player_" .. Player.UserId
@@ -63,18 +64,46 @@ local function save(Player)
 	return Success
 end
 
+local function getKiller(Humanoid)
+	local Creator = Humanoid:FindFirstChild("creator")
+	local Killer = Creator and Creator.Value
+	if typeof(Killer) ~= "Instance" or not Killer:IsA("Player") then return nil end
+	if Killer.Parent ~= Players then return nil end
+	return Killer
+end
+
+local function getReward(Name)
+	return math.max(0, math.floor(tonumber(Rewards[Name]) or 0))
+end
+
 local function rewardPlayerKill(Victim)
 	local Humanoid = Victim:FindFirstChildOfClass("Humanoid")
-	local Creator = Humanoid and Humanoid:FindFirstChild("creator")
-	local Killer = Creator and Creator.Value
-	local Reward = math.max(0, math.floor(tonumber(Rewards.PlayerKill) or 0))
+	local Killer = Humanoid and getKiller(Humanoid)
+	if not Killer then return end
 
-	if Reward <= 0 then return end
-	if typeof(Killer) ~= "Instance" or not Killer:IsA("Player") then return end
-	if Killer == Players:GetPlayerFromCharacter(Victim) then return end
-	if Killer.Parent ~= Players then return end
+	local Reward = getReward("PlayerKill")
+	if Reward > 0 and Killer ~= Players:GetPlayerFromCharacter(Victim) then
+		CashService.Add(Killer, Reward)
+	end
+end
 
-	CashService.Add(Killer, Reward)
+local function setupNPCDeath(Humanoid)
+	if not Humanoid or not Humanoid:IsDescendantOf(workspace) then return end
+	if NPCDeathConnections[Humanoid] then return end
+
+	local Character = Humanoid.Parent
+	if not Character or not Character:IsA("Model") then return end
+	if Players:GetPlayerFromCharacter(Character) then return end
+
+	NPCDeathConnections[Humanoid] = Humanoid.Died:Connect(function()
+		local Killer = getKiller(Humanoid)
+		if Killer then
+			local Reward = getReward("NPCKill")
+			if Reward > 0 then
+				CashService.Add(Killer, Reward)
+			end
+		end
+	end)
 end
 
 local function setupDeathDrop(Player, Character)
@@ -95,6 +124,18 @@ local function setupDeathDrop(Player, Character)
 		end
 	end)
 end
+
+for _, Descendant in ipairs(workspace:GetDescendants()) do
+	if Descendant:IsA("Humanoid") then
+		setupNPCDeath(Descendant)
+	end
+end
+
+workspace.DescendantAdded:Connect(function(Descendant)
+	if Descendant:IsA("Humanoid") then
+		setupNPCDeath(Descendant)
+	end
+end)
 
 Players.PlayerAdded:Connect(function(Player)
 	CashService.GetOrCreate(Player, DEFAULT_CASH)
