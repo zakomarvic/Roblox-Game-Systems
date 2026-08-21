@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local Debris = game:GetService("Debris")
 
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
+local ServerWeaponSystem = game.ServerScriptService:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 local InflictTarget = Remotes:WaitForChild("InflictTarget")
 local Explosion = Remotes:FindFirstChild("Explosion") or Instance.new("RemoteEvent")
@@ -12,9 +13,9 @@ local ProjectileFired = Remotes:FindFirstChild("ProjectileFired") or Instance.ne
 ProjectileFired.Name = "ProjectileFired"
 ProjectileFired.Parent = Remotes
 
-local WeaponState = require(WeaponSystem.Modules:WaitForChild("WeaponState"))
-local BulletEffects = require(WeaponSystem.Modules:WaitForChild("BulletEffects"))
-local ExplosionEffects = require(WeaponSystem.Modules:WaitForChild("ExplosionEffects"))
+local WeaponState = require(ServerWeaponSystem.Combat:WaitForChild("WeaponStateService"))
+local BulletEffects = require(WeaponSystem.Effects:WaitForChild("BulletEffects"))
+local ExplosionEffects = require(WeaponSystem.Effects:WaitForChild("ExplosionEffects"))
 local ProjectileRecords = {}
 local ShotTimes = {}
 local ExplosionTimes = {}
