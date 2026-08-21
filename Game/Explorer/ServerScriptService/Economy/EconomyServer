@@ -97,12 +97,18 @@ local function setupNPCDeath(Humanoid)
 
 	NPCDeathConnections[Humanoid] = Humanoid.Died:Connect(function()
 		local Killer = getKiller(Humanoid)
-		if Killer then
-			local Reward = getReward("NPCKill")
-			if Reward > 0 then
-				CashService.Add(Killer, Reward)
-			end
-		end
+		if not Killer then return end
+
+		local Reward = getReward("NPCKill")
+		if Reward <= 0 then return end
+
+		local Root = Character:FindFirstChild("HumanoidRootPart")
+		if not Root then return end
+
+		local DropOptions = {
+			IgnoreInstances = {Character},
+		}
+		EconomyDrop.DropFixedCash(Root.Position, Reward, DropOptions)
 	end)
 end
 

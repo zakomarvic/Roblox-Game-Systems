@@ -5,6 +5,7 @@ local CashDrop = {}
 
 local DEFAULT_LIFETIME = 120
 local DEFAULT_PICKUP_DISTANCE = 10
+local DEFAULT_GROUND_OFFSET = 0.15
 local DEFAULT_FLOAT_HEIGHT = 0.2
 local DEFAULT_FLOAT_SPEED = 2
 local DROP_FOLDER_NAME = "CashDrops"
@@ -18,22 +19,30 @@ local function getDropFolder()
 	return Folder
 end
 
-local function getGroundPosition(Position, Size)
+local function getGroundPosition(Position, Size, Options)
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
-	Params.FilterDescendantsInstances = {getDropFolder()}
-	local Result = workspace:Raycast(Position + Vector3.new(0, 10, 0), Vector3.new(0, -100, 0), Params)
-	if Result then
-		return Result.Position + Vector3.new(0, Size.Y * 0.5, 0)
+	local Ignore = {getDropFolder()}
+	if Options.IgnoreInstances then
+		for _, InstanceToIgnore in ipairs(Options.IgnoreInstances) do
+			table.insert(Ignore, InstanceToIgnore)
+		end
 	end
-	return Position + Vector3.new(0, 1.5, 0)
+	Params.FilterDescendantsInstances = Ignore
+
+	local Result = workspace:Raycast(Position + Vector3.new(0, 10, 0), Vector3.new(0, -100, 0), Params)
+	local GroundOffset = tonumber(Options.GroundOffset) or DEFAULT_GROUND_OFFSET
+	if Result then
+		return Result.Position + Vector3.new(0, Size.Y * 0.5 + GroundOffset, 0)
+	end
+	return Position + Vector3.new(0, Size.Y * 0.5 + GroundOffset, 0)
 end
 
 local function createPart(Position, Amount, Options)
 	local Part = Instance.new("Part")
 	Part.Name = "CashDrop"
 	Part.Size = Options.Size or Vector3.new(1, 0.35, 1)
-	Part.Position = getGroundPosition(Position, Part.Size)
+	Part.Position = getGroundPosition(Position, Part.Size, Options)
 	Part.Shape = Enum.PartType.Cylinder
 	Part.Material = Enum.Material.Neon
 	Part.Color = Options.Color or Color3.fromRGB(50, 205, 50)
@@ -80,6 +89,8 @@ function CashDrop.Drop(Position, Amount, Options)
 	Prompt.HoldDuration = math.max(0, tonumber(Options.HoldDuration) or 0)
 	Prompt.MaxActivationDistance = math.max(1, tonumber(Options.PickupDistance) or DEFAULT_PICKUP_DISTANCE)
 	Prompt.RequiresLineOfSight = false
+	Prompt.KeyboardKeyCode = Options.KeyboardKeyCode or Enum.KeyCode.E
+	Prompt.GamepadKeyCode = Options.GamepadKeyCode or Enum.KeyCode.ButtonX
 	Prompt.Parent = Part
 
 	local Claimed = false
