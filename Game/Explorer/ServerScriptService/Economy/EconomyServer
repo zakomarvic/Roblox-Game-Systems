@@ -5,6 +5,7 @@ local Modules = script.Parent:WaitForChild("Modules")
 local CashService = require(Modules:WaitForChild("CashService"))
 local EconomyDrop = require(Modules:WaitForChild("EconomyDrop"))
 local Rewards = require(Modules:WaitForChild("Rewards"))
+require(Modules:WaitForChild("ShopService"))
 
 local CashStore = DataStoreService:GetDataStore("PlayerEconomy_v1")
 
