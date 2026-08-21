@@ -20,44 +20,31 @@ end
 
 function WeaponCharacter:SetCharacter(Character, Humanoid)
 	if not Character or not Humanoid then return end
-
 	local WasEquipped = self.IsEquipped and self.IsEquipped() or self.PoseRequested
 	self:ClearPose()
 	self.Character = Character
 	self.Humanoid = Humanoid
 	self.PoseRequested = WasEquipped
-
 	if WasEquipped and self.Module and self.Module.WeaponPoseEnabled == true then
 		local Generation = self.PoseGeneration
 		task.defer(function()
-			if self.PoseRequested and self.PoseGeneration == Generation and self.Character == Character and self.Humanoid == Humanoid and self.IsEquipped and self.IsEquipped() then
-				self:EquipPose()
-			end
+			if self.PoseRequested and self.PoseGeneration == Generation and self.Character == Character and self.Humanoid == Humanoid and self.IsEquipped and self.IsEquipped() then self:EquipPose() end
 		end)
 	end
 end
 
 function WeaponCharacter:EquipPose()
-	-- Gun posing is opt-in. Only a setting explicitly set to true can enable it.
-	if not self.Module or self.Module.WeaponPoseEnabled ~= true then
-		return
-	end
-	if self.Module.WeaponType == "Melee" then
-		return
-	end
-
-	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
-
+	if not self.Module or self.Module.WeaponPoseEnabled ~= true then return end
+	if self.Module.WeaponType == "Melee" then return end
+	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Client.WeaponPose)
 	self:ClearPose()
 	self.PoseGeneration += 1
 	local Generation = self.PoseGeneration
 	self.PoseRequested = true
-
 	local Character = self.Character
 	if not Character or not Character.Parent then return end
 	local Humanoid = self.Humanoid or Character:FindFirstChildOfClass("Humanoid")
 	if not Humanoid or Humanoid.Health <= 0 then return end
-
 	local Torso = Character:WaitForChild("Torso", 2)
 	if self.PoseGeneration ~= Generation or not self.PoseRequested or self.Character ~= Character or self.Humanoid ~= Humanoid then return end
 	if not Torso then return end
@@ -67,22 +54,16 @@ function WeaponCharacter:EquipPose()
 	if self.PoseGeneration ~= Generation or not self.PoseRequested or self.Character ~= Character or self.Humanoid ~= Humanoid then return end
 	if not LeftShoulder or not RightShoulder then return end
 	if self.IsEquipped and not self.IsEquipped() then self.PoseRequested = false return end
-
 	self.CurrentPose = WeaponPose.Equip(Character, self.Module)
 	if self.CurrentPose then WeaponPose.BindAim(self.CurrentPose, self.Mouse) end
-	if self.Module.DualEnabled then
-		self.Grip2 = WeaponPose.CreateDualGrip(self.Tool, Character, self.Handle2, self.Workspace.FilteringEnabled)
-	end
+	if self.Module.DualEnabled then self.Grip2 = WeaponPose.CreateDualGrip(self.Tool, Character, self.Handle2, self.Workspace.FilteringEnabled) end
 end
 
 function WeaponCharacter:ClearPose()
 	self.PoseGeneration += 1
 	self.PoseRequested = false
-	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
-	if self.CurrentPose then
-		WeaponPose.Unequip(self.CurrentPose)
-		self.CurrentPose = nil
-	end
+	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Client.WeaponPose)
+	if self.CurrentPose then WeaponPose.Unequip(self.CurrentPose); self.CurrentPose = nil end
 	WeaponPose.DestroyDualGrip(self.Grip2, self.Handle2, self.Workspace.FilteringEnabled)
 	self.Grip2 = nil
 end
