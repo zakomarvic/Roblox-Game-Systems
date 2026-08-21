@@ -1,0 +1,113 @@
+local Debris = game:GetService("Debris")
+local RunService = game:GetService("RunService")
+
+local CashDrop = {}
+
+local DEFAULT_LIFETIME = 120
+local DEFAULT_PICKUP_DISTANCE = 10
+local DEFAULT_GROUND_OFFSET = 0.15
+local DEFAULT_FLOAT_HEIGHT = 0.2
+local DEFAULT_FLOAT_SPEED = 2
+local DROP_FOLDER_NAME = "CashDrops"
+
+local function getDropFolder()
+	local Folder = workspace:FindFirstChild(DROP_FOLDER_NAME)
+	if Folder then return Folder end
+	Folder = Instance.new("Folder")
+	Folder.Name = DROP_FOLDER_NAME
+	Folder.Parent = workspace
+	return Folder
+end
+
+local function getGroundPosition(Position, Size, Options)
+	local Params = RaycastParams.new()
+	Params.FilterType = Enum.RaycastFilterType.Exclude
+	local Ignore = {getDropFolder()}
+	if Options.IgnoreInstances then
+		for _, InstanceToIgnore in ipairs(Options.IgnoreInstances) do
+			table.insert(Ignore, InstanceToIgnore)
+		end
+	end
+	Params.FilterDescendantsInstances = Ignore
+
+	local Result = workspace:Raycast(Position + Vector3.new(0, 10, 0), Vector3.new(0, -100, 0), Params)
+	local GroundOffset = tonumber(Options.GroundOffset) or DEFAULT_GROUND_OFFSET
+	if Result then
+		return Result.Position + Vector3.new(0, Size.Y * 0.5 + GroundOffset, 0)
+	end
+	return Position + Vector3.new(0, Size.Y * 0.5 + GroundOffset, 0)
+end
+
+local function createPart(Position, Amount, Options)
+	local Part = Instance.new("Part")
+	Part.Name = "CashDrop"
+	Part.Size = Options.Size or Vector3.new(1, 0.35, 1)
+	Part.Position = getGroundPosition(Position, Part.Size, Options)
+	Part.Shape = Enum.PartType.Cylinder
+	Part.Material = Enum.Material.Neon
+	Part.Color = Options.Color or Color3.fromRGB(50, 205, 50)
+	Part.Anchored = true
+	Part.CanCollide = Options.CanCollide ~= false
+	Part.CanQuery = true
+	Part.CanTouch = true
+	Part:SetAttribute("CashAmount", Amount)
+	Part.Parent = getDropFolder()
+	return Part
+end
+
+local function animateDrop(Part, Options)
+	local BasePosition = Part.Position
+	local FloatHeight = math.max(0, tonumber(Options.FloatHeight) or DEFAULT_FLOAT_HEIGHT)
+	local FloatSpeed = math.max(0, tonumber(Options.FloatSpeed) or DEFAULT_FLOAT_SPEED)
+	local RotationSpeed = tonumber(Options.RotationSpeed) or 90
+	if FloatHeight <= 0 and RotationSpeed == 0 then return end
+
+	local StartTime = os.clock()
+	local Connection
+	Connection = RunService.Heartbeat:Connect(function()
+		if not Part.Parent then
+			Connection:Disconnect()
+			return
+		end
+		local Elapsed = os.clock() - StartTime
+		local Offset = math.sin(Elapsed * FloatSpeed) * FloatHeight
+		local Rotation = math.rad(Elapsed * RotationSpeed)
+		Part.CFrame = CFrame.new(BasePosition + Vector3.new(0, Offset, 0)) * CFrame.Angles(0, Rotation, 0)
+	end)
+end
+
+function CashDrop.Drop(Position, Amount, Options)
+	Options = Options or {}
+	local Value = math.floor(tonumber(Amount) or 0)
+	if Value <= 0 or typeof(Position) ~= "Vector3" then return nil end
+
+	local Part = createPart(Position, Value, Options)
+	local Prompt = Instance.new("ProximityPrompt")
+	Prompt.Name = "CashPickupPrompt"
+	Prompt.ActionText = Options.ActionText or "Pick Up"
+	Prompt.ObjectText = Options.ObjectText or ("$" .. Value)
+	Prompt.HoldDuration = math.max(0, tonumber(Options.HoldDuration) or 0)
+	Prompt.MaxActivationDistance = math.max(1, tonumber(Options.PickupDistance) or DEFAULT_PICKUP_DISTANCE)
+	Prompt.RequiresLineOfSight = false
+	Prompt.KeyboardKeyCode = Options.KeyboardKeyCode or Enum.KeyCode.E
+	Prompt.GamepadKeyCode = Options.GamepadKeyCode or Enum.KeyCode.ButtonX
+	Prompt.Parent = Part
+
+	local Claimed = false
+	Prompt.Triggered:Connect(function(Player)
+		if Claimed or not Player.Parent then return end
+		Claimed = true
+		Prompt.Enabled = false
+		local CashService = require(script.Parent:WaitForChild("CashService"))
+		CashService.Add(Player, Value)
+		Part:Destroy()
+	end)
+
+	animateDrop(Part, Options)
+
+	local Lifetime = math.max(0, tonumber(Options.Lifetime) or DEFAULT_LIFETIME)
+	if Lifetime > 0 then Debris:AddItem(Part, Lifetime) end
+	return Part
+end
+
+return CashDrop

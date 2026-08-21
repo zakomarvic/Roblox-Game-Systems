@@ -1,0 +1,46 @@
+# Economy Modules
+
+- `CashService` — authoritative carried-cash API for players.
+- `CashDrop` — creates a physical green cash pickup in the world. It is reusable by players, NPCs, destructibles, rewards, or any other system.
+- `EconomyDrop` — convenience helpers for dropping a player's carried cash or a fixed cash amount.
+- `Rewards` — centralized reward values for economy events.
+
+## Player kills
+
+Player deaths are handled by `EconomyServer`. The server reads the existing server-created `creator` tag on the dead Humanoid and rewards the credited player:
+
+```lua
+Rewards.PlayerKill
+```
+
+The default player-kill reward is `100` cash.
+
+## NPC kills
+
+`EconomyServer` also watches non-player Humanoids in `Workspace`. When an NPC dies with a valid server-created `creator` tag, the credited player receives:
+
+```lua
+Rewards.NPCKill
+```
+
+The default NPC-kill reward is `50` cash.
+
+NPC reward attribution uses the same server-side damage attribution as player kills, so NPCs do not need their own RemoteEvent or reward logic.
+
+To change either reward, edit `Rewards` rather than the weapon systems.
+
+## Cash drops
+
+Systems that have a fixed reward should call:
+
+```lua
+CashDrop.Drop(Position, CashAmount)
+```
+
+For a player death, use:
+
+```lua
+EconomyDrop.DropPlayerCash(Player, Position)
+```
+
+The player's carried cash is set to zero when their positive carried balance is dropped.

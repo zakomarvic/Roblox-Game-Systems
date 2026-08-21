@@ -1,0 +1,58 @@
+local Setting = {
+	--==================================================
+	-- CORE
+	--==================================================
+	WeaponType = "Melee";
+	BaseDamage = 35;
+	AttackCooldown = 0.6;
+	AttackDuration = 0.22;
+	
+	--==================================================
+	-- SHAPECAST HITBOX
+	--==================================================
+	MeleeEnabled = true;
+	MeleeHitOnce = true;
+	MeleeResolution = 60;
+	MeleeCastType = "Raycast";
+	MeleeCastSize = Vector3.zero;
+	MeleeCastCFrame = CFrame.identity;
+	MeleeCastRadius = 0;
+	
+	--==================================================
+	-- COMBAT
+	--==================================================
+	MeleeKnockback = 20;
+	
+	--==================================================
+	-- THROWING
+	--==================================================
+	ThrowEnabled = true;
+	ThrowKey = Enum.KeyCode.Q;
+	ThrowCooldown = 1;
+	ThrowSpeed = 120;
+	ThrowGravity = Vector3.new(0, -workspace.Gravity * 0.35, 0);
+	ThrowLifetime = 5;
+	ThrowDamage = 50;
+	ThrowSpin = true;
+	ThrowStick = true;
+	ThrowStickLifetime = 30;
+	ThrowConsumesWeapon = false;
+	
+	--==================================================
+	-- ANIMATION
+	--==================================================
+	IdleAnimationID = nil;
+	IdleAnimationSpeed = 1;
+	AttackAnimationID = nil;
+	AttackAnimationSpeed = 1;
+	ThrowAnimationID = nil;
+	ThrowAnimationSpeed = 1;
+	
+	--==================================================
+	-- AUDIO
+	--==================================================
+	SwingSoundID = "";
+	HitSoundIDs = {};
+}
+
+return Setting

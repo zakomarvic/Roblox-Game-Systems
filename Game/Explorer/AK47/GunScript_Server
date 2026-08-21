@@ -1,0 +1,7 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local WeaponService = require(
+	game:GetService("ServerScriptService").WeaponServer.WeaponService
+)
+
+WeaponService.Initialize(script.Parent)

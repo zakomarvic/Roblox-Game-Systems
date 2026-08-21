@@ -1,0 +1,17 @@
+local Settings = {}
+
+--========================
+-- MOVEMENT
+--========================
+
+Settings.WalkSpeed = 16
+
+--========================
+-- SPRINT
+--========================
+
+Settings.SprintEnabled = true
+Settings.SprintWalkSpeed = 24
+Settings.SprintTransitionSpeed = 10
+
+return Settings
