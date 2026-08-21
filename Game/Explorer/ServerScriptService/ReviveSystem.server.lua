@@ -76,7 +76,7 @@ end
 local function stopNPCAnimation(character, animationName)
 	local tracks = NPCTracks[character]
 	local track = tracks and tracks[animationName]
-	if track then
+	if track and track.IsPlaying then
 		track:Stop(0.1)
 	end
 end
@@ -111,7 +111,6 @@ local function playNPCAnimation(character, animationName)
 
 	NPCTracks[character] = NPCTracks[character] or {}
 	local tracks = NPCTracks[character]
-
 	stopAllNPCAnimations(character, animationName)
 
 	local track = tracks[animationName]
@@ -121,7 +120,6 @@ local function playNPCAnimation(character, animationName)
 		animation.AnimationId = "rbxassetid://" .. tostring(data.Id)
 		track = animator:LoadAnimation(animation)
 		track.Priority = Enum.AnimationPriority.Action4
-		track.Looped = data.Looped == true
 		animation:Destroy()
 		tracks[animationName] = track
 	end
@@ -138,28 +136,13 @@ local function playDownedNPCState(character)
 		return
 	end
 
-	-- DownedIdle is the persistent state. PlayerDowned is only the entry
-	-- animation and must never be allowed to restart after it has completed.
+	-- NPCs enter the persistent downed pose directly. This prevents the
+	-- normal NPC animation controller from showing a standing transition
+	-- between the downed hit and the downed idle pose.
+	stopNPCAnimation(character, "PlayerDowned")
 	stopNPCAnimation(character, "DownedSelfRevive")
 	stopNPCAnimation(character, "RevivingPlayer")
-
-	local tracks = NPCTracks[character]
-	local idle = tracks and tracks.DownedIdle
-	if idle and idle.IsPlaying then
-		return
-	end
-
-	local downedTrack = playNPCAnimation(character, "PlayerDowned")
-	if not downedTrack then
-		playNPCAnimation(character, "DownedIdle")
-		return
-	end
-
-	downedTrack.Ended:Once(function()
-		if character.Parent and isDowned(character) and not character:GetAttribute(REVIVING_ATTRIBUTE) then
-			playNPCAnimation(character, "DownedIdle")
-		end
-	end)
+	playNPCAnimation(character, "DownedIdle")
 end
 
 local function restoreReviver(state)
@@ -322,11 +305,21 @@ local function completeRevive(player, prompt)
 		prompt.Enabled = false
 	end
 
+	-- Keep Reviving true while changing Health so DownedSystem cannot
+	-- immediately put the character back into the downed state.
 	targetCharacter:SetAttribute(REVIVING_ATTRIBUTE, true)
 	targetCharacter:SetAttribute(DOWNED_ATTRIBUTE, false)
 	targetHumanoid.Health = revivedHealth
-	targetCharacter:SetAttribute(REVIVING_ATTRIBUTE, false)
 
+	-- Force the downed indicator off before returning to normal state.
+	local root = getCharacterRoot(targetCharacter)
+	local head = targetCharacter:FindFirstChild("Head")
+	local indicator = head and head:FindFirstChild("DownedIndicator")
+	if indicator then
+		indicator:Destroy()
+	end
+
+	targetCharacter:SetAttribute(REVIVING_ATTRIBUTE, false)
 	restoreReviver(state)
 
 	stopClientAnimation(player, "PlayerReviving")
@@ -335,10 +328,10 @@ local function completeRevive(player, prompt)
 		stopClientAnimation(state.TargetPlayer, "RevivingPlayer")
 		Remote:FireClient(state.TargetPlayer, "Complete")
 	else
-		-- NPCs should not play the player's solo recovery animation.
-		-- Their revive animation ends when the interaction finishes and they
-		-- return to their normal NPC animation controller.
+		-- NPCs only use the assisted-revive animation. They must never receive
+		-- the player's DownedSelfRevive animation.
 		stopNPCAnimation(targetCharacter, "RevivingPlayer")
+		stopNPCAnimation(targetCharacter, "DownedSelfRevive")
 	end
 
 	if prompt.Parent then
@@ -395,6 +388,8 @@ local function updateCharacter(character)
 		removePrompt(character)
 		stopNPCAnimation(character, "PlayerDowned")
 		stopNPCAnimation(character, "DownedIdle")
+		stopNPCAnimation(character, "RevivingPlayer")
+		stopNPCAnimation(character, "DownedSelfRevive")
 	end
 end
 
