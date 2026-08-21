@@ -4,8 +4,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
 local CharacterSystem = ReplicatedStorage:WaitForChild("CharacterSystem")
 local Settings = require(CharacterSystem:WaitForChild("Settings"))
-local CharacterRagdoll = require(CharacterSystem.Ragdoll:WaitForChild("CharacterRagdoll"))
-local RagdollRemote = CharacterSystem:WaitForChild("RagdollRemote")
+local CharacterRagdoll = require(CharacterSystem:WaitForChild("Ragdoll"):WaitForChild("CharacterRagdoll"))
+local RagdollRemote = CharacterSystem:WaitForChild("Remotes"):WaitForChild("RagdollRemote")
 
 local CharacterController = {}
 CharacterController.__index = CharacterController
@@ -13,19 +13,15 @@ CharacterController.__index = CharacterController
 local Singleton
 
 function CharacterController.new()
-	if Singleton then
-		return Singleton
-	end
+	if Singleton then return Singleton end
 
 	local self = setmetatable({}, CharacterController)
-
 	self.Character = nil
 	self.Humanoid = nil
 	self.Ragdoll = nil
 	self.Ragdolled = false
 	self.Sprinting = false
 	self.SprintChanged = Instance.new("BindableEvent")
-
 	Singleton = self
 
 	RagdollRemote.OnClientEvent:Connect(function(State)
@@ -33,7 +29,6 @@ function CharacterController.new()
 	end)
 
 	self:_setupCharacter(Player.Character or Player.CharacterAdded:Wait())
-
 	Player.CharacterAdded:Connect(function(Character)
 		self:_setupCharacter(Character)
 	end)
@@ -46,10 +41,7 @@ function CharacterController.Get()
 end
 
 function CharacterController:_setupCharacter(Character)
-	if self.Ragdoll then
-		self.Ragdoll:Destroy()
-	end
-
+	if self.Ragdoll then self.Ragdoll:Destroy() end
 	self.Character = Character
 	self.Humanoid = Character:WaitForChild("Humanoid")
 	self.Humanoid.BreakJointsOnDeath = false
@@ -83,9 +75,7 @@ function CharacterController:Knockdown(Direction, Force, Duration)
 	RagdollRemote:FireServer("Knockdown", Direction.Unit, Force, Duration)
 end
 
-function CharacterController:IsRagdolled()
-	return self.Ragdolled
-end
+function CharacterController:IsRagdolled() return self.Ragdolled end
 
 function CharacterController:SetSprinting(State)
 	if not self.Humanoid or self.Humanoid.Health <= 0 then return end
@@ -93,21 +83,12 @@ function CharacterController:SetSprinting(State)
 	State = State == true
 	if self.Sprinting == State then return end
 	self.Sprinting = State
-	local TargetSpeed = State and Settings.SprintWalkSpeed or Settings.WalkSpeed
-	self.Humanoid.WalkSpeed = TargetSpeed
+	self.Humanoid.WalkSpeed = State and Settings.SprintWalkSpeed or Settings.WalkSpeed
 	self.SprintChanged:Fire(State)
 end
 
-function CharacterController:IsSprinting()
-	return self.Sprinting
-end
-
-function CharacterController:GetHumanoid()
-	return self.Humanoid
-end
-
-function CharacterController:GetCharacter()
-	return self.Character
-end
+function CharacterController:IsSprinting() return self.Sprinting end
+function CharacterController:GetHumanoid() return self.Humanoid end
+function CharacterController:GetCharacter() return self.Character end
 
 return CharacterController
