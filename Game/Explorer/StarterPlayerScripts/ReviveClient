@@ -12,6 +12,7 @@ local Humanoid
 local Animator
 local Tracks = {}
 local DownedConnection
+local RecoveryPlaying = false
 
 local function stopTrack(name, fadeTime)
 	local track = Tracks[name]
@@ -33,6 +34,7 @@ local function loadTracks(character)
 	Humanoid = character:WaitForChild("Humanoid")
 	Animator = Humanoid:WaitForChild("Animator")
 	Tracks = {}
+	RecoveryPlaying = false
 
 	for name, data in pairs(Animations) do
 		local animation = Instance.new("Animation")
@@ -41,7 +43,7 @@ local function loadTracks(character)
 
 		local track = Animator:LoadAnimation(animation)
 		track.Looped = data.Looped == true
-		track.Priority = Enum.AnimationPriority.Action
+		track.Priority = Enum.AnimationPriority.Action4
 		Tracks[name] = track
 
 		animation:Destroy()
@@ -52,16 +54,23 @@ local function playTrack(name)
 	local data = Animations[name]
 	local track = Tracks[name]
 	if not data or not track then
+		warn("[ReviveClient] Missing animation track:", name)
 		return nil
 	end
 
 	stopAllReviveTracks(name)
+	track.Looped = data.Looped == true
+	track.Priority = Enum.AnimationPriority.Action4
 	track:Play(0.1, 1, data.Speed or 1)
 	track:AdjustSpeed(data.Speed or 1)
 	return track
 end
 
 local function playDownedState()
+	if RecoveryPlaying then
+		return
+	end
+
 	if not Character or Character:GetAttribute("Downed") ~= true then
 		return
 	end
@@ -69,13 +78,31 @@ local function playDownedState()
 	local downedTrack = playTrack("PlayerDowned")
 	if downedTrack then
 		downedTrack.Ended:Once(function()
-			if Character and Character.Parent and Character:GetAttribute("Downed") == true then
+			if not RecoveryPlaying and Character and Character.Parent and Character:GetAttribute("Downed") == true then
 				playTrack("DownedIdle")
 			end
 		end)
 	else
 		playTrack("DownedIdle")
 	end
+end
+
+local function playRecoveryAnimation()
+	RecoveryPlaying = true
+	stopAllReviveTracks()
+
+	local track = playTrack("DownedSelfRevive")
+	if not track then
+		RecoveryPlaying = false
+		return
+	end
+
+	track.Ended:Once(function()
+		if Character and Character.Parent then
+			stopTrack("DownedSelfRevive")
+		end
+		RecoveryPlaying = false
+	end)
 end
 
 local function onCharacter(character)
@@ -88,8 +115,11 @@ local function onCharacter(character)
 
 	DownedConnection = character:GetAttributeChangedSignal("Downed"):Connect(function()
 		if character:GetAttribute("Downed") then
+			RecoveryPlaying = false
 			playDownedState()
 		else
+			-- Do not stop DownedSelfRevive here. The server clears Downed before
+			-- telling the client to play the recovery animation.
 			stopTrack("PlayerDowned")
 			stopTrack("DownedIdle")
 			stopTrack("RevivingPlayer")
@@ -103,23 +133,25 @@ end
 
 Remote.OnClientEvent:Connect(function(action, animationName)
 	if action == "Begin" then
-		playTrack(animationName)
+		if animationName == "RevivingPlayer" then
+			playTrack("RevivingPlayer")
+		else
+			playTrack(animationName)
+		end
+
 	elseif action == "Stop" then
 		stopTrack(animationName)
-		if Character and Character:GetAttribute("Downed") == true then
+		if Character and Character:GetAttribute("Downed") == true and not RecoveryPlaying then
 			playTrack("DownedIdle")
 		end
+
 	elseif action == "Complete" then
-		stopAllReviveTracks()
-		local track = playTrack("DownedSelfRevive")
-		if track then
-			track.Ended:Once(function()
-				if Character and Character.Parent then
-					stopTrack("DownedSelfRevive")
-				end
-			end)
-		end
+		-- Completion is explicit. Do not depend on the Downed attribute event,
+		-- because that event can fire before or after the RemoteEvent.
+		playRecoveryAnimation()
+
 	elseif action == "ReviveCancelled" then
+		RecoveryPlaying = false
 		if Character and Character:GetAttribute("Downed") == true then
 			playTrack("DownedIdle")
 		end
