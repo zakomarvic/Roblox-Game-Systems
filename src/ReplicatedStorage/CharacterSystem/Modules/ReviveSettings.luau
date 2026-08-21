@@ -1,0 +1,6 @@
+return {
+	ReviveDuration = 4,
+	RevivedHealthPercent = 0.35,
+	MaxActivationDistance = 8,
+	RequiresLineOfSight = false,
+}

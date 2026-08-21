@@ -1,0 +1,63 @@
+local MeleeUtility = {}
+
+function MeleeUtility.GetHumanoid(Character)
+	return Character and Character:FindFirstChildOfClass("Humanoid")
+end
+
+function MeleeUtility.GetTorso(Character)
+	return Character and (Character:FindFirstChild("HumanoidRootPart") or Character:FindFirstChild("Torso"))
+end
+
+function MeleeUtility.SetToolVisible(Tool, Visible)
+	if not Tool or not Tool.Parent then return end
+	for _, Descendant in ipairs(Tool:GetDescendants()) do
+		if Descendant:IsA("BasePart") or Descendant:IsA("Decal") or Descendant:IsA("Texture") then
+			if Visible then
+				local Original = Descendant:GetAttribute("MeleeThrowOriginalTransparency")
+				if Original ~= nil then
+					Descendant.Transparency = Original
+					Descendant:SetAttribute("MeleeThrowOriginalTransparency", nil)
+				end
+			else
+				if Descendant:GetAttribute("MeleeThrowOriginalTransparency") == nil then
+					Descendant:SetAttribute("MeleeThrowOriginalTransparency", Descendant.Transparency)
+				end
+				Descendant.Transparency = 1
+			end
+		end
+	end
+end
+
+function MeleeUtility.GetPromptPart(Visual)
+	if not Visual then return nil end
+	if Visual:IsA("BasePart") then return Visual end
+	if Visual:IsA("Model") then
+		return Visual.PrimaryPart or Visual:FindFirstChildWhichIsA("BasePart", true)
+	end
+	return nil
+end
+
+function MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris)
+	if Damage <= 0 or not TargetHumanoid or TargetHumanoid.Health <= 0 then return end
+	local Creator = TargetHumanoid:FindFirstChild("creator")
+	if Creator then Creator:Destroy() end
+	Creator = Instance.new("ObjectValue")
+	Creator.Name = "creator"
+	Creator.Value = Player
+	Creator.Parent = TargetHumanoid
+	if Debris then Debris:AddItem(Creator, 5) end
+	TargetHumanoid:TakeDamage(Damage)
+end
+
+function MeleeUtility.GetOwnedEquippedWeapon(Player, Tool)
+	if not Tool or not Tool:IsA("Tool") then return nil, nil end
+	local Character = Player.Character
+	if not Character or Tool.Parent ~= Character then return nil, nil end
+	local Setting = Tool:FindFirstChild("Setting")
+	if not Setting or not Setting:IsA("ModuleScript") then return nil, nil end
+	local Module = require(Setting)
+	if type(Module) ~= "table" or Module.WeaponType ~= "Melee" or Module.MeleeEnabled == false then return nil, nil end
+	return Tool, Module
+end
+
+return MeleeUtility

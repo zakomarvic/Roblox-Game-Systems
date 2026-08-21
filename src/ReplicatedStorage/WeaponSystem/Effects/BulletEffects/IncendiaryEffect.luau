@@ -1,0 +1,96 @@
+local Debris = game:GetService("Debris")
+
+local Incendiary = {}
+
+local DEFAULT_DURATION = 5
+local DAMAGE_PER_SECOND = 5
+local TICK_RATE = 0.1
+local BURN_SOUND_ID = "rbxassetid://32791565"
+
+function Incendiary.Apply(Context)
+	local TargetCharacter = Context and Context.TargetCharacter
+	local TargetHumanoid = Context and Context.TargetHumanoid
+	local Player = Context and Context.Player
+
+	if not TargetCharacter or not TargetHumanoid then
+		return false
+	end
+
+	if not TargetHumanoid:IsA("Humanoid") or TargetHumanoid.Health <= 0 then
+		return false
+	end
+
+	local Torso = TargetCharacter:FindFirstChild("Torso")
+	if not Torso or not Torso:IsA("BasePart") then
+		return false
+	end
+
+	local Existing = TargetCharacter:FindFirstChild("IgniteScript")
+	if Existing then
+		return true
+	end
+
+	local Duration = tonumber(Context.Duration) or DEFAULT_DURATION
+	if Duration <= 0 then
+		return true
+	end
+
+	local BurnSound = Instance.new("Sound")
+	BurnSound.Name = "BurnSound"
+	BurnSound.SoundId = BURN_SOUND_ID
+	BurnSound.Volume = 1
+	BurnSound.Parent = Torso
+	BurnSound:Play()
+	Debris:AddItem(BurnSound, 10)
+
+	local Fires = {}
+	for _, Part in ipairs(TargetCharacter:GetChildren()) do
+		if Part:IsA("BasePart") then
+			local Fire = Instance.new("Fire")
+			Fire.Size = 5 + (Part.Size.Magnitude * 1.5)
+			Fire.Parent = Part
+			table.insert(Fires, Fire)
+		end
+	end
+
+	task.spawn(function()
+		local Remaining = Duration
+
+		while Remaining > 0 and TargetHumanoid.Parent and TargetHumanoid.Health > 0 do
+			task.wait(TICK_RATE)
+			Remaining -= TICK_RATE
+
+			while TargetHumanoid:FindFirstChild("creator") do
+				TargetHumanoid.creator:Destroy()
+			end
+
+			if Player then
+				local Creator = Instance.new("ObjectValue")
+				Creator.Name = "creator"
+				Creator.Value = Player
+				Creator.Parent = TargetHumanoid
+				Debris:AddItem(Creator, 5)
+			end
+
+			TargetHumanoid:TakeDamage(DAMAGE_PER_SECOND * TICK_RATE)
+		end
+
+		for _, Fire in ipairs(Fires) do
+			if Fire.Parent then
+				Fire.Enabled = false
+			end
+		end
+
+		task.wait(5)
+
+		for _, Fire in ipairs(Fires) do
+			if Fire.Parent then
+				Fire:Destroy()
+			end
+		end
+	end)
+
+	return true
+end
+
+return Incendiary

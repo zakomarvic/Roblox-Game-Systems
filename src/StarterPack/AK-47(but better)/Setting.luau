@@ -1,0 +1,135 @@
+local Setting = {
+	--==================================================
+	-- CORE / FIRING
+	--==================================================
+	Auto = true;
+	BaseDamage = 40;
+	FireRate = 0.1;
+	ReloadTime = 2;
+	AmmoPerClip = 30;
+
+	--==================================================
+	-- ACCURACY / DAMAGE
+	--==================================================
+	Spread = 1.25;
+	HeadshotEnabled = true;
+	HeadshotDamageMultiplier = 4;
+	Piercing = 0;
+
+	--==================================================
+	-- AMMO / MAGAZINE
+	--==================================================
+	LimitedClipEnabled = false;
+	Clips = 10;
+	MaxClip = 10;
+
+	--==================================================
+	-- FIRE MODES
+	--==================================================
+	ShotgunEnabled = false;
+	BulletPerShot = 8;
+	ShotgunReload = false;
+	ShotgunClipinAnimationID = nil;
+	ShotgunClipinAnimationSpeed = 1;
+	ShellClipinSpeed = 0.5;
+	BurstFireEnabled = false;
+	BulletPerBurst = 3;
+	BurstRate = 0.075;
+	MinigunEnabled = false;
+	DelayBeforeFiring = 1;
+	DelayAfterFiring = 1;
+	ChargedShotEnabled = false;
+	ChargingTime = 1;
+
+	--==================================================
+	-- PROJECTILE / HIT DETECTION
+	--==================================================
+	ProjectileType = "Hitscan";
+	ProjectileSpeed = 500;
+	ProjectileGravity = Vector3.zero;
+	ProjectileLifetime = 10;
+
+	--==================================================
+	-- EXPLOSIVE / IMPACT
+	--==================================================
+	ExplosiveEnabled = false;
+	ExplosionRadius = 8;
+	Knockback = 0;
+	Lifesteal = 0;
+	FlamingBullet = false;
+
+	--==================================================
+	-- AIM / SCOPE
+	--==================================================
+	SniperEnabled = false;
+	FieldOfView = 12.5;
+	MouseSensitive = 0.05;
+	SpreadRedution = 1;
+
+	-- Controls the gun-specific arm/shoulder pose.
+	WeaponPoseEnabled = true;
+	BodyAimEnabled = true;
+	BodyAimSpeed = 20;
+
+	--==================================================
+	-- CAMERA / RECOIL
+	--==================================================
+	RecoilEnabled = true;
+	RecoilUp = 2;
+	RecoilSide = 0.5;
+	RecoilRecovery = 8;
+	MovementSwayEnabled = true;
+	MovementSwayAmount = 0.20;
+	MovementSwaySpeed = 8;
+	IdleSwayEnabled = true;
+	IdleSwayAmount = 0.01;
+	IdleSwaySpeed = 1.5;
+	AimSwayEnabled = true;
+	AimSwayMultiplier = 0.35;
+	StrafeTiltEnabled = true;
+	StrafeTiltAmount = 2;
+	StrafeTiltSpeed = 8;
+	AimStrafeTiltMultiplier = 0.35;
+	WalkBobEnabled = true;
+	WalkBobAmount = 0.06;
+	WalkBobSpeed = 8;
+	AimWalkBobMultiplier = 0.3;
+
+	--==================================================
+	-- ANIMATIONS
+	--==================================================
+	IdleAnimationID = 94331086;
+	IdleAnimationSpeed = 1;
+	FireAnimationID = 94332152;
+	FireAnimationSpeed = 6;
+	ReloadAnimationID = nil;
+	ReloadAnimationSpeed = 1;
+
+	--==================================================
+	-- VISUALS / AUDIO
+	--==================================================
+	MouseIconID = "316279304";
+	HitSoundIDs = {186809061, 186809249, 186809250, 186809252};
+	VisualizerEnabled = true;
+	BulletSize = Vector3.new(0.25, 0.25, 100);
+	BulletColor = BrickColor.new("Bright yellow");
+	BulletTransparency = 0.25;
+	BulletMaterial = Enum.Material.SmoothPlastic;
+
+	--==================================================
+	-- MOVEMENT / SPRINT
+	--==================================================
+	SprintEnabled = true;
+	SprintWalkSpeed = 24;
+	SprintOffset = CFrame.new(0.15, -0.35, 0.25);
+	SprintRotation = CFrame.Angles(math.rad(-25), math.rad(15), math.rad(-5));
+	SprintTransitionSpeed = 10;
+
+	--==================================================
+	-- SPECIAL
+	--==================================================
+	DualEnabled = false;
+	MuzzleOffset = Vector3.new(0, 0.625, 1.25);
+}
+
+return Setting

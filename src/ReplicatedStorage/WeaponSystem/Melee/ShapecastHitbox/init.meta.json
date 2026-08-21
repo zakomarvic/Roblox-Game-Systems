@@ -1,0 +1,14 @@
+{
+  "properties": {
+    "SourceAssetId": 122697148509799.0,
+    "Sandboxed": true,
+    "Capabilities": {
+      "SecurityCapabilities": 17996771963439872
+    }
+  },
+  "attributes": {
+    "Name": "shapecasthitbox",
+    "Scope": "teamswordphin",
+    "Version": "0.2.5"
+  }
+}

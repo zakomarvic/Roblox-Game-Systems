@@ -1,0 +1,94 @@
+{
+  "className": "ParticleEmitter",
+  "properties": {
+    "Rotation": {
+      "NumberRange": [
+        -360.0,
+        360.0
+      ]
+    },
+    "ZOffset": 0.5,
+    "Transparency": {
+      "NumberSequence": {
+        "keypoints": [
+          {
+            "time": 0.0,
+            "value": 0.0,
+            "envelope": 0.0
+          },
+          {
+            "time": 0.75,
+            "value": 0.0,
+            "envelope": 0.0
+          },
+          {
+            "time": 1.0,
+            "value": 1.0,
+            "envelope": 0.0
+          }
+        ]
+      }
+    },
+    "RotSpeed": {
+      "NumberRange": [
+        -750.0,
+        750.0
+      ]
+    },
+    "EmissionDirection": "Front",
+    "Size": {
+      "NumberSequence": {
+        "keypoints": [
+          {
+            "time": 0.0,
+            "value": 0.0,
+            "envelope": 0.0
+          },
+          {
+            "time": 1.0,
+            "value": 2.5,
+            "envelope": 0.0
+          }
+        ]
+      }
+    },
+    "Speed": {
+      "NumberRange": [
+        0.0,
+        0.0
+      ]
+    },
+    "Lifetime": {
+      "NumberRange": [
+        0.125,
+        0.125
+      ]
+    },
+    "Color": {
+      "ColorSequence": {
+        "keypoints": [
+          {
+            "time": 0.0,
+            "color": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          {
+            "time": 1.0,
+            "color": [
+              1.0,
+              1.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    "Enabled": false,
+    "LockedToPart": true,
+    "LightEmission": 1.0,
+    "TextureContent": "http://www.roblox.com/asset/?id=243728166"
+  }
+}

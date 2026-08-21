@@ -1,0 +1,9 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
+local Remotes = WeaponSystem:WaitForChild("Remotes")
+
+return {
+	WeaponEffects = Remotes:WaitForChild("WeaponEffects"),
+	InflictTarget = Remotes:WaitForChild("InflictTarget"),
+	Explosion = Remotes:WaitForChild("Explosion"),
+}

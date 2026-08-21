@@ -1,0 +1,27 @@
+local CashDrop = require(script.Parent:WaitForChild("CashDrop"))
+local CashService = require(script.Parent:WaitForChild("CashService"))
+
+local EconomyDrop = {}
+
+function EconomyDrop.DropPlayerCash(Player, Position, Options)
+	local Amount = CashService.Get(Player)
+	if Amount <= 0 then return nil, 0 end
+
+	local DropOptions = table.clone(Options or {})
+	DropOptions.IgnoreInstances = DropOptions.IgnoreInstances or {}
+	if Player.Character then
+		table.insert(DropOptions.IgnoreInstances, Player.Character)
+	end
+
+	local Drop = CashDrop.Drop(Position, Amount, DropOptions)
+	if not Drop then return nil, 0 end
+
+	CashService.Set(Player, 0)
+	return Drop, Amount
+end
+
+function EconomyDrop.DropFixedCash(Position, Amount, Options)
+	return CashDrop.Drop(Position, Amount, Options)
+end
+
+return EconomyDrop

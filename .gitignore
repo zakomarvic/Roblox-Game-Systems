@@ -1,0 +1,17 @@
+# Roblox Studio place files
+*.rbxl
+*.rbxlx
+
+# Roblox Studio lock files
+*.rbxl.lock
+*.rbxlx.lock
+
+# Rojo generated files
+sourcemap.json
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
