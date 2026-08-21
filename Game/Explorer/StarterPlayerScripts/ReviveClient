@@ -1,0 +1,133 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local CharacterSystem = ReplicatedStorage:WaitForChild("CharacterSystem")
+local Modules = CharacterSystem:WaitForChild("Modules")
+local Animations = require(Modules:WaitForChild("ReviveAnimations"))
+local Remote = CharacterSystem:WaitForChild("ReviveRemote")
+
+local Character
+local Humanoid
+local Animator
+local Tracks = {}
+local DownedConnection
+
+local function stopTrack(name, fadeTime)
+	local track = Tracks[name]
+	if track and track.IsPlaying then
+		track:Stop(fadeTime or 0.1)
+	end
+end
+
+local function stopAllReviveTracks(except)
+	for name in pairs(Tracks) do
+		if name ~= except then
+			stopTrack(name)
+		end
+	end
+end
+
+local function loadTracks(character)
+	Character = character
+	Humanoid = character:WaitForChild("Humanoid")
+	Animator = Humanoid:WaitForChild("Animator")
+	Tracks = {}
+
+	for name, data in pairs(Animations) do
+		local animation = Instance.new("Animation")
+		animation.Name = name
+		animation.AnimationId = "rbxassetid://" .. tostring(data.Id)
+
+		local track = Animator:LoadAnimation(animation)
+		track.Looped = data.Looped == true
+		track.Priority = Enum.AnimationPriority.Action
+		Tracks[name] = track
+
+		animation:Destroy()
+	end
+end
+
+local function playTrack(name)
+	local data = Animations[name]
+	local track = Tracks[name]
+	if not data or not track then
+		return nil
+	end
+
+	stopAllReviveTracks(name)
+	track:Play(0.1, 1, data.Speed or 1)
+	track:AdjustSpeed(data.Speed or 1)
+	return track
+end
+
+local function playDownedState()
+	if not Character or Character:GetAttribute("Downed") ~= true then
+		return
+	end
+
+	local downedTrack = playTrack("PlayerDowned")
+	if downedTrack then
+		downedTrack.Ended:Once(function()
+			if Character and Character.Parent and Character:GetAttribute("Downed") == true then
+				playTrack("DownedIdle")
+			end
+		end)
+	else
+		playTrack("DownedIdle")
+	end
+end
+
+local function onCharacter(character)
+	if DownedConnection then
+		DownedConnection:Disconnect()
+		DownedConnection = nil
+	end
+
+	loadTracks(character)
+
+	DownedConnection = character:GetAttributeChangedSignal("Downed"):Connect(function()
+		if character:GetAttribute("Downed") then
+			playDownedState()
+		else
+			stopTrack("PlayerDowned")
+			stopTrack("DownedIdle")
+			stopTrack("RevivingPlayer")
+		end
+	end)
+
+	if character:GetAttribute("Downed") then
+		playDownedState()
+	end
+end
+
+Remote.OnClientEvent:Connect(function(action, animationName)
+	if action == "Begin" then
+		playTrack(animationName)
+	elseif action == "Stop" then
+		stopTrack(animationName)
+		if Character and Character:GetAttribute("Downed") == true then
+			playTrack("DownedIdle")
+		end
+	elseif action == "Complete" then
+		stopAllReviveTracks()
+		local track = playTrack("DownedSelfRevive")
+		if track then
+			track.Ended:Once(function()
+				if Character and Character.Parent then
+					stopTrack("DownedSelfRevive")
+				end
+			end)
+		end
+	elseif action == "ReviveCancelled" then
+		if Character and Character:GetAttribute("Downed") == true then
+			playTrack("DownedIdle")
+		end
+	end
+end)
+
+if LocalPlayer.Character then
+	onCharacter(LocalPlayer.Character)
+end
+
+LocalPlayer.CharacterAdded:Connect(onCharacter)
