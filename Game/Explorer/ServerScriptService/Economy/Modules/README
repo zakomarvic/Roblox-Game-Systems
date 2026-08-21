@@ -15,9 +15,21 @@ Rewards.PlayerKill
 
 The default player-kill reward is `100` cash.
 
-To change it, edit `Rewards` rather than the weapon systems.
+## NPC kills
 
-## NPCs / destructibles
+`EconomyServer` also watches non-player Humanoids in `Workspace`. When an NPC dies with a valid server-created `creator` tag, the credited player receives:
+
+```lua
+Rewards.NPCKill
+```
+
+The default NPC-kill reward is `50` cash.
+
+NPC reward attribution uses the same server-side damage attribution as player kills, so NPCs do not need their own RemoteEvent or reward logic.
+
+To change either reward, edit `Rewards` rather than the weapon systems.
+
+## Cash drops
 
 Systems that have a fixed reward should call:
 
