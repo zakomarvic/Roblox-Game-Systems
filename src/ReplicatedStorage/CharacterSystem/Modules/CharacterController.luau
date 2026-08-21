@@ -4,8 +4,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
 local CharacterSystem = ReplicatedStorage:WaitForChild("CharacterSystem")
 local Settings = require(CharacterSystem.Settings)
-local CharacterRagdoll = require(CharacterSystem.Modules.CharacterRagdoll)
-local RagdollRemote = CharacterSystem:WaitForChild("RagdollRemote")
+local CharacterRagdoll = require(CharacterSystem.Ragdoll:WaitForChild("CharacterRagdoll"))
+local RagdollRemote = CharacterSystem.Remotes:WaitForChild("RagdollRemote")
 
 local CharacterController = {}
 CharacterController.__index = CharacterController
