@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local DOWNED_HEALTH_THRESHOLD = 10
 local DOWNED_HEALTH = 1
 local DOWNED_ATTRIBUTE = "Downed"
+local REVIVING_ATTRIBUTE = "Reviving"
 local DOWNED_IMAGE = "rbxassetid://8121963838"
 
 local CharacterConnections = {}
@@ -90,9 +91,9 @@ local function setupCharacter(character)
 	CharacterConnections[character] = true
 	clearDowned(character)
 
-	-- A downed character must never enter Humanoid's permanent Dead state.
-	-- This is especially important for NPCs because lethal damage can otherwise
-	-- put their Health at 0 before the downed system gets a chance to recover it.
+	-- Revived characters are allowed to receive normal health changes without
+	-- the downed health listener converting them back into the downed state.
+	-- ReviveSystem clears Reviving before restoring normal gameplay.
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
 	humanoid.BreakJointsOnDeath = false
 
@@ -119,14 +120,13 @@ local function setupCharacter(character)
 			return
 		end
 
-		-- Lethal damage is converted into the downed state instead of death.
 		if humanoid.Health <= 0 then
 			humanoid.Health = DOWNED_HEALTH
 			setDowned(character)
 			return
 		end
 
-		if humanoid.Health <= DOWNED_HEALTH_THRESHOLD then
+		if humanoid.Health <= DOWNED_HEALTH_THRESHOLD and not character:GetAttribute(REVIVING_ATTRIBUTE) then
 			setDowned(character)
 		end
 	end)
