@@ -80,6 +80,8 @@ function CashDrop.Drop(Position, Amount, Options)
 	Prompt.HoldDuration = math.max(0, tonumber(Options.HoldDuration) or 0)
 	Prompt.MaxActivationDistance = math.max(1, tonumber(Options.PickupDistance) or DEFAULT_PICKUP_DISTANCE)
 	Prompt.RequiresLineOfSight = false
+	Prompt.KeyboardKeyCode = Options.KeyboardKeyCode or Enum.KeyCode.E
+	Prompt.GamepadKeyCode = Options.GamepadKeyCode or Enum.KeyCode.ButtonX
 	Prompt.Parent = Part
 
 	local Claimed = false
