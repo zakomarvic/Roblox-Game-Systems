@@ -4,6 +4,7 @@ local DataStoreService = game:GetService("DataStoreService")
 local Modules = script.Parent:WaitForChild("Modules")
 local CashService = require(Modules:WaitForChild("CashService"))
 local EconomyDrop = require(Modules:WaitForChild("EconomyDrop"))
+local Rewards = require(Modules:WaitForChild("Rewards"))
 
 local CashStore = DataStoreService:GetDataStore("PlayerEconomy_v1")
 
@@ -62,6 +63,20 @@ local function save(Player)
 	return Success
 end
 
+local function rewardPlayerKill(Victim)
+	local Humanoid = Victim:FindFirstChildOfClass("Humanoid")
+	local Creator = Humanoid and Humanoid:FindFirstChild("creator")
+	local Killer = Creator and Creator.Value
+	local Reward = math.max(0, math.floor(tonumber(Rewards.PlayerKill) or 0))
+
+	if Reward <= 0 then return end
+	if typeof(Killer) ~= "Instance" or not Killer:IsA("Player") then return end
+	if Killer == Players:GetPlayerFromCharacter(Victim) then return end
+	if Killer.Parent ~= Players then return end
+
+	CashService.Add(Killer, Reward)
+end
+
 local function setupDeathDrop(Player, Character)
 	if DeathConnections[Player] then
 		DeathConnections[Player]:Disconnect()
@@ -72,6 +87,8 @@ local function setupDeathDrop(Player, Character)
 	if not Humanoid then return end
 
 	DeathConnections[Player] = Humanoid.Died:Connect(function()
+		rewardPlayerKill(Character)
+
 		local Root = Character:FindFirstChild("HumanoidRootPart")
 		if Root then
 			EconomyDrop.DropPlayerCash(Player, Root.Position)
