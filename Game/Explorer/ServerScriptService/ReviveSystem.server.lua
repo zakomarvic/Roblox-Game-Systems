@@ -39,10 +39,7 @@ end
 
 local function getAnimator(character)
 	local humanoid = getHumanoid(character)
-	if not humanoid then
-		return nil
-	end
-	return humanoid:FindFirstChildOfClass("Animator")
+	return humanoid and humanoid:FindFirstChildOfClass("Animator")
 end
 
 local function isDowned(character)
@@ -131,17 +128,9 @@ end
 local function stopAllNPCAnimations(character, except)
 	local animator = getNPCAnimator(character)
 	if animator then
+		local exceptTrack = NPCTracks[character] and NPCTracks[character][except]
 		for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-			if not isOwnedNPCTrack(character, track) or track ~= (NPCTracks[character] and NPCTracks[character][except]) then
-				track:Stop(0)
-			end
-		end
-	end
-
-	local tracks = NPCTracks[character]
-	if tracks then
-		for name, track in pairs(tracks) do
-			if name ~= except and track.IsPlaying then
+			if track ~= exceptTrack then
 				track:Stop(0)
 			end
 		end
@@ -228,9 +217,6 @@ local function maintainNPCIdle(character, idle)
 				idle:Play(0, 1, Animations.DownedIdle.Speed or 1)
 				idle:AdjustSpeed(Animations.DownedIdle.Speed or 1)
 			elseif idle.Length > 0 and idle.TimePosition >= math.max(0, idle.Length - LOOP_RESET_LEAD_TIME) then
-				-- Some uploaded loop clips contain a final pose that is not the
-				-- desired downed pose. Reset just before that frame so the runtime
-				-- loop never exposes a standing pose at the seam.
 				idle.TimePosition = 0
 			end
 			RunService.Heartbeat:Wait()
@@ -469,11 +455,9 @@ local function completeRevive(player, prompt)
 	end
 
 	targetCharacter:SetAttribute(REVIVING_ATTRIBUTE, true)
-targetCharacter:SetAttribute(DOWNED_ATTRIBUTE, false)
-targetHumanoid.Health = revivedHealth
+	targetCharacter:SetAttribute(DOWNED_ATTRIBUTE, false)
+	targetHumanoid.Health = revivedHealth
 
-	-- The target remains marked as Reviving until the old downed tracks are
-	-- stopped, so no downed animation listener can restart them during recovery.
 	if state.TargetPlayer then
 		stopClientAnimation(state.TargetPlayer, "RevivingPlayer")
 	else
@@ -547,12 +531,8 @@ end
 local function updateCharacter(character)
 	if character:GetAttribute(DOWNED_ATTRIBUTE) then
 		createPrompt(character)
-		if not character:GetAttribute(REVIVING_ATTRIBUTE) then
-			if isPlayerCharacter(character) then
-				Remote:FireClient(Players:GetPlayerFromCharacter(character), "Downed")
-			else
-				beginNPCDownedAnimation(character)
-			end
+		if not character:GetAttribute(REVIVING_ATTRIBUTE) and not isPlayerCharacter(character) then
+			beginNPCDownedAnimation(character)
 		end
 	else
 		removePrompt(character)
