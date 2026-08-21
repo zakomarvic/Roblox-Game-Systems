@@ -66,6 +66,11 @@ local function setDowned(character)
 	humanoid.AutoRotate = false
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
 
+	-- Keep the Humanoid state machine from trying to stand/walk while the
+	-- custom downed animation tracks are playing. Animation tracks continue
+	-- to play while the Humanoid is in Physics.
+	humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+
 	addDownedIndicator(character)
 end
 
@@ -91,9 +96,6 @@ local function setupCharacter(character)
 	CharacterConnections[character] = true
 	clearDowned(character)
 
-	-- Revived characters are allowed to receive normal health changes without
-	-- the downed health listener converting them back into the downed state.
-	-- ReviveSystem clears Reviving before restoring normal gameplay.
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
 	humanoid.BreakJointsOnDeath = false
 
@@ -141,6 +143,7 @@ local function setupCharacter(character)
 			humanoid.JumpPower = originalJumpPower
 			humanoid.AutoRotate = originalAutoRotate
 			humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+			humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 		end
 	end)
 
@@ -165,8 +168,6 @@ end
 
 Players.PlayerAdded:Connect(setupPlayer)
 
--- NPCs don't have CharacterAdded, so discover existing NPCs and watch for
--- Humanoids that are added to Workspace later.
 for _, descendant in ipairs(workspace:GetDescendants()) do
 	if descendant:IsA("Humanoid") and descendant.Parent and descendant.Parent:IsA("Model") then
 		if not Players:GetPlayerFromCharacter(descendant.Parent) then
