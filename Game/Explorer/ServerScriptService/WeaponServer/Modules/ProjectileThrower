@@ -3,8 +3,9 @@ local Debris = game:GetService("Debris")
 
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local ProjectileController = require(WeaponSystem.Modules:WaitForChild("ProjectileController"))
-local MeleeUtility = require(WeaponSystem.Modules:WaitForChild("MeleeUtility"))
+local MeleeUtility = require(script.Parent:WaitForChild("MeleeUtility"))
 local ProjectilePickup = require(script.Parent:WaitForChild("ProjectilePickup"))
+local DestructibleService = require(game.ServerScriptService.Destruction.Modules:WaitForChild("DestructibleService"))
 
 local ProjectileThrower = {}
 ProjectileThrower.__index = ProjectileThrower
@@ -57,10 +58,16 @@ function ProjectileThrower:Throw(Player, Tool, Origin, Direction, Settings)
 				local Model = Result.Instance:FindFirstAncestorOfClass("Model")
 				TargetHumanoid = Model and Model:FindFirstChildOfClass("Humanoid")
 			end
+
 			if TargetHumanoid and TargetHumanoid.Health > 0 and TargetHumanoid.Parent ~= Character then
 				local Damage = tonumber(Settings.ThrowDamage) or tonumber(Settings.BaseDamage) or 0
 				MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris)
-				if type(Settings.ThrowOnCharacterHit) == "function" then Settings.ThrowOnCharacterHit(Thrown, Result, TargetHumanoid, TargetHumanoid.Parent) end
+				if type(Settings.ThrowOnCharacterHit) == "function" then
+					Settings.ThrowOnCharacterHit(Thrown, Result, TargetHumanoid, TargetHumanoid.Parent)
+				end
+			elseif DestructibleService.IsDestructible(Result.Instance) then
+				local Damage = tonumber(Settings.ThrowDamage) or tonumber(Settings.BaseDamage) or 0
+				DestructibleService.Damage(Result.Instance, Damage, Player)
 			elseif type(Settings.ThrowOnSurfaceHit) == "function" then
 				Settings.ThrowOnSurfaceHit(Thrown, Result, Result.Instance)
 			end

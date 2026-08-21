@@ -16,9 +16,6 @@ function MeleeController.new(Config)
 	self.HitTargets = {}
 	self.LastAttackTime = -math.huge
 	self.AttackEndTime = 0
-	self.PendingAttack = false
-	self.PendingDuration = nil
-	self.PendingToken = 0
 	self.Destroyed = false
 
 	if self.Hitbox then
@@ -69,38 +66,13 @@ function MeleeController:CanAttack()
 	return self:_CanStartNow()
 end
 
-function MeleeController:_QueueAttack(Duration)
-	self.PendingAttack = true
-	self.PendingDuration = Duration
-	self.PendingToken += 1
-	local Token = self.PendingToken
-	local Remaining = math.max(0, self:_GetCooldown() - (os.clock() - self.LastAttackTime))
-
-	task.delay(Remaining, function()
-		if self.Destroyed or not self.PendingAttack or self.PendingToken ~= Token then return end
-		self.PendingAttack = false
-		local QueuedDuration = self.PendingDuration
-		self.PendingDuration = nil
-		self:Start(QueuedDuration)
-	end)
-end
-
 function MeleeController:Start(Duration)
 	if Duration == nil then
 		Duration = self.Module.MeleeAttackDuration or self.Module.AttackDuration or 0
 	end
 	Duration = math.max(0, Duration)
 
-	if not self:_CanStartNow() then
-		if not self.Destroyed and self.Module.MeleeEnabled ~= false and self.Character and self.Humanoid and self.Humanoid.Health > 0 and self.Hitbox then
-			self:_QueueAttack(Duration)
-		end
-		return false
-	end
-
-	self.PendingAttack = false
-	self.PendingDuration = nil
-	self.PendingToken += 1
+	if not self:_CanStartNow() then return false end
 
 	self.Active = true
 	self.AttackId += 1
@@ -133,17 +105,21 @@ function MeleeController:_HandleHit(RaycastResult, Segment)
 	if not self.Active or not RaycastResult then return end
 
 	local HitPart = RaycastResult.Instance
-	if not HitPart then return end
+	if not HitPart or not HitPart:IsA("BasePart") then return end
 
-	local TargetCharacter = HitPart:FindFirstAncestorOfClass("Model")
-	if not TargetCharacter or TargetCharacter == self.Character then return end
+	local TargetModel = HitPart:FindFirstAncestorOfClass("Model")
+	if TargetModel == self.Character then return end
 
-	local TargetHumanoid = TargetCharacter:FindFirstChildOfClass("Humanoid")
-	if not TargetHumanoid or TargetHumanoid.Health <= 0 then return end
+	local TargetHumanoid = TargetModel and TargetModel:FindFirstChildOfClass("Humanoid")
+	if TargetHumanoid and TargetHumanoid.Health <= 0 then return end
 
+	-- A melee hit can target either a Humanoid or a physical object.
+	-- For models without Humanoids, keep the model as the target so all
+	-- parts of a destructible count as the same target during one swing.
+	local TargetInstance = TargetHumanoid or TargetModel or HitPart
 	local HitOnce = self.Module.MeleeHitOnce
-	if HitOnce ~= false and self.HitTargets[TargetHumanoid] then return end
-	self.HitTargets[TargetHumanoid] = true
+	if HitOnce ~= false and self.HitTargets[TargetInstance] then return end
+	self.HitTargets[TargetInstance] = true
 
 	if self.OnHit then
 		self.OnHit({
@@ -151,8 +127,9 @@ function MeleeController:_HandleHit(RaycastResult, Segment)
 			HitPart = HitPart,
 			RaycastResult = RaycastResult,
 			Segment = Segment,
-			TargetCharacter = TargetCharacter,
+			TargetCharacter = TargetModel,
 			TargetHumanoid = TargetHumanoid,
+			TargetInstance = TargetInstance,
 		})
 	end
 end
@@ -164,21 +141,6 @@ function MeleeController:Stop()
 	if self.Hitbox and self.Hitbox.Stop then self.Hitbox:Stop() end
 	if self.OnStop then self.OnStop(self.AttackId) end
 	self.HitTargets = {}
-
-	-- If the player clicked during the active swing, start the buffered
-	-- attack as soon as the cooldown has elapsed. Only one input is buffered.
-	if self.PendingAttack and not self.Destroyed then
-		local Remaining = math.max(0, self:_GetCooldown() - (os.clock() - self.LastAttackTime))
-		local Token = self.PendingToken
-		task.delay(Remaining, function()
-			if self.Destroyed or not self.PendingAttack or self.PendingToken ~= Token then return end
-			self.PendingAttack = false
-			local Duration = self.PendingDuration
-			self.PendingDuration = nil
-			self:Start(Duration)
-		end)
-	end
-
 	return true
 end
 
@@ -199,9 +161,6 @@ function MeleeController:Destroy()
 	if self.Destroyed then return end
 	self:Stop()
 	self.Destroyed = true
-	self.PendingAttack = false
-	self.PendingDuration = nil
-	self.PendingToken += 1
 	if self.Hitbox and self.Hitbox.Destroy then self.Hitbox:Destroy() end
 	self.Hitbox = nil
 	self.OnHit = nil

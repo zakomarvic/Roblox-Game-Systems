@@ -1,0 +1,87 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Modules = script.Parent
+local CashService = require(Modules:WaitForChild("CashService"))
+local ShopConfig = require(Modules:WaitForChild("ShopConfig"))
+
+local ShopService = {}
+
+local function getPurchaseRemote()
+	local Remotes = ReplicatedStorage:FindFirstChild("EconomyRemotes")
+	if not Remotes then
+		Remotes = Instance.new("Folder")
+		Remotes.Name = "EconomyRemotes"
+		Remotes.Parent = ReplicatedStorage
+	end
+
+	local Purchase = Remotes:FindFirstChild("PurchaseItem")
+	if not Purchase then
+		Purchase = Instance.new("RemoteFunction")
+		Purchase.Name = "PurchaseItem"
+		Purchase.Parent = Remotes
+	end
+
+	return Purchase
+end
+
+local PurchaseRemote = getPurchaseRemote()
+
+local function getInventory(Player)
+	local Inventory = Player:FindFirstChild("ShopInventory")
+	if not Inventory then
+		Inventory = Instance.new("Folder")
+		Inventory.Name = "ShopInventory"
+		Inventory.Parent = Player
+	end
+	return Inventory
+end
+
+local function grantItem(Player, Item)
+	local Inventory = getInventory(Player)
+	local Owned = Inventory:FindFirstChild(Item.Id)
+	if Owned then
+		Owned.Value += 1
+	else
+		Owned = Instance.new("IntValue")
+		Owned.Name = Item.Id
+		Owned.Value = 1
+		Owned.Parent = Inventory
+	end
+	return true
+end
+
+function ShopService.Purchase(Player, ItemId)
+	if typeof(Player) ~= "Instance" or not Player:IsA("Player") then
+		return false, "Invalid player."
+	end
+	if typeof(ItemId) ~= "string" then
+		return false, "Invalid item."
+	end
+
+	local Item = ShopConfig.GetItem(ItemId)
+	if not Item then
+		return false, "Item not found."
+	end
+
+	local Price = math.max(0, math.floor(tonumber(Item.Price) or 0))
+	if CashService.Get(Player) < Price then
+		return false, "Not enough cash."
+	end
+
+	if not CashService.Remove(Player, Price) then
+		return false, "Purchase failed."
+	end
+
+	if not grantItem(Player, Item) then
+		CashService.Add(Player, Price)
+		return false, "Purchase failed."
+	end
+
+	return true, "Purchased " .. Item.DisplayName .. "."
+end
+
+PurchaseRemote.OnServerInvoke = function(Player, ItemId)
+	return ShopService.Purchase(Player, ItemId)
+end
+
+return ShopService
