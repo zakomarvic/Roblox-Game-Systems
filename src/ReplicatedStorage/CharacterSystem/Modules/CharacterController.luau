@@ -3,8 +3,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
 local CharacterSystem = ReplicatedStorage:WaitForChild("CharacterSystem")
-local Settings = require(CharacterSystem.Settings)
-local CharacterRagdoll = require(CharacterSystem.Modules.CharacterRagdoll)
+local Settings = require(CharacterSystem:WaitForChild("Settings"))
+local CharacterRagdoll = require(CharacterSystem.Ragdoll:WaitForChild("CharacterRagdoll"))
 local RagdollRemote = CharacterSystem:WaitForChild("RagdollRemote")
 
 local CharacterController = {}
@@ -61,52 +61,25 @@ function CharacterController:_setupCharacter(Character)
 end
 
 function CharacterController:SetRagdolled(State, Duration)
-	if not self.Character then
-		return
-	end
-
-	if Duration ~= nil and (typeof(Duration) ~= "number" or Duration <= 0) then
-		Duration = nil
-	end
-
+	if not self.Character then return end
+	if Duration ~= nil and (typeof(Duration) ~= "number" or Duration <= 0) then Duration = nil end
 	RagdollRemote:FireServer(State == true, Duration)
 end
 
 function CharacterController:ApplyRagdollImpulse(Direction, Force)
-	if not self.Character then
-		return
-	end
-
-	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then
-		return
-	end
-
+	if not self.Character then return end
+	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return end
 	Force = tonumber(Force)
-	if not Force or Force <= 0 then
-		return
-	end
-
+	if not Force or Force <= 0 then return end
 	RagdollRemote:FireServer("Impulse", Direction.Unit, Force)
 end
 
 function CharacterController:Knockdown(Direction, Force, Duration)
-	if not self.Character then
-		return
-	end
-
-	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then
-		return
-	end
-
+	if not self.Character then return end
+	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return end
 	Force = tonumber(Force)
-	if not Force or Force <= 0 then
-		return
-	end
-
-	if Duration ~= nil and (typeof(Duration) ~= "number" or Duration <= 0) then
-		Duration = nil
-	end
-
+	if not Force or Force <= 0 then return end
+	if Duration ~= nil and (typeof(Duration) ~= "number" or Duration <= 0) then Duration = nil end
 	RagdollRemote:FireServer("Knockdown", Direction.Unit, Force, Duration)
 end
 
@@ -115,28 +88,13 @@ function CharacterController:IsRagdolled()
 end
 
 function CharacterController:SetSprinting(State)
-	if not self.Humanoid or self.Humanoid.Health <= 0 then
-		return
-	end
-
-	if not Settings.SprintEnabled then
-		State = false
-	end
-
+	if not self.Humanoid or self.Humanoid.Health <= 0 then return end
+	if not Settings.SprintEnabled then State = false end
 	State = State == true
-
-	if self.Sprinting == State then
-		return
-	end
-
+	if self.Sprinting == State then return end
 	self.Sprinting = State
-
-	local TargetSpeed = State
-		and Settings.SprintWalkSpeed
-		or Settings.WalkSpeed
-
+	local TargetSpeed = State and Settings.SprintWalkSpeed or Settings.WalkSpeed
 	self.Humanoid.WalkSpeed = TargetSpeed
-
 	self.SprintChanged:Fire(State)
 end
 
