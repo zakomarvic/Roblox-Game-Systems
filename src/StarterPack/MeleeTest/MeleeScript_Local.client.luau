@@ -8,9 +8,9 @@ local Setting = require(Tool:WaitForChild("Setting"))
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 local MeleeRemote = Remotes:WaitForChild("Melee")
-local MeleeController = require(WeaponSystem.Modules:WaitForChild("MeleeController"))
-local MeleeHitbox = require(WeaponSystem.Modules:WaitForChild("MeleeHitbox"))
-local WeaponAnimation = require(WeaponSystem.Modules:WaitForChild("WeaponAnimation"))
+local MeleeController = require(WeaponSystem.Melee:WaitForChild("MeleeController"))
+local MeleeHitbox = require(WeaponSystem.Melee:WaitForChild("MeleeHitbox"))
+local WeaponAnimation = require(WeaponSystem.Client:WaitForChild("WeaponAnimation"))
 
 local Player = Players.LocalPlayer
 local Character
@@ -90,28 +90,11 @@ local function throwWeapon()
 		Params.FilterDescendantsInstances = {Character, Tool}
 		Params.IgnoreWater = true
 
-		local Result = workspace:Raycast(
-			Ray.Origin,
-			Ray.Direction * 1000,
-			Params
-		)
-
-		local AimPoint
-
-		if Result then
-			AimPoint = Result.Position
-		else
-			AimPoint = Ray.Origin + Ray.Direction * 1000
-		end
-
+		local Result = workspace:Raycast(Ray.Origin, Ray.Direction * 1000, Params)
+		local AimPoint = Result and Result.Position or (Ray.Origin + Ray.Direction * 1000)
 		local ThrowDirection = (AimPoint - Handle.Position).Unit
 
-		MeleeRemote:FireServer(
-			"Throw",
-			Tool,
-			Handle.Position,
-			ThrowDirection
-		)
+		MeleeRemote:FireServer("Throw", Tool, Handle.Position, ThrowDirection)
 	end
 
 	task.delay(0.15, function()
@@ -153,11 +136,7 @@ local function setup()
 		},
 	})
 
-	AnimationController = WeaponAnimation.new({
-		Tool = Tool,
-		Humanoid = Humanoid,
-		Module = Setting,
-	})
+	AnimationController = WeaponAnimation.new({Tool = Tool, Humanoid = Humanoid, Module = Setting})
 
 	Controller = MeleeController.new({
 		Tool = Tool,
