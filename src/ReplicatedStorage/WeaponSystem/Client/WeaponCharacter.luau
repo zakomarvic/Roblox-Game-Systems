@@ -1,6 +1,10 @@
 local WeaponCharacter = {}
 WeaponCharacter.__index = WeaponCharacter
 
+local WeaponPose = require(
+	game.ReplicatedStorage.WeaponSystem.Shared:WaitForChild("WeaponPose")
+)
+
 function WeaponCharacter.new(Config)
 	local self = setmetatable({}, WeaponCharacter)
 	self.Character = Config.Character
@@ -38,15 +42,8 @@ function WeaponCharacter:SetCharacter(Character, Humanoid)
 end
 
 function WeaponCharacter:EquipPose()
-	-- Gun posing is opt-in. Only a setting explicitly set to true can enable it.
-	if not self.Module or self.Module.WeaponPoseEnabled ~= true then
-		return
-	end
-	if self.Module.WeaponType == "Melee" then
-		return
-	end
-
-	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
+	if not self.Module or self.Module.WeaponPoseEnabled ~= true then return end
+	if self.Module.WeaponType == "Melee" then return end
 
 	self:ClearPose()
 	self.PoseGeneration += 1
@@ -78,7 +75,6 @@ end
 function WeaponCharacter:ClearPose()
 	self.PoseGeneration += 1
 	self.PoseRequested = false
-	local WeaponPose = require(game.ReplicatedStorage.WeaponSystem.Modules.WeaponPose)
 	if self.CurrentPose then
 		WeaponPose.Unequip(self.CurrentPose)
 		self.CurrentPose = nil
