@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local Debris = game:GetService("Debris")
 
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
+local ServerWeaponSystem = game.ServerScriptService:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:FindFirstChild("Remotes") or Instance.new("Folder")
 Remotes.Name = "Remotes"
 Remotes.Parent = WeaponSystem
@@ -12,8 +13,8 @@ MeleeRemote.Name = "Melee"
 MeleeRemote.Sandboxed = true
 MeleeRemote.Parent = Remotes
 
-local MeleeUtility = require(script.Parent.Modules:WaitForChild("MeleeUtility"))
-local ProjectileThrower = require(script.Parent.Modules:WaitForChild("ProjectileThrower"))
+local MeleeUtility = require(ServerWeaponSystem.Modules:WaitForChild("MeleeUtility"))
+local ProjectileThrower = require(ServerWeaponSystem.Modules:WaitForChild("ProjectileThrower"))
 local DestructibleService = require(game.ServerScriptService.Destruction.Modules:WaitForChild("DestructibleService"))
 local Thrower = ProjectileThrower.new()
 
@@ -100,7 +101,6 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetOrOrigin,
 	local HitPart = HitOrDirection
 	if typeof(HitPart) ~= "Instance" or not HitPart:IsA("BasePart") then return end
 
-	-- Player target.
 	local TargetCharacter, TargetTorso = getValidTarget(Player, TargetOrOrigin, HitPart)
 	if TargetCharacter then
 		if Attack.HitTargets[TargetOrOrigin] then return end
@@ -118,9 +118,6 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetOrOrigin,
 		return
 	end
 
-	-- Physical/destructible target. The server resolves the tagged root from
-	-- the reported instance, so the client cannot choose an arbitrary object
-	-- that merely looks like a destructible.
 	local TargetRoot = DestructibleService.GetRoot(TargetOrOrigin) or DestructibleService.GetRoot(HitPart)
 	if not TargetRoot then return end
 	if Attack.HitTargets[TargetRoot] then return end
