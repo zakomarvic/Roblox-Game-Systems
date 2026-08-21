@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 
+local DOWNED_HEALTH_THRESHOLD = 10
 local DOWNED_HEALTH = 1
 local DOWNED_ATTRIBUTE = "Downed"
 local DOWNED_IMAGE = "rbxassetid://8121963838"
@@ -41,7 +42,7 @@ local function addDownedIndicator(character)
 	image.Parent = billboard
 end
 
-local function setDowned(player, character)
+local function setDowned(character)
 	if not character.Parent then
 		return
 	end
@@ -74,7 +75,7 @@ local function clearDowned(character)
 	removeDownedIndicator(character)
 end
 
-local function setupCharacter(player, character)
+local function setupCharacter(character)
 	clearDowned(character)
 
 	local humanoid = character:WaitForChild("Humanoid")
@@ -101,8 +102,8 @@ local function setupCharacter(player, character)
 			return
 		end
 
-		if humanoid.Health <= DOWNED_HEALTH then
-			setDowned(player, character)
+		if humanoid.Health <= DOWNED_HEALTH_THRESHOLD then
+			setDowned(character)
 		end
 	end)
 
@@ -118,22 +119,18 @@ local function setupCharacter(player, character)
 			humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
 		end
 	end)
-
-	-- If another server system restores health, leave the downed state only when it explicitly clears the attribute.
-	-- This keeps the downed state authoritative and prevents accidental recovery from small health changes.
 end
 
-Players.PlayerAdded:Connect(function(player)
-	player.CharacterAdded:Connect(function(character)
-		setupCharacter(player, character)
-	end)
-end)
+local function setupPlayer(player)
+	player.CharacterAdded:Connect(setupCharacter)
+
+	if player.Character then
+		setupCharacter(player.Character)
+	end
+end
 
 for _, player in ipairs(Players:GetPlayers()) do
-	if player.Character then
-		setupCharacter(player, player.Character)
-	end
-	player.CharacterAdded:Connect(function(character)
-		setupCharacter(player, character)
-	end)
+	setupPlayer(player)
 end
+
+Players.PlayerAdded:Connect(setupPlayer)
