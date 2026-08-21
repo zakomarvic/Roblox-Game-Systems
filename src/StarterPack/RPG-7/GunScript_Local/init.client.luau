@@ -5,7 +5,7 @@ local Players = game:GetService("Players")
 local Workspace = workspace
 
 local Setting = require(Tool:WaitForChild("Setting"))
-local WeaponController = require(ReplicatedStorage.WeaponSystem.Client.WeaponController)
+local WeaponController = require(ReplicatedStorage.WeaponSystem.Client.WeaponStateController)
 local WeaponFire = require(ReplicatedStorage.WeaponSystem.Client.WeaponFire)
 local WeaponReload = require(ReplicatedStorage.WeaponSystem.Client.WeaponReload)
 local WeaponCamera = require(ReplicatedStorage.WeaponSystem.Client.WeaponCamera)
