@@ -5,6 +5,7 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local CharacterSystem = ReplicatedStorage:WaitForChild("CharacterSystem")
 local Modules = CharacterSystem:WaitForChild("Modules")
 local Settings = require(Modules:WaitForChild("ReviveSettings"))
+local Animations = require(Modules:WaitForChild("ReviveAnimations"))
 
 local Remote = CharacterSystem:FindFirstChild("ReviveRemote")
 if not Remote then
@@ -20,6 +21,7 @@ local REVIVE_PROMPT = "RevivePrompt"
 local Prompts = {}
 local ActiveRevives = {}
 local CharacterConnections = {}
+local NPCTracks = {}
 
 local function getCharacterRoot(character)
 	return character and character:FindFirstChild("HumanoidRootPart")
@@ -27,6 +29,10 @@ end
 
 local function getHumanoid(character)
 	return character and character:FindFirstChildOfClass("Humanoid")
+end
+
+local function isPlayerCharacter(character)
+	return Players:GetPlayerFromCharacter(character) ~= nil
 end
 
 local function isDowned(character)
@@ -50,6 +56,93 @@ end
 local function stopClientAnimation(player, animationName)
 	if player then
 		Remote:FireClient(player, "Stop", animationName)
+	end
+end
+
+local function getNPCTrack(character, animationName)
+	if isPlayerCharacter(character) then
+		return nil
+	end
+
+	local data = Animations[animationName]
+	if not data then
+		return nil
+	end
+
+	NPCTracks[character] = NPCTracks[character] or {}
+	local existing = NPCTracks[character][animationName]
+	if existing then
+		return existing
+	end
+
+	local humanoid = getHumanoid(character)
+	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+	if not animator then
+		return nil
+	end
+
+	local animation = Instance.new("Animation")
+	animation.Name = "Revive_" .. animationName
+	animation.AnimationId = "rbxassetid://" .. tostring(data.Id)
+
+	local track = animator:LoadAnimation(animation)
+	track.Looped = data.Looped == true
+	track.Priority = Enum.AnimationPriority.Action
+
+	animation:Destroy()
+	NPCTracks[character][animationName] = track
+
+	return track
+end
+
+local function stopNPCAnimation(character, animationName)
+	local tracks = NPCTracks[character]
+	local track = tracks and tracks[animationName]
+	if track and track.IsPlaying then
+		track:Stop(0.1)
+	end
+end
+
+local function stopAllNPCAnimations(character, except)
+	local tracks = NPCTracks[character]
+	if not tracks then
+		return
+	end
+
+	for name, track in pairs(tracks) do
+		if name ~= except and track.IsPlaying then
+			track:Stop(0.1)
+		end
+	end
+end
+
+local function playNPCAnimation(character, animationName)
+	local data = Animations[animationName]
+	local track = getNPCTrack(character, animationName)
+	if not data or not track then
+		return nil
+	end
+
+	stopAllNPCAnimations(character, animationName)
+	track:Play(0.1, 1, data.Speed or 1)
+	track:AdjustSpeed(data.Speed or 1)
+	return track
+end
+
+local function playDownedNPCState(character)
+	if isPlayerCharacter(character) or not isDowned(character) then
+		return
+	end
+
+	local track = playNPCAnimation(character, "PlayerDowned")
+	if track then
+		track.Ended:Once(function()
+			if character.Parent and isDowned(character) then
+				playNPCAnimation(character, "DownedIdle")
+			end
+		end)
+	else
+		playNPCAnimation(character, "DownedIdle")
 	end
 end
 
@@ -84,7 +177,12 @@ local function cancelRevive(targetCharacter, reason)
 	end
 
 	stopClientAnimation(state.ReviverPlayer, "PlayerReviving")
-	stopClientAnimation(state.TargetPlayer, "RevivingPlayer")
+	if state.TargetPlayer then
+		stopClientAnimation(state.TargetPlayer, "RevivingPlayer")
+	else
+		stopNPCAnimation(state.TargetCharacter, "RevivingPlayer")
+		playDownedNPCState(state.TargetCharacter)
+	end
 
 	if state.TargetPlayer then
 		Remote:FireClient(state.TargetPlayer, "ReviveCancelled", reason)
@@ -134,11 +232,11 @@ local function startRevive(player, prompt)
 	end
 
 	local reviverHumanoid = getHumanoid(reviverCharacter)
-	local targetPlayer = Players:GetPlayerFromCharacter(targetCharacter)
-	if not reviverHumanoid or not targetPlayer then
+	if not reviverHumanoid then
 		return
 	end
 
+	local targetPlayer = Players:GetPlayerFromCharacter(targetCharacter)
 	local state = {
 		ReviverPlayer = player,
 		ReviverCharacter = reviverCharacter,
@@ -159,7 +257,12 @@ local function startRevive(player, prompt)
 	reviverHumanoid.AutoRotate = false
 
 	Remote:FireClient(player, "Begin", "PlayerReviving")
-	Remote:FireClient(targetPlayer, "Begin", "RevivingPlayer")
+
+	if targetPlayer then
+		Remote:FireClient(targetPlayer, "Begin", "RevivingPlayer")
+	else
+		playNPCAnimation(targetCharacter, "RevivingPlayer")
+	end
 end
 
 local function completeRevive(player, prompt)
@@ -207,8 +310,13 @@ local function completeRevive(player, prompt)
 	restoreReviver(state)
 
 	stopClientAnimation(player, "PlayerReviving")
-	stopClientAnimation(state.TargetPlayer, "RevivingPlayer")
-	Remote:FireClient(state.TargetPlayer, "Complete")
+	if state.TargetPlayer then
+		stopClientAnimation(state.TargetPlayer, "RevivingPlayer")
+		Remote:FireClient(state.TargetPlayer, "Complete")
+	else
+		stopNPCAnimation(targetCharacter, "RevivingPlayer")
+		playNPCAnimation(targetCharacter, "DownedSelfRevive")
+	end
 
 	if prompt.Parent then
 		prompt:Destroy()
@@ -229,7 +337,7 @@ local function createPrompt(character)
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = REVIVE_PROMPT
 	prompt.ActionText = "Revive"
-	prompt.ObjectText = "Downed Player"
+	prompt.ObjectText = isPlayerCharacter(character) and "Downed Player" or "Downed NPC"
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.GamepadKeyCode = Enum.KeyCode.ButtonX
 	prompt.HoldDuration = Settings.ReviveDuration
@@ -257,15 +365,26 @@ local function removePrompt(character)
 end
 
 local function updateCharacter(character)
+	if not character:IsA("Model") or not getHumanoid(character) then
+		return
+	end
+
 	if character:GetAttribute(DOWNED_ATTRIBUTE) then
 		createPrompt(character)
+		if not isPlayerCharacter(character) then
+			playDownedNPCState(character)
+		end
 	else
 		removePrompt(character)
+		if not isPlayerCharacter(character) then
+			stopNPCAnimation(character, "PlayerDowned")
+			stopNPCAnimation(character, "DownedIdle")
+		end
 	end
 end
 
 local function setupCharacter(character)
-	if CharacterConnections[character] then
+	if not character:IsA("Model") or not getHumanoid(character) or CharacterConnections[character] then
 		return
 	end
 
@@ -275,9 +394,16 @@ local function setupCharacter(character)
 		updateCharacter(character)
 	end)
 
+	character.ChildAdded:Connect(function(child)
+		if child:IsA("BasePart") and child.Name == "HumanoidRootPart" then
+			updateCharacter(character)
+		end
+	end)
+
 	character.AncestryChanged:Connect(function(_, parent)
 		if parent == nil then
 			removePrompt(character)
+			NPCTracks[character] = nil
 			CharacterConnections[character] = nil
 		end
 	end)
@@ -324,3 +450,15 @@ for _, player in ipairs(Players:GetPlayers()) do
 	end
 	player.CharacterAdded:Connect(setupCharacter)
 end
+
+for _, descendant in ipairs(workspace:GetDescendants()) do
+	if descendant:IsA("Humanoid") and descendant.Parent and descendant.Parent:IsA("Model") then
+		setupCharacter(descendant.Parent)
+	end
+end
+
+workspace.DescendantAdded:Connect(function(descendant)
+	if descendant:IsA("Humanoid") and descendant.Parent and descendant.Parent:IsA("Model") then
+		setupCharacter(descendant.Parent)
+	end
+end)
