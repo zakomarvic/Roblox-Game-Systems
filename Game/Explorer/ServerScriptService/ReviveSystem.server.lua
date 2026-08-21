@@ -232,7 +232,7 @@ local function createPrompt(character)
 	prompt.ObjectText = "Downed Player"
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.GamepadKeyCode = Enum.KeyCode.ButtonX
-	prompt.HoldDuration = Settings.PromptHoldDuration
+	prompt.HoldDuration = Settings.ReviveDuration
 	prompt.MaxActivationDistance = Settings.MaxActivationDistance
 	prompt.RequiresLineOfSight = Settings.RequiresLineOfSight
 	prompt.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
