@@ -173,13 +173,10 @@ local function cancelRevive(targetCharacter, reason)
 	stopClientAnimation(state.ReviverPlayer, "PlayerReviving")
 	if state.TargetPlayer then
 		stopClientAnimation(state.TargetPlayer, "RevivingPlayer")
+		Remote:FireClient(state.TargetPlayer, "ReviveCancelled", reason)
 	else
 		stopNPCAnimation(state.TargetCharacter, "RevivingPlayer")
 		playDownedNPCState(state.TargetCharacter)
-	end
-
-	if state.TargetPlayer then
-		Remote:FireClient(state.TargetPlayer, "ReviveCancelled", reason)
 	end
 end
 
@@ -270,6 +267,8 @@ local function completeRevive(player, prompt)
 		return
 	end
 
+	state.Completing = true
+
 	local reviverCharacter = player.Character
 	if not reviverCharacter or reviverCharacter ~= state.ReviverCharacter then
 		cancelRevive(targetCharacter, "ReviverChanged")
@@ -297,19 +296,19 @@ local function completeRevive(player, prompt)
 		prompt.Enabled = false
 	end
 
-	-- Mark the target as being revived before changing Health. This prevents
-	-- the downed health listener from treating the health transition as damage.
+	-- Keep Reviving true through the health transition so the downed system
+	-- cannot turn the character back into the downed state.
 	targetCharacter:SetAttribute(REVIVING_ATTRIBUTE, true)
-	targetCharacter:SetAttribute(DOWNED_ATTRIBUTE, false)
 	targetHumanoid.Health = revivedHealth
+	targetCharacter:SetAttribute(DOWNED_ATTRIBUTE, false)
 	targetCharacter:SetAttribute(REVIVING_ATTRIBUTE, false)
 
 	restoreReviver(state)
-
 	stopClientAnimation(player, "PlayerReviving")
+
 	if state.TargetPlayer then
-		stopClientAnimation(state.TargetPlayer, "RevivingPlayer")
-		Remote:FireClient(state.TargetPlayer, "Complete")
+		-- Explicitly tell the target client to play its recovery animation.
+		Remote:FireClient(state.TargetPlayer, "Complete", "DownedSelfRevive")
 	else
 		stopNPCAnimation(targetCharacter, "RevivingPlayer")
 		local track = playNPCAnimation(targetCharacter, "DownedSelfRevive")
@@ -419,9 +418,18 @@ ProximityPromptService.PromptButtonHoldEnded:Connect(function(prompt, player)
 
 	local targetCharacter = prompt.Parent and prompt.Parent.Parent
 	local state = targetCharacter and ActiveRevives[targetCharacter]
-	if state and state.ReviverPlayer == player then
-		cancelRevive(targetCharacter, "Cancelled")
+	if not state or state.ReviverPlayer ~= player then
+		return
 	end
+
+	-- Defer cancellation so a successful PromptTriggered event gets priority
+	-- over the hold-ended event fired by the same completed interaction.
+	task.defer(function()
+		local currentState = ActiveRevives[targetCharacter]
+		if currentState and currentState.ReviverPlayer == player and not currentState.Completing then
+			cancelRevive(targetCharacter, "Cancelled")
+		end
+	end)
 end)
 
 ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
