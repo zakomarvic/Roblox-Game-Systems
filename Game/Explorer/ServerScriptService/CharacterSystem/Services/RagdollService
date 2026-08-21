@@ -1,7 +1,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CharacterSystem = ReplicatedStorage:WaitForChild("CharacterSystem")
-local CharacterRagdoll = require(CharacterSystem.Modules:WaitForChild("CharacterRagdoll"))
+local CharacterRagdoll = require(CharacterSystem:WaitForChild("Ragdoll"):WaitForChild("CharacterRagdoll"))
 
 local RagdollService = {}
 local ActiveRagdolls = {}
@@ -47,10 +47,8 @@ function RagdollService:Ragdoll(Character, Duration)
 		return false
 	end
 
-	if Duration ~= nil then
-		if typeof(Duration) ~= "number" or Duration <= 0 or Duration > 60 then
-			return false
-		end
+	if Duration ~= nil and (typeof(Duration) ~= "number" or Duration <= 0 or Duration > 60) then
+		return false
 	end
 
 	getRagdoll(Character):SetRagdolled(true)

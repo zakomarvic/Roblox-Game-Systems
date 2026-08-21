@@ -1,0 +1,33 @@
+local animations = {
+	PlayerDowned = {
+		Id = 84173359961169,
+		Speed = 1,
+		Looped = false,
+	},
+
+	DownedIdle = {
+		Id = 136393228382821,
+		Speed = 1,
+		Looped = true,
+	},
+
+	DownedSelfRevive = {
+		Id = 77202224101063,
+		Speed = 1,
+		Looped = false,
+	},
+
+	PlayerReviving = {
+		Id = 97215559951758,
+		Speed = 1,
+		Looped = true,
+	},
+
+	RevivingPlayer = {
+		Id = 81261954991948,
+		Speed = 1,
+		Looped = true,
+	},
+}
+
+return animations
