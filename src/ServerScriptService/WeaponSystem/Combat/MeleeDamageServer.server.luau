@@ -4,9 +4,9 @@ local Debris = game:GetService("Debris")
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:FindFirstChild("Remotes") or Instance.new("Folder"); Remotes.Name="Remotes"; Remotes.Parent=WeaponSystem
 local MeleeRemote = Remotes:FindFirstChild("Melee") or Instance.new("RemoteEvent"); MeleeRemote.Name="Melee"; MeleeRemote.Sandboxed=true; MeleeRemote.Parent=Remotes
-local MeleeUtility = require(script.Parent.Parent.Modules:WaitForChild("MeleeUtility"))
-local ProjectileThrower = require(script.Parent.Parent.Modules:WaitForChild("ProjectileThrower"))
-local DestructibleService = require(game.ServerScriptService.DestructionSystem.Modules:WaitForChild("DestructibleService"))
+local MeleeUtility = require(script.Parent.Parent.Melee:WaitForChild("MeleeUtility"))
+local ProjectileThrower = require(script.Parent.Parent.Projectile:WaitForChild("ProjectileThrower"))
+local DestructibleService = require(game.ServerScriptService.Destruction.Modules:WaitForChild("DestructibleService"))
 local Thrower=ProjectileThrower.new(); local ActiveAttacks={}; local LastAttacks={}
 local function clearAttack(Player,Tool) local PlayerAttacks=ActiveAttacks[Player]; if not PlayerAttacks then return end; PlayerAttacks[Tool]=nil; if next(PlayerAttacks)==nil then ActiveAttacks[Player]=nil end end
 local function getValidTarget(Player,TargetHumanoid,HitPart)
