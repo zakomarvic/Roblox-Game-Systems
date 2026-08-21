@@ -5,7 +5,7 @@ WeaponController.__index = WeaponController
 
 local ProjectileController
 if RunService:IsClient() then
-	ProjectileController = require(script.Parent:WaitForChild("ProjectileController"))
+	ProjectileController = require(script.Parent.Parent:WaitForChild("Projectile"):WaitForChild("ProjectileController"))
 end
 
 function WeaponController.new(Tool, Settings)
