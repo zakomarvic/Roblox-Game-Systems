@@ -1,3 +1,0 @@
-local DestructibleService = require(script.Parent.Modules:WaitForChild("DestructibleService"))
-
-DestructibleService.Initialize()
