@@ -1,9 +1,12 @@
 local Debris = game:GetService("Debris")
+local RunService = game:GetService("RunService")
 
 local CashDrop = {}
 
 local DEFAULT_LIFETIME = 120
 local DEFAULT_PICKUP_DISTANCE = 10
+local DEFAULT_FLOAT_HEIGHT = 0.2
+local DEFAULT_FLOAT_SPEED = 2
 local DROP_FOLDER_NAME = "CashDrops"
 
 local function getDropFolder()
@@ -15,21 +18,53 @@ local function getDropFolder()
 	return Folder
 end
 
+local function getGroundPosition(Position, Size)
+	local Params = RaycastParams.new()
+	Params.FilterType = Enum.RaycastFilterType.Exclude
+	Params.FilterDescendantsInstances = {getDropFolder()}
+	local Result = workspace:Raycast(Position + Vector3.new(0, 10, 0), Vector3.new(0, -100, 0), Params)
+	if Result then
+		return Result.Position + Vector3.new(0, Size.Y * 0.5, 0)
+	end
+	return Position + Vector3.new(0, 1.5, 0)
+end
+
 local function createPart(Position, Amount, Options)
 	local Part = Instance.new("Part")
 	Part.Name = "CashDrop"
 	Part.Size = Options.Size or Vector3.new(1, 0.35, 1)
-	Part.Position = Position + (Options.Offset or Vector3.new(0, 1.5, 0))
+	Part.Position = getGroundPosition(Position, Part.Size)
 	Part.Shape = Enum.PartType.Cylinder
 	Part.Material = Enum.Material.Neon
 	Part.Color = Options.Color or Color3.fromRGB(50, 205, 50)
-	Part.Anchored = false
+	Part.Anchored = true
 	Part.CanCollide = Options.CanCollide ~= false
 	Part.CanQuery = true
 	Part.CanTouch = true
 	Part:SetAttribute("CashAmount", Amount)
 	Part.Parent = getDropFolder()
 	return Part
+end
+
+local function animateDrop(Part, Options)
+	local BasePosition = Part.Position
+	local FloatHeight = math.max(0, tonumber(Options.FloatHeight) or DEFAULT_FLOAT_HEIGHT)
+	local FloatSpeed = math.max(0, tonumber(Options.FloatSpeed) or DEFAULT_FLOAT_SPEED)
+	local RotationSpeed = tonumber(Options.RotationSpeed) or 90
+	if FloatHeight <= 0 and RotationSpeed == 0 then return end
+
+	local StartTime = os.clock()
+	local Connection
+	Connection = RunService.Heartbeat:Connect(function()
+		if not Part.Parent then
+			Connection:Disconnect()
+			return
+		end
+		local Elapsed = os.clock() - StartTime
+		local Offset = math.sin(Elapsed * FloatSpeed) * FloatHeight
+		local Rotation = math.rad(Elapsed * RotationSpeed)
+		Part.CFrame = CFrame.new(BasePosition + Vector3.new(0, Offset, 0)) * CFrame.Angles(0, Rotation, 0)
+	end)
 end
 
 function CashDrop.Drop(Position, Amount, Options)
@@ -51,10 +86,13 @@ function CashDrop.Drop(Position, Amount, Options)
 	Prompt.Triggered:Connect(function(Player)
 		if Claimed or not Player.Parent then return end
 		Claimed = true
+		Prompt.Enabled = false
 		local CashService = require(script.Parent:WaitForChild("CashService"))
 		CashService.Add(Player, Value)
 		Part:Destroy()
 	end)
+
+	animateDrop(Part, Options)
 
 	local Lifetime = math.max(0, tonumber(Options.Lifetime) or DEFAULT_LIFETIME)
 	if Lifetime > 0 then Debris:AddItem(Part, Lifetime) end
