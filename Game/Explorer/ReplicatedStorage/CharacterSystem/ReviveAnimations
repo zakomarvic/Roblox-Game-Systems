@@ -1,0 +1,9 @@
+local animations = {}
+
+animations.PlayerDowned = 84173359961169
+animations.DownedIdle = 136393228382821
+animations.DownedSelfRevive = 77202224101063
+animations.PlayerReviving = 97215559951758
+animations.RevivingPlayer = 81261954991948
+
+return animations
