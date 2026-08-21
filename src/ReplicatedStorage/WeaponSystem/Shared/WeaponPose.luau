@@ -1,0 +1,131 @@
+local RunService = game:GetService("RunService")
+
+local WeaponPose = {}
+
+local LEFT_POSE = CFrame.new(-0.4, 0.5, 0) * CFrame.Angles(0, math.rad(-80), 0)
+local RIGHT_POSE = CFrame.new(0.9, 0.5, 0) * CFrame.Angles(math.rad(-10), math.rad(80), 0)
+
+function WeaponPose.Equip(Character, Settings)
+	if not Settings or Settings.WeaponPoseEnabled ~= true then
+		return nil
+	end
+	if not Character or not Character.Parent then return nil end
+	local Torso = Character:FindFirstChild("Torso")
+	if not Torso then return nil end
+	local LeftShoulder = Torso:FindFirstChild("Left Shoulder")
+	local RightShoulder = Torso:FindFirstChild("Right Shoulder")
+	if not LeftShoulder or not RightShoulder then return nil end
+	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+	local RootPart = Character:FindFirstChild("HumanoidRootPart")
+	if not Humanoid or Humanoid.Health <= 0 then return nil end
+
+	local PoseData = {
+		Character = Character,
+		Humanoid = Humanoid,
+		Torso = Torso,
+		RootPart = RootPart,
+		LeftShoulder = LeftShoulder,
+		RightShoulder = RightShoulder,
+		DefaultLeftC0 = LeftShoulder.C0,
+		DefaultRightC0 = RightShoulder.C0,
+		OldAutoRotate = Humanoid.AutoRotate,
+		BodyAimEnabled = Settings.BodyAimEnabled == true,
+		BodyAimSpeed = Settings.BodyAimSpeed or 12,
+		AimConnection = nil,
+	}
+
+	LeftShoulder.C0 = LEFT_POSE
+	RightShoulder.C0 = RIGHT_POSE
+	Humanoid.AutoRotate = false
+	return PoseData
+end
+
+function WeaponPose.BindAim(PoseData, AimSource)
+	if not PoseData then return nil end
+	WeaponPose.UnbindAim(PoseData)
+	PoseData.AimConnection = RunService.RenderStepped:Connect(function(DeltaTime)
+		if not PoseData.Character or not PoseData.Character.Parent or not PoseData.Humanoid or PoseData.Humanoid.Health <= 0 then
+			WeaponPose.UnbindAim(PoseData)
+			return
+		end
+		if PoseData.LeftShoulder and PoseData.LeftShoulder.Parent then PoseData.LeftShoulder.C0 = LEFT_POSE end
+		if PoseData.RightShoulder and PoseData.RightShoulder.Parent then PoseData.RightShoulder.C0 = RIGHT_POSE end
+		if not AimSource then return end
+		local AimPosition
+		if typeof(AimSource) == "function" then
+			AimPosition = AimSource()
+		elseif typeof(AimSource) == "Instance" then
+			AimPosition = AimSource.Hit.Position
+		end
+		if AimPosition then WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime) end
+	end)
+	return PoseData.AimConnection
+end
+
+function WeaponPose.UnbindAim(PoseData)
+	if not PoseData then return end
+	if PoseData.AimConnection then
+		PoseData.AimConnection:Disconnect()
+		PoseData.AimConnection = nil
+	end
+end
+
+function WeaponPose.UpdateAim(PoseData, AimPosition, DeltaTime)
+	if not PoseData or not PoseData.RootPart or not PoseData.RootPart.Parent then return end
+	if not PoseData.BodyAimEnabled then return end
+	if typeof(AimPosition) ~= "Vector3" then return end
+	local RootPart = PoseData.RootPart
+	local RootPosition = RootPart.Position
+	local Direction = Vector3.new(AimPosition.X - RootPosition.X, 0, AimPosition.Z - RootPosition.Z)
+	if Direction.Magnitude <= 0.001 then return end
+	Direction = Direction.Unit
+	local TargetCFrame = CFrame.lookAt(RootPosition, RootPosition + Direction)
+	local Speed = PoseData.BodyAimSpeed or 12
+	local Alpha = DeltaTime and math.clamp(DeltaTime * Speed, 0, 1) or 0.2
+	RootPart.CFrame = RootPart.CFrame:Lerp(TargetCFrame, Alpha)
+end
+
+function WeaponPose.SetBodyAimEnabled(PoseData, Enabled)
+	if PoseData then PoseData.BodyAimEnabled = Enabled == true end
+end
+
+function WeaponPose.SetBodyAimSpeed(PoseData, Speed)
+	if not PoseData or typeof(Speed) ~= "number" then return end
+	PoseData.BodyAimSpeed = math.max(0, Speed)
+end
+
+function WeaponPose.Unequip(PoseData)
+	if not PoseData then return end
+	WeaponPose.UnbindAim(PoseData)
+	if PoseData.LeftShoulder and PoseData.LeftShoulder.Parent then PoseData.LeftShoulder.C0 = PoseData.DefaultLeftC0 end
+	if PoseData.RightShoulder and PoseData.RightShoulder.Parent then PoseData.RightShoulder.C0 = PoseData.DefaultRightC0 end
+	if PoseData.Humanoid and PoseData.Humanoid.Parent then PoseData.Humanoid.AutoRotate = PoseData.OldAutoRotate end
+	PoseData.Character = nil
+	PoseData.Humanoid = nil
+	PoseData.RootPart = nil
+	PoseData.LeftShoulder = nil
+	PoseData.RightShoulder = nil
+end
+
+function WeaponPose.CreateDualGrip(Tool, Character, Handle2, FilteringEnabled)
+	if FilteringEnabled or not Character or not Handle2 then return nil end
+	local LeftArm = Character:FindFirstChild("Left Arm")
+	local RightArm = Character:FindFirstChild("Right Arm")
+	if not LeftArm or not RightArm then return nil end
+	Handle2.CanCollide = false
+	local Grip = RightArm:FindFirstChild("RightGrip")
+	if not Grip then return nil end
+	local Grip2 = Grip:Clone()
+	Grip2.Name = "LeftGrip"
+	Grip2.Part0 = LeftArm
+	Grip2.Part1 = Handle2
+	Grip2.Parent = LeftArm
+	return Grip2
+end
+
+function WeaponPose.DestroyDualGrip(Grip2, Handle2, FilteringEnabled)
+	if Handle2 and Handle2.Parent and not FilteringEnabled then Handle2.CanCollide = true end
+	if Grip2 then Grip2:Destroy() end
+end
+
+return WeaponPose
