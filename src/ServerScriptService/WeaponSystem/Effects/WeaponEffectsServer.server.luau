@@ -3,7 +3,7 @@ local Players = game:GetService("Players")
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
-local WeaponState = require(game.ServerScriptService.WeaponSystem.Combat:WaitForChild("WeaponStateService"))
+local WeaponState = require(game.ServerScriptService.WeaponSystem.Services:WaitForChild("WeaponStateService"))
 WeaponEffects.OnServerEvent:Connect(function(Player,Tool,Effect,...)
 	if not Player or not Tool or not Tool:IsA("Tool") or Tool.Parent~=Player.Character then return end
 	if Effect=="Bullet" then
