@@ -18,10 +18,17 @@ local function getDropFolder()
 	return Folder
 end
 
-local function getGroundPosition(Position, Size)
+local function getGroundPosition(Position, Size, Options)
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
-	Params.FilterDescendantsInstances = {getDropFolder()}
+	local Ignore = {getDropFolder()}
+	if Options.IgnoreInstances then
+		for _, InstanceToIgnore in ipairs(Options.IgnoreInstances) do
+			table.insert(Ignore, InstanceToIgnore)
+		end
+	end
+	Params.FilterDescendantsInstances = Ignore
+
 	local Result = workspace:Raycast(Position + Vector3.new(0, 10, 0), Vector3.new(0, -100, 0), Params)
 	if Result then
 		return Result.Position + Vector3.new(0, Size.Y * 0.5, 0)
@@ -33,7 +40,7 @@ local function createPart(Position, Amount, Options)
 	local Part = Instance.new("Part")
 	Part.Name = "CashDrop"
 	Part.Size = Options.Size or Vector3.new(1, 0.35, 1)
-	Part.Position = getGroundPosition(Position, Part.Size)
+	Part.Position = getGroundPosition(Position, Part.Size, Options)
 	Part.Shape = Enum.PartType.Cylinder
 	Part.Material = Enum.Material.Neon
 	Part.Color = Options.Color or Color3.fromRGB(50, 205, 50)
