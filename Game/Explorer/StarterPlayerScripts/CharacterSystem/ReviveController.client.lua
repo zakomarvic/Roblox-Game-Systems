@@ -4,8 +4,8 @@ local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 local CharacterSystem = ReplicatedStorage:WaitForChild("CharacterSystem")
-local Modules = CharacterSystem:WaitForChild("Modules")
-local Animations = require(Modules:WaitForChild("ReviveAnimations"))
+local Revive = CharacterSystem:WaitForChild("Revive")
+local Animations = require(Revive:WaitForChild("ReviveAnimations"))
 local Remote = CharacterSystem:WaitForChild("ReviveRemote")
 
 local TRANSITION_LEAD_TIME = 0.08
@@ -121,8 +121,6 @@ local function maintainDownedIdle()
 				if not idle.IsPlaying then
 					playTrack("DownedIdle", 0)
 				elseif idle.Length > 0 and idle.TimePosition >= math.max(0, idle.Length - LOOP_RESET_LEAD_TIME) then
-					-- Prevent an uploaded loop clip from exposing a standing final
-					-- keyframe before the next loop begins.
 					idle.TimePosition = 0
 				end
 			end
@@ -246,20 +244,16 @@ end
 Remote.OnClientEvent:Connect(function(action, animationName)
 	if action == "Downed" then
 		playDownedState()
-
 	elseif action == "Begin" then
 		playTrack(animationName, 0.05)
-
 	elseif action == "Stop" then
 		stopTrack(animationName, 0)
 		if Character and Character:GetAttribute("Downed") == true and not RecoveryPlaying then
 			playTrack("DownedIdle", 0)
 			maintainDownedIdle()
 		end
-
 	elseif action == "Complete" then
 		playRecoveryAnimation()
-
 	elseif action == "ReviveCancelled" then
 		RecoveryPlaying = false
 		if Character and Character:GetAttribute("Downed") == true then
