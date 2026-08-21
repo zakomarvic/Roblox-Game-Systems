@@ -81,6 +81,19 @@ local function stopNPCAnimation(character, animationName)
 	end
 end
 
+local function stopAllNPCAnimations(character, except)
+	local tracks = NPCTracks[character]
+	if not tracks then
+		return
+	end
+
+	for name, track in pairs(tracks) do
+		if name ~= except and track.IsPlaying then
+			track:Stop(0.1)
+		end
+	end
+end
+
 local function playNPCAnimation(character, animationName)
 	if isPlayerCharacter(character) then
 		return nil
@@ -99,11 +112,7 @@ local function playNPCAnimation(character, animationName)
 	NPCTracks[character] = NPCTracks[character] or {}
 	local tracks = NPCTracks[character]
 
-	for name, existingTrack in pairs(tracks) do
-		if name ~= animationName and existingTrack.IsPlaying then
-			existingTrack:Stop(0.1)
-		end
-	end
+	stopAllNPCAnimations(character, animationName)
 
 	local track = tracks[animationName]
 	if not track then
@@ -111,12 +120,13 @@ local function playNPCAnimation(character, animationName)
 		animation.Name = animationName
 		animation.AnimationId = "rbxassetid://" .. tostring(data.Id)
 		track = animator:LoadAnimation(animation)
-		track.Priority = Enum.AnimationPriority.Action
+		track.Priority = Enum.AnimationPriority.Action4
 		track.Looped = data.Looped == true
 		animation:Destroy()
 		tracks[animationName] = track
 	end
 
+	track.Priority = Enum.AnimationPriority.Action4
 	track.Looped = data.Looped == true
 	track:Play(0.1, 1, data.Speed or 1)
 	track:AdjustSpeed(data.Speed or 1)
@@ -128,16 +138,28 @@ local function playDownedNPCState(character)
 		return
 	end
 
-	local track = playNPCAnimation(character, "PlayerDowned")
-	if track then
-		track.Ended:Once(function()
-			if character.Parent and isDowned(character) then
-				playNPCAnimation(character, "DownedIdle")
-			end
-		end)
-	else
-		playNPCAnimation(character, "DownedIdle")
+	-- DownedIdle is the persistent state. PlayerDowned is only the entry
+	-- animation and must never be allowed to restart after it has completed.
+	stopNPCAnimation(character, "DownedSelfRevive")
+	stopNPCAnimation(character, "RevivingPlayer")
+
+	local tracks = NPCTracks[character]
+	local idle = tracks and tracks.DownedIdle
+	if idle and idle.IsPlaying then
+		return
 	end
+
+	local downedTrack = playNPCAnimation(character, "PlayerDowned")
+	if not downedTrack then
+		playNPCAnimation(character, "DownedIdle")
+		return
+	end
+
+	downedTrack.Ended:Once(function()
+		if character.Parent and isDowned(character) and not character:GetAttribute(REVIVING_ATTRIBUTE) then
+			playNPCAnimation(character, "DownedIdle")
+		end
+	end)
 end
 
 local function restoreReviver(state)
@@ -155,7 +177,7 @@ end
 
 local function cancelRevive(targetCharacter, reason)
 	local state = ActiveRevives[targetCharacter]
-	if not state then
+	if not state or state.Completing then
 		return
 	end
 
@@ -271,54 +293,52 @@ local function completeRevive(player, prompt)
 
 	local reviverCharacter = player.Character
 	if not reviverCharacter or reviverCharacter ~= state.ReviverCharacter then
+		state.Completing = false
 		cancelRevive(targetCharacter, "ReviverChanged")
 		return
 	end
 	if not isDowned(targetCharacter) or isDowned(reviverCharacter) then
+		state.Completing = false
 		cancelRevive(targetCharacter, "InvalidState")
 		return
 	end
 	if getDistance(reviverCharacter, targetCharacter) > Settings.MaxActivationDistance + 1 then
+		state.Completing = false
 		cancelRevive(targetCharacter, "OutOfRange")
 		return
 	end
 
 	local targetHumanoid = getHumanoid(targetCharacter)
 	if not targetHumanoid then
+		state.Completing = false
 		cancelRevive(targetCharacter, "MissingHumanoid")
 		return
 	end
 
 	local revivedHealth = math.max(1, targetHumanoid.MaxHealth * Settings.RevivedHealthPercent)
-
 	ActiveRevives[targetCharacter] = nil
+
 	if prompt.Parent then
 		prompt.Enabled = false
 	end
 
-	-- Keep Reviving true through the health transition so the downed system
-	-- cannot turn the character back into the downed state.
 	targetCharacter:SetAttribute(REVIVING_ATTRIBUTE, true)
-	targetHumanoid.Health = revivedHealth
 	targetCharacter:SetAttribute(DOWNED_ATTRIBUTE, false)
+	targetHumanoid.Health = revivedHealth
 	targetCharacter:SetAttribute(REVIVING_ATTRIBUTE, false)
 
 	restoreReviver(state)
+
 	stopClientAnimation(player, "PlayerReviving")
 
 	if state.TargetPlayer then
-		-- Explicitly tell the target client to play its recovery animation.
-		Remote:FireClient(state.TargetPlayer, "Complete", "DownedSelfRevive")
+		stopClientAnimation(state.TargetPlayer, "RevivingPlayer")
+		Remote:FireClient(state.TargetPlayer, "Complete")
 	else
+		-- NPCs should not play the player's solo recovery animation.
+		-- Their revive animation ends when the interaction finishes and they
+		-- return to their normal NPC animation controller.
 		stopNPCAnimation(targetCharacter, "RevivingPlayer")
-		local track = playNPCAnimation(targetCharacter, "DownedSelfRevive")
-		if track then
-			track.Ended:Once(function()
-				if targetCharacter.Parent then
-					stopNPCAnimation(targetCharacter, "DownedSelfRevive")
-				end
-			end)
-		end
 	end
 
 	if prompt.Parent then
@@ -416,17 +436,10 @@ ProximityPromptService.PromptButtonHoldEnded:Connect(function(prompt, player)
 		return
 	end
 
-	local targetCharacter = prompt.Parent and prompt.Parent.Parent
-	local state = targetCharacter and ActiveRevives[targetCharacter]
-	if not state or state.ReviverPlayer ~= player then
-		return
-	end
-
-	-- Defer cancellation so a successful PromptTriggered event gets priority
-	-- over the hold-ended event fired by the same completed interaction.
 	task.defer(function()
-		local currentState = ActiveRevives[targetCharacter]
-		if currentState and currentState.ReviverPlayer == player and not currentState.Completing then
+		local targetCharacter = prompt.Parent and prompt.Parent.Parent
+		local state = targetCharacter and ActiveRevives[targetCharacter]
+		if state and state.ReviverPlayer == player and not state.Completing then
 			cancelRevive(targetCharacter, "Cancelled")
 		end
 	end)
