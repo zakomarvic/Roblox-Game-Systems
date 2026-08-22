@@ -1,10 +1,14 @@
 local Players = game:GetService("Players")
 
+local MAX_HEALTH = 110
 local DOWNED_HEALTH_THRESHOLD = 10
 local DOWNED_HEALTH = 1
+local DOWNED_INVULNERABILITY_DURATION = 1
 local DOWNED_ATTRIBUTE = "Downed"
 local REVIVING_ATTRIBUTE = "Reviving"
 local DOWNED_IMAGE = "rbxassetid://8121963838"
+local DAMAGE_OVERKILL_ATTRIBUTE = "DownedDamageOverkill"
+local DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE = "DownedInvulnerableUntil"
 
 local CharacterConnections = {}
 
@@ -45,6 +49,11 @@ local function addDownedIndicator(character)
 	image.Parent = billboard
 end
 
+local function isDownedInvulnerable(character)
+	local untilTime = character:GetAttribute(DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE)
+	return type(untilTime) == "number" and os.clock() < untilTime
+end
+
 local function setDowned(character)
 	if not character.Parent then
 		return
@@ -60,15 +69,16 @@ local function setDowned(character)
 	end
 
 	character:SetAttribute(DOWNED_ATTRIBUTE, true)
+	character:SetAttribute(DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE, os.clock() + DOWNED_INVULNERABILITY_DURATION)
 	humanoid.Health = DOWNED_HEALTH
 	humanoid.WalkSpeed = 0
 	humanoid.JumpPower = 0
 	humanoid.AutoRotate = false
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
 
-	-- Keep the Humanoid state machine from trying to stand/walk while the
-	-- custom downed animation tracks are playing. Animation tracks continue
-	-- to play while the Humanoid is in Physics.
+	-- Keep the Humanoid from trying to stand while the custom downed
+	-- animation tracks are playing. Dead remains enabled so a downed
+	-- character can actually die after the protection window.
 	humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 
 	addDownedIndicator(character)
@@ -80,6 +90,7 @@ local function clearDowned(character)
 	end
 
 	character:SetAttribute(DOWNED_ATTRIBUTE, false)
+	character:SetAttribute(DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE, nil)
 	removeDownedIndicator(character)
 end
 
@@ -96,7 +107,9 @@ local function setupCharacter(character)
 	CharacterConnections[character] = true
 	clearDowned(character)
 
-	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+	-- Every character uses the same health pool for the downing system.
+	humanoid.MaxHealth = MAX_HEALTH
+	humanoid.Health = MAX_HEALTH
 	humanoid.BreakJointsOnDeath = false
 
 	local originalWalkSpeed = humanoid.WalkSpeed
@@ -109,7 +122,7 @@ local function setupCharacter(character)
 		end
 
 		if character:GetAttribute(DOWNED_ATTRIBUTE) then
-			if humanoid.Health <= 0 then
+			if isDownedInvulnerable(character) and humanoid.Health < DOWNED_HEALTH then
 				humanoid.Health = DOWNED_HEALTH
 			end
 
@@ -123,6 +136,12 @@ local function setupCharacter(character)
 		end
 
 		if humanoid.Health <= 0 then
+			-- Overkill is supplied by the weapon that applied the damage.
+			-- When disabled, convert lethal damage into a downed state.
+			if character:GetAttribute(DAMAGE_OVERKILL_ATTRIBUTE) == true then
+				return
+			end
+
 			humanoid.Health = DOWNED_HEALTH
 			setDowned(character)
 			return
