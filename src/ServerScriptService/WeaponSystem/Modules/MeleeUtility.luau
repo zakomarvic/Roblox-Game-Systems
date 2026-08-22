@@ -51,6 +51,7 @@ function MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris, Overki
 
 	TargetHumanoid:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, Overkill == true)
 	TargetHumanoid:TakeDamage(Damage)
+	TargetHumanoid:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, nil)
 end
 
 function MeleeUtility.GetOwnedEquippedWeapon(Player, Tool)
