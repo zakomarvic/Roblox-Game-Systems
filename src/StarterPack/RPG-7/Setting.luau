@@ -7,6 +7,7 @@ local Setting = {
 	FireRate = 1.5;
 	ReloadTime = 4.5;
 	AmmoPerClip = 1;
+	Overkill = false;
 
 	--==================================================
 	-- PROJECTILE
