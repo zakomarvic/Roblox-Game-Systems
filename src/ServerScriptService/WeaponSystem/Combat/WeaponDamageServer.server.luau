@@ -21,6 +21,7 @@ local ExplosionEffects = require(Effects:WaitForChild("ExplosionEffects"))
 local ProjectileRecords = {}
 local ShotTimes = {}
 local ExplosionTimes = {}
+local DAMAGE_OVERKILL_ATTRIBUTE = "DownedDamageOverkill"
 
 local function getOwnedWeapon(Player, Tool)
 	if not Tool or not Tool:IsA("Tool") then return nil, nil end
@@ -51,6 +52,12 @@ local function addCreator(TargetHumanoid, Player)
 	Creator.Value = Player
 	Creator.Parent = TargetHumanoid
 	Debris:AddItem(Creator, 5)
+end
+
+local function applyWeaponDamage(TargetHumanoid, Damage, Overkill)
+	TargetHumanoid:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, Overkill == true)
+	TargetHumanoid:TakeDamage(Damage)
+	TargetHumanoid:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, nil)
 end
 
 ProjectileFired.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
@@ -103,7 +110,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	local Knockback = tonumber(Module.Knockback) or 0
 	local Lifesteal = tonumber(Module.Lifesteal) or 0
 	addCreator(TargetHumanoid, Player)
-	TargetHumanoid:TakeDamage(Damage)
+	applyWeaponDamage(TargetHumanoid, Damage, Module.Overkill)
 	if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += Direction * Knockback end
 	if Lifesteal > 0 and ShooterHumanoid.Health > 0 then ShooterHumanoid.Health += Damage * Lifesteal end
 	if Module.FlamingBullet == true then BulletEffects.Apply("Incendiary", {Player=Player, Tool=Tool, Module=Module, TargetCharacter=TargetCharacter, TargetHumanoid=TargetHumanoid, TargetTorso=TargetTorso, HitPart=HitPart, Direction=Direction, Duration=Module.FlamingBulletDuration}) end
@@ -159,7 +166,10 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool, Clie
 				local Falloff = 1 - math.clamp(Distance / Radius, 0, 1)
 				local AppliedDamage = Damage * Falloff
 				local ExplosionDirection = Distance > 0 and Offset.Unit or Direction
-				if AppliedDamage > 0 then addCreator(TargetHumanoid, Player) TargetHumanoid:TakeDamage(AppliedDamage) end
+				if AppliedDamage > 0 then
+					addCreator(TargetHumanoid, Player)
+					applyWeaponDamage(TargetHumanoid, AppliedDamage, Module.Overkill)
+				end
 				if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += ExplosionDirection * (Knockback * Falloff) end
 			end
 		end
