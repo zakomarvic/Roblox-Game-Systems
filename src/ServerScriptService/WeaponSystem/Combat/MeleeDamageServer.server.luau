@@ -1,8 +1,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Debris = game:GetService("Debris")
+local ServerScriptService = game:GetService("ServerScriptService")
 
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
+local ServerWeaponSystem = ServerScriptService:WaitForChild("WeaponSystem")
+local ServerModules = ServerWeaponSystem:WaitForChild("Modules")
 local Remotes = WeaponSystem:FindFirstChild("Remotes") or Instance.new("Folder")
 Remotes.Name = "Remotes"
 Remotes.Parent = WeaponSystem
@@ -12,11 +15,9 @@ MeleeRemote.Name = "Melee"
 MeleeRemote.Sandboxed = true
 MeleeRemote.Parent = Remotes
 
--- Server weapon modules live directly under WeaponSystem.Modules.
-local ServerModules = WeaponSystem:WaitForChild("Modules")
 local MeleeUtility = require(ServerModules:WaitForChild("MeleeUtility"))
 local ProjectileThrower = require(ServerModules:WaitForChild("ProjectileThrower"))
-local DestructibleService = require(game.ServerScriptService.Destruction.Modules:WaitForChild("DestructibleService"))
+local DestructibleService = require(ServerScriptService.Destruction.Modules:WaitForChild("DestructibleService"))
 local Thrower = ProjectileThrower.new()
 
 local ActiveAttacks = {}
