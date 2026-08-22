@@ -4,7 +4,7 @@ local MeleeHitbox = {}
 MeleeHitbox.__index = MeleeHitbox
 
 local function getShapecastHitbox()
-	local Container = ReplicatedStorage.WeaponSystem.Modules:WaitForChild("ShapecastHitbox")
+	local Container = ReplicatedStorage.WeaponSystem.Melee:WaitForChild("ShapecastHitbox")
 
 	if Container:IsA("ModuleScript") then
 		return require(Container)
@@ -15,7 +15,7 @@ local function getShapecastHitbox()
 		Module = Container:FindFirstChildWhichIsA("ModuleScript", true)
 	end
 
-	assert(Module, "ShapecastHitbox module was not found inside WeaponSystem.Modules.ShapecastHitbox")
+	assert(Module, "ShapecastHitbox module was not found inside WeaponSystem.Melee.ShapecastHitbox")
 	return require(Module)
 end
 

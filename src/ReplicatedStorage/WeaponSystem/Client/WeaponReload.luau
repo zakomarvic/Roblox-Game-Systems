@@ -3,7 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local WeaponReload = {}
 WeaponReload.__index = WeaponReload
 
-local WeaponProjectileVisual = require(ReplicatedStorage.WeaponSystem.Modules:WaitForChild("WeaponProjectileVisual"))
+local WeaponProjectileVisual = require(ReplicatedStorage.WeaponSystem.Client:WaitForChild("WeaponProjectileVisual"))
 
 function WeaponReload.new(Options)
 	local self = setmetatable({}, WeaponReload)

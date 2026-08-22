@@ -12,9 +12,12 @@ local ProjectileFired = Remotes:FindFirstChild("ProjectileFired") or Instance.ne
 ProjectileFired.Name = "ProjectileFired"
 ProjectileFired.Parent = Remotes
 
-local WeaponState = require(WeaponSystem.Modules:WaitForChild("WeaponState"))
-local BulletEffects = require(WeaponSystem.Modules:WaitForChild("BulletEffects"))
-local ExplosionEffects = require(WeaponSystem.Modules:WaitForChild("ExplosionEffects"))
+-- These are shared server-side services/modules, not ReplicatedStorage.Modules.
+local Combat = script.Parent
+local WeaponState = require(Combat:WaitForChild("WeaponStateService"))
+local Effects = WeaponSystem:WaitForChild("Effects")
+local BulletEffects = require(Effects:WaitForChild("BulletEffects"))
+local ExplosionEffects = require(Effects:WaitForChild("ExplosionEffects"))
 local ProjectileRecords = {}
 local ShotTimes = {}
 local ExplosionTimes = {}

@@ -6,7 +6,6 @@ local LEFT_POSE = CFrame.new(-0.4, 0.5, 0) * CFrame.Angles(0, math.rad(-80), 0)
 local RIGHT_POSE = CFrame.new(0.9, 0.5, 0) * CFrame.Angles(math.rad(-10), math.rad(80), 0)
 
 function WeaponPose.Equip(Character, Settings)
-	-- Weapon posing is opt-in. Missing/nil settings must never enable it.
 	if not Settings or Settings.WeaponPoseEnabled ~= true then
 		return nil
 	end
@@ -49,14 +48,8 @@ function WeaponPose.BindAim(PoseData, AimSource)
 			WeaponPose.UnbindAim(PoseData)
 			return
 		end
-
-		if PoseData.LeftShoulder and PoseData.LeftShoulder.Parent then
-			PoseData.LeftShoulder.C0 = LEFT_POSE
-		end
-		if PoseData.RightShoulder and PoseData.RightShoulder.Parent then
-			PoseData.RightShoulder.C0 = RIGHT_POSE
-		end
-
+		if PoseData.LeftShoulder and PoseData.LeftShoulder.Parent then PoseData.LeftShoulder.C0 = LEFT_POSE end
+		if PoseData.RightShoulder and PoseData.RightShoulder.Parent then PoseData.RightShoulder.C0 = RIGHT_POSE end
 		if not AimSource then return end
 		local AimPosition
 		if typeof(AimSource) == "function" then

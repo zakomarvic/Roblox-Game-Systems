@@ -1,11 +1,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local WeaponPose = require(
-	ReplicatedStorage.WeaponSystem.Modules.WeaponPose
+	ReplicatedStorage.WeaponSystem.Shared:WaitForChild("WeaponPose")
 )
 
 local WeaponGrip = require(
-	ReplicatedStorage.WeaponSystem.Modules.WeaponGrip
+	ReplicatedStorage.WeaponSystem.Shared:WaitForChild("WeaponGrip")
 )
 
 local WeaponService = {}
