@@ -1,5 +1,7 @@
 local MeleeUtility = {}
 
+local DAMAGE_OVERKILL_ATTRIBUTE = "DownedDamageOverkill"
+
 function MeleeUtility.GetHumanoid(Character)
 	return Character and Character:FindFirstChildOfClass("Humanoid")
 end
@@ -37,7 +39,7 @@ function MeleeUtility.GetPromptPart(Visual)
 	return nil
 end
 
-function MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris)
+function MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris, Overkill)
 	if Damage <= 0 or not TargetHumanoid or TargetHumanoid.Health <= 0 then return end
 	local Creator = TargetHumanoid:FindFirstChild("creator")
 	if Creator then Creator:Destroy() end
@@ -46,6 +48,8 @@ function MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris)
 	Creator.Value = Player
 	Creator.Parent = TargetHumanoid
 	if Debris then Debris:AddItem(Creator, 5) end
+
+	TargetHumanoid:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, Overkill == true)
 	TargetHumanoid:TakeDamage(Damage)
 end
 
