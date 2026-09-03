@@ -2,9 +2,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
+local ServerWeaponSystem = game.ServerScriptService:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
-local WeaponState = require(WeaponSystem.Modules:WaitForChild("WeaponState"))
+local WeaponState = require(ServerWeaponSystem.Combat:WaitForChild("WeaponStateService"))
 
 WeaponEffects.OnServerEvent:Connect(function(Player, Tool, Effect, ...)
 	if not Player or not Tool or not Tool:IsA("Tool") then
@@ -40,22 +41,7 @@ WeaponEffects.OnServerEvent:Connect(function(Player, Tool, Effect, ...)
 
 		for _, OtherPlayer in ipairs(Players:GetPlayers()) do
 			if OtherPlayer ~= Player then
-				WeaponEffects:FireClient(
-					OtherPlayer,
-					"Bullet",
-					Player,
-					Tool,
-					ShootingHandle,
-					MuzzleOffset,
-					EndPos,
-					MuzzleEffect,
-					HitEffect,
-					HitSound,
-					ExplosiveData,
-					BulletData,
-					VisualizeExplosion,
-					VisualizeEnabled
-				)
+				WeaponEffects:FireClient(OtherPlayer, "Bullet", Player, Tool, ShootingHandle, MuzzleOffset, EndPos, MuzzleEffect, HitEffect, HitSound, ExplosiveData, BulletData, VisualizeExplosion, VisualizeEnabled)
 			end
 		end
 		return
@@ -109,13 +95,7 @@ WeaponEffects.OnServerEvent:Connect(function(Player, Tool, Effect, ...)
 
 	for _, OtherPlayer in ipairs(Players:GetPlayers()) do
 		if OtherPlayer ~= Player then
-			WeaponEffects:FireClient(
-				OtherPlayer,
-				"Fire",
-				Player,
-				Tool,
-				Tool:FindFirstChild("Handle")
-			)
+			WeaponEffects:FireClient(OtherPlayer, "Fire", Player, Tool, Tool:FindFirstChild("Handle"))
 		end
 	end
 end)

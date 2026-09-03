@@ -8,9 +8,9 @@ local Setting = require(Tool:WaitForChild("Setting"))
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 local MeleeRemote = Remotes:WaitForChild("Melee")
-local MeleeController = require(WeaponSystem.Modules:WaitForChild("MeleeController"))
-local MeleeHitbox = require(WeaponSystem.Modules:WaitForChild("MeleeHitbox"))
-local WeaponAnimation = require(WeaponSystem.Modules:WaitForChild("WeaponAnimation"))
+local MeleeController = require(WeaponSystem.Melee:WaitForChild("MeleeController"))
+local MeleeHitbox = require(WeaponSystem.Melee:WaitForChild("MeleeHitbox"))
+local WeaponAnimation = require(WeaponSystem.Client:WaitForChild("WeaponAnimation"))
 
 local Player = Players.LocalPlayer
 local Character
