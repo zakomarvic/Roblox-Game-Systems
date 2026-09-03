@@ -1,4 +1,4 @@
-local MeleeUtility = require(script.Parent:WaitForChild("MeleeUtility"))
+local MeleeUtility = require(script.Parent.Parent.Melee:WaitForChild("MeleeUtility"))
 
 local ProjectilePickup = {}
 

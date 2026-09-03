@@ -1,0 +1,26 @@
+local CollectionService = game:GetService("CollectionService")
+local CashDrop = require(game.ServerScriptService.EconomySystem.Modules:WaitForChild("CashDrop"))
+
+local DestructibleService={}; local TAG="Destructible"; local DEFAULT_HEALTH=100; local DEFAULT_CASH=0; local DEFAULT_RESPAWN=0; local States={}
+local function getTaggedRoot(Instance) if not Instance then return nil end; if CollectionService:HasTag(Instance,TAG) then return Instance end; local Current=Instance.Parent; while Current and Current~=workspace do if CollectionService:HasTag(Current,TAG) then return Current end; Current=Current.Parent end; return nil end
+local function getNumber(Object,AttributeName,Default) local Value=Object:GetAttribute(AttributeName); if Value==nil then return Default end; return tonumber(Value) or Default end
+local function getDropPosition(Object) if Object:IsA("BasePart") then return Object.Position end; if Object:IsA("Model") then local Part=Object.PrimaryPart or Object:FindFirstChildWhichIsA("BasePart",true); return Part and Part.Position end end
+local function getHitPart(Object) if Object:IsA("BasePart") then return Object end; if Object:IsA("Model") then return Object.PrimaryPart or Object:FindFirstChildWhichIsA("BasePart",true) end end
+local function setup(Object)
+	local Root=getTaggedRoot(Object) or Object; if not Root or States[Root] then return States[Root] end
+	local MaxHealth=math.max(1,getNumber(Root,"MaxHealth",getNumber(Root,"Health",DEFAULT_HEALTH))); local ExistingHealth=getNumber(Root,"Health",MaxHealth); local State={Object=Root,MaxHealth=MaxHealth,Health=math.clamp(ExistingHealth,0,MaxHealth),Destroyed=false,Destroying=false}; States[Root]=State; Root:SetAttribute("MaxHealth",MaxHealth); Root:SetAttribute("Health",State.Health); return State
+end
+local function dropCash(State) local Amount=math.max(0,math.floor(getNumber(State.Object,"CashDropValue",DEFAULT_CASH))); if Amount<=0 then return end; local Position=getDropPosition(State.Object); if Position then CashDrop.Drop(Position,Amount) end end
+local function destroy(State)
+	if not State or State.Destroyed or State.Destroying then return end; State.Destroying=true; State.Destroyed=true; State.Health=0; State.Object:SetAttribute("Health",0); dropCash(State); local Object=State.Object; local RespawnTime=math.max(0,getNumber(Object,"RespawnTime",DEFAULT_RESPAWN)); local Parent=Object.Parent; local Clone=RespawnTime>0 and Object:Clone() or nil; if Clone then Clone:SetAttribute("Health",State.MaxHealth); Clone.Parent=nil end; States[Object]=nil; Object:Destroy(); if Clone and Parent then task.delay(RespawnTime,function() if Parent.Parent then Clone.Parent=Parent end end) end
+end
+function DestructibleService.Register(Object) return setup(Object) end
+function DestructibleService.GetRoot(Object) return getTaggedRoot(Object) end
+function DestructibleService.GetHitPart(Object) local Root=getTaggedRoot(Object) or Object; return Root and getHitPart(Root) or nil end
+function DestructibleService.IsDestructible(Object) return getTaggedRoot(Object)~=nil end
+function DestructibleService.Damage(Object,Amount,Attacker)
+	local Root=getTaggedRoot(Object); if not Root then return false,0 end; local State=States[Root] or setup(Root); if not State or State.Destroyed or State.Destroying then return false,0 end; local Damage=math.max(0,tonumber(Amount) or 0); if Damage<=0 then return false,State.Health end; State.Health=math.max(0,State.Health-Damage); Root:SetAttribute("Health",State.Health); if typeof(Attacker)=="Instance" and Attacker:IsA("Player") then Root:SetAttribute("LastDamagerUserId",Attacker.UserId) end; if State.Health<=0 then destroy(State); return true,0 end; return true,State.Health
+end
+function DestructibleService.Destroy(Object) local Root=getTaggedRoot(Object); local State=Root and States[Root]; if State then destroy(State) end end
+function DestructibleService.Initialize() for _,Object in ipairs(CollectionService:GetTagged(TAG)) do setup(Object) end; CollectionService:GetInstanceAddedSignal(TAG):Connect(setup); CollectionService:GetInstanceRemovedSignal(TAG):Connect(function(Object) local Root=getTaggedRoot(Object) or Object; States[Root]=nil end) end
+return DestructibleService

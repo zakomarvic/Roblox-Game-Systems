@@ -1,222 +1,25 @@
-local Tool = script.Parent
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local CollectionService = game:GetService("CollectionService")
-local UserInputService = game:GetService("UserInputService")
-
-local Setting = require(Tool:WaitForChild("Setting"))
-local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
-local Remotes = WeaponSystem:WaitForChild("Remotes")
-local MeleeRemote = Remotes:WaitForChild("Melee")
-local MeleeController = require(WeaponSystem.Modules:WaitForChild("MeleeController"))
-local MeleeHitbox = require(WeaponSystem.Modules:WaitForChild("MeleeHitbox"))
-local WeaponAnimation = require(WeaponSystem.Modules:WaitForChild("WeaponAnimation"))
-
-local Player = Players.LocalPlayer
-local Character
-local Humanoid
-local Handle
-local Hitbox
-local Controller
-local AnimationController
-local CustomGrip
-local Equipped = false
-local Throwing = false
-local LastThrow = 0
-local OldAutoRotate = nil
-
-local function getCharacter()
-	Character = Player.Character or Player.CharacterAdded:Wait()
-	Humanoid = Character:WaitForChild("Humanoid")
-end
-
-local function removeDefaultGrip()
-	if not Character then return end
-	local RightArm = Character:FindFirstChild("Right Arm") or Character:FindFirstChild("RightHand")
-	if not RightArm then return end
-
-	local DefaultGrip = RightArm:FindFirstChild("RightGrip")
-	if DefaultGrip then DefaultGrip:Destroy() end
-	if CustomGrip then CustomGrip:Destroy(); CustomGrip = nil end
-	if not Handle then return end
-
-	Handle.CanCollide = false
-	Handle.CanTouch = false
-	Handle.CanQuery = true
-	Handle.Massless = true
-
-	CustomGrip = Instance.new("Motor6D")
-	CustomGrip.Name = "MeleeGrip"
-	CustomGrip.Part0 = RightArm
-	CustomGrip.Part1 = Handle
-	CustomGrip.C0 = CFrame.identity
-	CustomGrip.C1 = Tool.Grip:Inverse()
-	CustomGrip.Parent = RightArm
-end
-
-local function clearGrip()
-	if CustomGrip then CustomGrip:Destroy(); CustomGrip = nil end
-end
-
-local function countDamagePoints()
-	local Count = 0
-	for _, Descendant in Handle:GetDescendants() do
-		if Descendant:IsA("Attachment") and (Descendant.Name == "DmgPoint" or CollectionService:HasTag(Descendant, "DmgPoint")) then
-			Count += 1
-		end
-	end
-	return Count
-end
-
+local Tool=script.Parent
+local ReplicatedStorage=game:GetService("ReplicatedStorage"); local Players=game:GetService("Players"); local CollectionService=game:GetService("CollectionService"); local UserInputService=game:GetService("UserInputService")
+local Setting=require(Tool:WaitForChild("Setting")); local WeaponSystem=ReplicatedStorage:WaitForChild("WeaponSystem"); local Remotes=WeaponSystem:WaitForChild("Remotes"); local MeleeRemote=Remotes:WaitForChild("Melee")
+local MeleeController=require(WeaponSystem.Melee:WaitForChild("MeleeController")); local MeleeHitbox=require(WeaponSystem.Melee:WaitForChild("MeleeHitbox")); local WeaponAnimation=require(WeaponSystem.Client:WaitForChild("WeaponAnimation"))
+local Player=Players.LocalPlayer; local Character; local Humanoid; local Handle; local Hitbox; local Controller; local AnimationController; local CustomGrip; local Equipped=false; local Throwing=false; local LastThrow=0; local OldAutoRotate=nil
+local function getCharacter() Character=Player.Character or Player.CharacterAdded:Wait(); Humanoid=Character:WaitForChild("Humanoid") end
+local function removeDefaultGrip() if not Character then return end; local RightArm=Character:FindFirstChild("Right Arm") or Character:FindFirstChild("RightHand"); if not RightArm then return end; local DefaultGrip=RightArm:FindFirstChild("RightGrip"); if DefaultGrip then DefaultGrip:Destroy() end; if CustomGrip then CustomGrip:Destroy(); CustomGrip=nil end; if not Handle then return end; Handle.CanCollide=false; Handle.CanTouch=false; Handle.CanQuery=true; Handle.Massless=true; CustomGrip=Instance.new("Motor6D"); CustomGrip.Name="MeleeGrip"; CustomGrip.Part0=RightArm; CustomGrip.Part1=Handle; CustomGrip.C0=CFrame.identity; CustomGrip.C1=Tool.Grip:Inverse(); CustomGrip.Parent=RightArm end
+local function clearGrip() if CustomGrip then CustomGrip:Destroy(); CustomGrip=nil end end
+local function countDamagePoints() local Count=0; for _,Descendant in Handle:GetDescendants() do if Descendant:IsA("Attachment") and (Descendant.Name=="DmgPoint" or CollectionService:HasTag(Descendant,"DmgPoint")) then Count+=1 end end; return Count end
 local function throwWeapon()
-	if not Equipped or not Setting.ThrowEnabled or Throwing or not Handle or not Humanoid then return end
-	if Humanoid.Health <= 0 then return end
-	local Now = os.clock()
-	if Now - LastThrow < (Setting.ThrowCooldown or 0) then return end
-	LastThrow = Now
-	Throwing = true
-
-	if Setting.ThrowAnimationID ~= nil then
-		AnimationController:Play("ThrowAnim", Setting.ThrowAnimationSpeed or 1, 0.03)
-	end
-
-	local Camera = workspace.CurrentCamera
-	if Camera then
-		local MousePosition = UserInputService:GetMouseLocation()
-		local Ray = Camera:ViewportPointToRay(MousePosition.X, MousePosition.Y)
-
-		local Params = RaycastParams.new()
-		Params.FilterType = Enum.RaycastFilterType.Exclude
-		Params.FilterDescendantsInstances = {Character, Tool}
-		Params.IgnoreWater = true
-
-		local Result = workspace:Raycast(
-			Ray.Origin,
-			Ray.Direction * 1000,
-			Params
-		)
-
-		local AimPoint
-
-		if Result then
-			AimPoint = Result.Position
-		else
-			AimPoint = Ray.Origin + Ray.Direction * 1000
-		end
-
-		local ThrowDirection = (AimPoint - Handle.Position).Unit
-
-		MeleeRemote:FireServer(
-			"Throw",
-			Tool,
-			Handle.Position,
-			ThrowDirection
-		)
-	end
-
-	task.delay(0.15, function()
-		Throwing = false
-	end)
+	if not Equipped or not Setting.ThrowEnabled or Throwing or not Handle or not Humanoid or Humanoid.Health<=0 then return end; local Now=os.clock(); if Now-LastThrow<(Setting.ThrowCooldown or 0) then return end; LastThrow=Now; Throwing=true; if Setting.ThrowAnimationID~=nil then AnimationController:Play("ThrowAnim",Setting.ThrowAnimationSpeed or 1,0.03) end
+	local Camera=workspace.CurrentCamera; if Camera then local MousePosition=UserInputService:GetMouseLocation(); local Ray=Camera:ViewportPointToRay(MousePosition.X,MousePosition.Y); local Params=RaycastParams.new(); Params.FilterType=Enum.RaycastFilterType.Exclude; Params.FilterDescendantsInstances={Character,Tool}; Params.IgnoreWater=true; local Result=workspace:Raycast(Ray.Origin,Ray.Direction*1000,Params); local AimPoint=Result and Result.Position or (Ray.Origin+Ray.Direction*1000); local ThrowDirection=(AimPoint-Handle.Position).Unit; MeleeRemote:FireServer("Throw",Tool,Handle.Position,ThrowDirection) end; task.delay(0.15,function() Throwing=false end)
 end
-
 local function setup()
-	getCharacter()
-	Handle = Tool:FindFirstChild("Handle")
-	if not Handle then
-		warn("[MeleeTest] Tool needs a Handle")
-		return
-	end
-
-	OldAutoRotate = Humanoid.AutoRotate
-	Humanoid.AutoRotate = true
-	removeDefaultGrip()
-
-	local Params = RaycastParams.new()
-	Params.FilterType = Enum.RaycastFilterType.Exclude
-	Params.FilterDescendantsInstances = {Character, Tool}
-	Params.IgnoreWater = true
-
-	local DamagePointCount = countDamagePoints()
-	if DamagePointCount == 0 then
-		warn("[MeleeTest] No DmgPoint attachments found inside Handle. Add one or more Attachments named DmgPoint (or tag them DmgPoint).")
-	end
-
-	Hitbox = MeleeHitbox.new({
-		Origin = Handle,
-		RaycastParams = Params,
-		Resolution = Setting.MeleeResolution,
-		CastData = {
-			CastType = Setting.MeleeCastType,
-			Size = Setting.MeleeCastSize,
-			CFrame = Setting.MeleeCastCFrame,
-			Radius = Setting.MeleeCastRadius,
-		},
-	})
-
-	AnimationController = WeaponAnimation.new({
-		Tool = Tool,
-		Humanoid = Humanoid,
-		Module = Setting,
-	})
-
-	Controller = MeleeController.new({
-		Tool = Tool,
-		Character = Character,
-		Humanoid = Humanoid,
-		Module = Setting,
-		Hitbox = Hitbox,
-		OnStart = function()
-			if Throwing then return end
-			MeleeRemote:FireServer("Start", Tool)
-			if Setting.AttackAnimationID ~= nil then
-				AnimationController:Play("AttackAnim", Setting.AttackAnimationSpeed or 1, 0.03)
-			end
-		end,
-		OnHit = function(Hit)
-			local Target = Hit.TargetInstance or Hit.TargetHumanoid or Hit.TargetCharacter or Hit.HitPart
-			warn("[MeleeTest] HIT", Target:GetFullName(), Hit.HitPart:GetFullName())
-			MeleeRemote:FireServer("Hit", Tool, Target, Hit.HitPart)
-		end,
-	})
+	getCharacter(); Handle=Tool:FindFirstChild("Handle"); if not Handle then warn("[MeleeTest] Tool needs a Handle"); return end; OldAutoRotate=Humanoid.AutoRotate; Humanoid.AutoRotate=true; removeDefaultGrip(); local Params=RaycastParams.new(); Params.FilterType=Enum.RaycastFilterType.Exclude; Params.FilterDescendantsInstances={Character,Tool}; Params.IgnoreWater=true; local DamagePointCount=countDamagePoints(); if DamagePointCount==0 then warn("[MeleeTest] No DmgPoint attachments found inside Handle. Add one or more Attachments named DmgPoint (or tag them DmgPoint).") end
+	Hitbox=MeleeHitbox.new({Origin=Handle,RaycastParams=Params,Resolution=Setting.MeleeResolution,CastData={CastType=Setting.MeleeCastType,Size=Setting.MeleeCastSize,CFrame=Setting.MeleeCastCFrame,Radius=Setting.MeleeCastRadius}})
+	AnimationController=WeaponAnimation.new({Tool=Tool,Humanoid=Humanoid,Module=Setting})
+	Controller=MeleeController.new({Tool=Tool,Character=Character,Humanoid=Humanoid,Module=Setting,Hitbox=Hitbox,OnStart=function() if Throwing then return end; MeleeRemote:FireServer("Start",Tool); if Setting.AttackAnimationID~=nil then AnimationController:Play("AttackAnim",Setting.AttackAnimationSpeed or 1,0.03) end end,OnHit=function(Hit) local Target=Hit.TargetInstance or Hit.TargetHumanoid or Hit.TargetCharacter or Hit.HitPart; warn("[MeleeTest] HIT",Target:GetFullName(),Hit.HitPart:GetFullName()); MeleeRemote:FireServer("Hit",Tool,Target,Hit.HitPart) end})
 end
-
-local function attack()
-	if Throwing then return end
-	if not Equipped or not Controller then return end
-	if not Setting.MeleeEnabled then return end
-	if Humanoid.Health <= 0 then return end
-	Controller:Attack(Setting.AttackDuration)
-end
-
-Tool.Equipped:Connect(function()
-	Equipped = true
-	setup()
-end)
-
-Tool.Unequipped:Connect(function()
-	Equipped = false
-	Throwing = false
-	if Controller then Controller:Destroy() end
-	if AnimationController then AnimationController:StopAll() end
-	Controller = nil
-	AnimationController = nil
-	Hitbox = nil
-	clearGrip()
-	if Humanoid and Humanoid.Parent then
-		Humanoid.AutoRotate = OldAutoRotate ~= nil and OldAutoRotate or true
-	end
-	OldAutoRotate = nil
-end)
-
+local function attack() if Throwing or not Equipped or not Controller or not Setting.MeleeEnabled or Humanoid.Health<=0 then return end; Controller:Attack(Setting.AttackDuration) end
+Tool.Equipped:Connect(function() Equipped=true; setup() end)
+Tool.Unequipped:Connect(function() Equipped=false; Throwing=false; if Controller then Controller:Destroy() end; if AnimationController then AnimationController:StopAll() end; Controller=nil; AnimationController=nil; Hitbox=nil; clearGrip(); if Humanoid and Humanoid.Parent then Humanoid.AutoRotate=OldAutoRotate~=nil and OldAutoRotate or true end; OldAutoRotate=nil end)
 Tool.Activated:Connect(attack)
-
-UserInputService.InputBegan:Connect(function(Input, GameProcessed)
-	if GameProcessed or not Equipped then return end
-	if Input.KeyCode == Setting.ThrowKey then
-		throwWeapon()
-	end
-end)
-
-Player.CharacterAdded:Connect(function()
-	if Equipped then task.defer(setup) end
-end)
+UserInputService.InputBegan:Connect(function(Input,GameProcessed) if GameProcessed or not Equipped then return end; if Input.KeyCode==Setting.ThrowKey then throwWeapon() end end)
+Player.CharacterAdded:Connect(function() if Equipped then task.defer(setup) end end)

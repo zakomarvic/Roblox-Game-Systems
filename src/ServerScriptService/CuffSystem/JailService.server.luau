@@ -66,12 +66,7 @@ local function sendMessageToDiscord(embed)
 
 	local success, response = pcall(function()
 		local data = HttpService:JSONEncode({embeds = {embed}})
-		return HttpService:PostAsync(
-			WebhookURL,
-			data,
-			Enum.HttpContentType.ApplicationJson,
-			false
-		)
+		return HttpService:PostAsync(WebhookURL, data, Enum.HttpContentType.ApplicationJson, false)
 	end)
 
 	if not success then
@@ -85,21 +80,9 @@ local function sendJailLog(player, target, time)
 		description = "A player got jailed!",
 		color = 0x000000,
 		fields = {
-			{
-				name = "Who Jailed the Player:",
-				value = string.format("UserName: %s\nUserId: %s", player.Name, player.UserId),
-				inline = false,
-			},
-			{
-				name = "Jailed Player Info:",
-				value = string.format("UserName: %s\nUserId: %s", target.Name, target.UserId),
-				inline = false,
-			},
-			{
-				name = "Jailed Time:",
-				value = string.format("Time: %s", tostring(time)),
-				inline = false,
-			},
+			{name = "Who Jailed the Player:", value = string.format("UserName: %s\nUserId: %s", player.Name, player.UserId), inline = false},
+			{name = "Jailed Player Info:", value = string.format("UserName: %s\nUserId: %s", target.Name, target.UserId), inline = false},
+			{name = "Jailed Time:", value = string.format("Time: %s", tostring(time)), inline = false},
 		},
 		footer = {
 			text = "Cuff Engine By pwntime2",
@@ -112,48 +95,32 @@ local function readStoredJailData(result)
 	if type(result) == "number" then
 		return math.max(0, math.floor(result)), nil
 	end
-
 	if type(result) == "table" then
 		local time = tonumber(result.Time) or tonumber(result.JailTime) or 0
 		local previousTeam = result.PreviousTeam
-		if type(previousTeam) ~= "string" then
-			previousTeam = nil
-		end
+		if type(previousTeam) ~= "string" then previousTeam = nil end
 		return math.max(0, math.floor(time)), previousTeam
 	end
-
 	return 0, nil
 end
 
 local function savePlayerJail(player)
 	local _, jailTime = getJailData(player)
 	local remaining = math.max(0, math.floor(jailTime.Value))
-
 	if remaining <= 0 then
 		local success, err = pcall(function()
 			JailTimeStore:RemoveAsync(tostring(player.UserId))
 		end)
-		if not success then
-			warn("Failed to clear jail time for " .. player.Name .. ": " .. tostring(err))
-		end
+		if not success then warn("Failed to clear jail time for " .. player.Name .. ": " .. tostring(err)) end
 		return success
 	end
 
 	local jailState = ActiveJails[player]
 	local previousTeam = jailState and jailState.PreviousTeam
-	local data = {
-		Time = remaining,
-		PreviousTeam = previousTeam,
-	}
-
 	local success, err = pcall(function()
-		JailTimeStore:SetAsync(tostring(player.UserId), data)
+		JailTimeStore:SetAsync(tostring(player.UserId), {Time = remaining, PreviousTeam = previousTeam})
 	end)
-
-	if not success then
-		warn("Failed to save jail time for " .. player.Name .. ": " .. tostring(err))
-	end
-
+	if not success then warn("Failed to save jail time for " .. player.Name .. ": " .. tostring(err)) end
 	return success
 end
 
@@ -167,39 +134,23 @@ end
 
 local function startJailTimer(player, previousTeamName)
 	stopJailTimer(player)
-
 	local _, jailTime = getJailData(player)
 	local token = 1
-	local state = {
-		Token = token,
-		PreviousTeam = previousTeamName,
-	}
+	local state = {Token = token, PreviousTeam = previousTeamName}
 	ActiveJails[player] = state
 
 	task.spawn(function()
 		while player.Parent and state.Token == token and jailTime.Value > 0 do
 			task.wait(1)
-
-			if not player.Parent or state.Token ~= token then
-				return
-			end
-
+			if not player.Parent or state.Token ~= token then return end
 			jailTime.Value = math.max(0, jailTime.Value - 1)
 		end
-
-		if not player.Parent or state.Token ~= token then
-			return
-		end
-
+		if not player.Parent or state.Token ~= token then return end
 		ActiveJails[player] = nil
-
 		local success, err = pcall(function()
 			JailTimeStore:RemoveAsync(tostring(player.UserId))
 		end)
-		if not success then
-			warn("Failed to clear expired jail time for " .. player.Name .. ": " .. tostring(err))
-		end
-
+		if not success then warn("Failed to clear expired jail time for " .. player.Name .. ": " .. tostring(err)) end
 		restorePlayerTeam(player, state.PreviousTeam)
 	end)
 end
@@ -215,26 +166,19 @@ end
 
 Players.PlayerAdded:Connect(function(player)
 	local _, jailTime = getJailData(player)
-
 	local success, result = pcall(function()
 		return JailTimeStore:GetAsync(tostring(player.UserId))
 	end)
-
 	if not success then
 		warn("Failed to load jail time for " .. player.Name .. ": " .. tostring(result))
 		return
 	end
-
 	local remaining, previousTeamName = readStoredJailData(result)
-	if remaining <= 0 then
-		return
-	end
-
+	if remaining <= 0 then return end
 	if not JailedTeam then
 		warn("Jailed team does not exist; cannot jail " .. player.Name)
 		return
 	end
-
 	jailTime.Value = remaining
 	player.Team = JailedTeam
 	player:LoadCharacter()
@@ -243,11 +187,7 @@ end)
 
 Players.PlayerRemoving:Connect(function(player)
 	stopJailTimer(player)
-
-	if SaveInProgress[player] then
-		return
-	end
-
+	if SaveInProgress[player] then return end
 	SaveInProgress[player] = true
 	savePlayerJail(player)
 	SaveInProgress[player] = nil
@@ -256,11 +196,7 @@ end)
 game:BindToClose(function()
 	local players = Players:GetPlayers()
 	local remaining = #players
-
-	if remaining == 0 then
-		return
-	end
-
+	if remaining == 0 then return end
 	for _, player in ipairs(players) do
 		task.spawn(function()
 			stopJailTimer(player)
@@ -268,11 +204,8 @@ game:BindToClose(function()
 			remaining -= 1
 		end)
 	end
-
 	local deadline = os.clock() + 25
-	while remaining > 0 and os.clock() < deadline do
-		task.wait()
-	end
+	while remaining > 0 and os.clock() < deadline do task.wait() end
 end)
 
 JailEvent.OnServerEvent:Connect(function(player, target, time)
@@ -282,7 +215,6 @@ JailEvent.OnServerEvent:Connect(function(player, target, time)
 	end
 
 	local targetPlayer
-
 	if typeof(target) == "Instance" then
 		if target:IsA("Player") then
 			targetPlayer = target
@@ -290,26 +222,12 @@ JailEvent.OnServerEvent:Connect(function(player, target, time)
 			targetPlayer = Players:GetPlayerFromCharacter(target)
 		end
 	end
-
-	if not targetPlayer then
-		warn("Invalid jailed player passed to JailEvent: " .. tostring(target))
-		return
-	end
-
-	if targetPlayer == player then
-		return
-	end
-
+	if not targetPlayer or targetPlayer == player then return end
 	if not isDowned(targetPlayer) then
 		warn(player.Name .. " attempted to jail " .. targetPlayer.Name .. " while they were not downed")
 		return
 	end
-
-	if typeof(time) ~= "number" or time <= 0 or time ~= time then
-		warn("Invalid jail time passed to JailEvent: " .. tostring(time))
-		return
-	end
-
+	if typeof(time) ~= "number" or time <= 0 or time ~= time then return end
 	if not JailedTeam then
 		warn("Jailed team does not exist; cannot jail " .. targetPlayer.Name)
 		return
@@ -318,28 +236,18 @@ JailEvent.OnServerEvent:Connect(function(player, target, time)
 	local _, jailTime = getJailData(targetPlayer)
 	local existingState = ActiveJails[targetPlayer]
 	local previousTeamName = existingState and existingState.PreviousTeam
-
 	if not previousTeamName and targetPlayer.Team and targetPlayer.Team ~= JailedTeam then
 		previousTeamName = targetPlayer.Team.Name
 	end
-
 	stopJailTimer(targetPlayer)
-
 	jailTime.Value = math.floor(time)
 	targetPlayer.Team = JailedTeam
 	targetPlayer:LoadCharacter()
 
 	local saveSuccess = pcall(function()
-		JailTimeStore:SetAsync(tostring(targetPlayer.UserId), {
-			Time = jailTime.Value,
-			PreviousTeam = previousTeamName,
-		})
+		JailTimeStore:SetAsync(tostring(targetPlayer.UserId), {Time = jailTime.Value, PreviousTeam = previousTeamName})
 	end)
-
-	if not saveSuccess then
-		warn("Failed to save jail time for " .. targetPlayer.Name)
-	end
-
+	if not saveSuccess then warn("Failed to save jail time for " .. targetPlayer.Name) end
 	sendJailLog(player, targetPlayer, jailTime.Value)
 	startJailTimer(targetPlayer, previousTeamName)
 end)
