@@ -1,0 +1,258 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+local Items = {
+	{Id = "Medkit", DisplayName = "Medkit", Price = 250},
+	{Id = "Armor", DisplayName = "Armor", Price = 500},
+	{Id = "AmmoPack", DisplayName = "Ammo Pack", Price = 150},
+}
+
+local function formatCash(Value)
+	local Text = tostring(math.floor(tonumber(Value) or 0))
+	while true do
+		local New, Count = Text:gsub("^(-?%d+)(%d%d%d)", "%1,%2")
+		Text = New
+		if Count == 0 then break end
+	end
+	return "$" .. Text
+end
+
+local function corner(Object, Radius)
+	local C = Instance.new("UICorner")
+	C.CornerRadius = UDim.new(0, Radius)
+	C.Parent = Object
+end
+
+local function stroke(Object, Transparency)
+	local S = Instance.new("UIStroke")
+	S.Color = Color3.fromRGB(70, 76, 86)
+	S.Transparency = Transparency or 0
+	S.Thickness = 1
+	S.Parent = Object
+end
+
+local function label(Name, Parent, Text, Position, Size, TextSize, Color, Font)
+	local L = Instance.new("TextLabel")
+	L.Name = Name
+	L.BackgroundTransparency = 1
+	L.Position = Position
+	L.Size = Size
+	L.Font = Font or Enum.Font.GothamMedium
+	L.Text = Text
+	L.TextColor3 = Color
+	L.TextSize = TextSize
+	L.TextXAlignment = Enum.TextXAlignment.Left
+	L.Parent = Parent
+	return L
+end
+
+local UI = PlayerGui:FindFirstChild("ShopUI")
+
+if not UI then
+	UI = Instance.new("ScreenGui")
+	UI.Name = "ShopUI"
+	UI.ResetOnSpawn = false
+	UI.DisplayOrder = 25
+	UI.Parent = PlayerGui
+
+	local ShopButton = Instance.new("TextButton")
+	ShopButton.Name = "ShopButton"
+	ShopButton.AnchorPoint = Vector2.new(1, 0)
+	ShopButton.Position = UDim2.new(1, -24, 0, 94)
+	ShopButton.Size = UDim2.new(0, 110, 0, 42)
+	ShopButton.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
+	ShopButton.BackgroundTransparency = 0.08
+	ShopButton.BorderSizePixel = 0
+	ShopButton.AutoButtonColor = false
+	ShopButton.Font = Enum.Font.GothamBold
+	ShopButton.Text = "SHOP"
+	ShopButton.TextColor3 = Color3.new(1, 1, 1)
+	ShopButton.TextSize = 15
+	ShopButton.Parent = UI
+	corner(ShopButton, 12)
+	stroke(ShopButton, 0.35)
+
+	local ShopFrame = Instance.new("Frame")
+	ShopFrame.Name = "ShopFrame"
+	ShopFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+	ShopFrame.Position = UDim2.fromScale(0.5, 0.5)
+	ShopFrame.Size = UDim2.new(0, 470, 0, 470)
+	ShopFrame.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
+	ShopFrame.BorderSizePixel = 0
+	ShopFrame.Visible = false
+	ShopFrame.Parent = UI
+	corner(ShopFrame, 16)
+	stroke(ShopFrame, 0.25)
+
+	local Header = Instance.new("Frame")
+	Header.Name = "Header"
+	Header.BackgroundTransparency = 1
+	Header.Size = UDim2.new(1, 0, 0, 72)
+	Header.Parent = ShopFrame
+	label("Title", Header, "SHOP", UDim2.new(0, 24, 0, 12), UDim2.new(1, -90, 0, 30), 24, Color3.new(1,1,1), Enum.Font.GothamBold)
+	label("Subtitle", Header, "Spend your cash on useful gear.", UDim2.new(0, 25, 0, 43), UDim2.new(1, -90, 0, 18), 12, Color3.fromRGB(170,176,186))
+
+	local CloseButton = Instance.new("TextButton")
+	CloseButton.Name = "CloseButton"
+	CloseButton.AnchorPoint = Vector2.new(1, 0)
+	CloseButton.Position = UDim2.new(1, -16, 0, 16)
+	CloseButton.Size = UDim2.new(0, 38, 0, 38)
+	CloseButton.BackgroundColor3 = Color3.fromRGB(34,37,43)
+	CloseButton.BorderSizePixel = 0
+	CloseButton.AutoButtonColor = false
+	CloseButton.Font = Enum.Font.GothamBold
+	CloseButton.Text = "X"
+	CloseButton.TextColor3 = Color3.fromRGB(210,214,220)
+	CloseButton.TextSize = 14
+	CloseButton.Parent = Header
+	corner(CloseButton, 10)
+
+	local CashBalance = Instance.new("TextLabel")
+	CashBalance.Name = "CashBalance"
+	CashBalance.Position = UDim2.new(0, 24, 0, 82)
+	CashBalance.Size = UDim2.new(1, -48, 0, 48)
+	CashBalance.BackgroundColor3 = Color3.fromRGB(28,31,37)
+	CashBalance.BorderSizePixel = 0
+	CashBalance.Font = Enum.Font.GothamBold
+	CashBalance.Text = "$0"
+	CashBalance.TextColor3 = Color3.fromRGB(78,220,120)
+	CashBalance.TextSize = 22
+	CashBalance.TextXAlignment = Enum.TextXAlignment.Left
+	CashBalance.Parent = ShopFrame
+	corner(CashBalance, 11)
+	local CashPadding = Instance.new("UIPadding")
+	CashPadding.PaddingLeft = UDim.new(0, 16)
+	CashPadding.Parent = CashBalance
+
+	local ItemsFrame = Instance.new("Frame")
+	ItemsFrame.Name = "Items"
+	ItemsFrame.BackgroundTransparency = 1
+	ItemsFrame.Position = UDim2.new(0,24,0,144)
+	ItemsFrame.Size = UDim2.new(1,-48,0,236)
+	ItemsFrame.Parent = ShopFrame
+	local List = Instance.new("UIListLayout")
+	List.Padding = UDim.new(0,10)
+	List.SortOrder = Enum.SortOrder.LayoutOrder
+	List.Parent = ItemsFrame
+
+	for Index, Item in ipairs(Items) do
+		local Button = Instance.new("TextButton")
+		Button.Name = Item.Id
+		Button.LayoutOrder = Index
+		Button.Size = UDim2.new(1,0,0,72)
+		Button.BackgroundColor3 = Color3.fromRGB(28,31,37)
+		Button.BorderSizePixel = 0
+		Button.AutoButtonColor = false
+		Button.Text = ""
+		Button.Parent = ItemsFrame
+		corner(Button, 12)
+		stroke(Button, 0.45)
+		label("Name", Button, Item.DisplayName, UDim2.new(0,16,0,10), UDim2.new(1,-140,0,26), 16, Color3.new(1,1,1), Enum.Font.GothamBold)
+		label("Description", Button, "Purchase one", UDim2.new(0,16,0,38), UDim2.new(1,-140,0,18), 11, Color3.fromRGB(150,156,166))
+		local Price = label("Price", Button, formatCash(Item.Price), UDim2.new(1,-116,0,20), UDim2.new(0,100,0,30), 16, Color3.fromRGB(78,220,120), Enum.Font.GothamBold)
+		Price.TextXAlignment = Enum.TextXAlignment.Right
+	end
+
+	local Status = Instance.new("TextLabel")
+	Status.Name = "Status"
+	Status.Position = UDim2.new(0,24,1,-68)
+	Status.Size = UDim2.new(1,-48,0,44)
+	Status.BackgroundTransparency = 1
+	Status.Font = Enum.Font.GothamMedium
+	Status.Text = "Select an item to purchase."
+	Status.TextColor3 = Color3.fromRGB(170,176,186)
+	Status.TextSize = 12
+	Status.TextWrapped = true
+	Status.TextXAlignment = Enum.TextXAlignment.Center
+	Status.Parent = ShopFrame
+end
+
+local ShopButton = UI:WaitForChild("ShopButton")
+local ShopFrame = UI:WaitForChild("ShopFrame")
+local CloseButton = ShopFrame:WaitForChild("Header"):WaitForChild("CloseButton")
+local CashBalance = ShopFrame:WaitForChild("CashBalance")
+local ItemsFrame = ShopFrame:WaitForChild("Items")
+local Status = ShopFrame:WaitForChild("Status")
+local PurchaseRemote = ReplicatedStorage:WaitForChild("EconomyRemotes"):WaitForChild("PurchaseItem")
+local Cash = Player:WaitForChild("leaderstats"):WaitForChild("Cash")
+
+local OpenPosition = ShopFrame.Position
+local ClosedPosition = UDim2.new(OpenPosition.X.Scale, OpenPosition.X.Offset, OpenPosition.Y.Scale, OpenPosition.Y.Offset + 12)
+local Busy = false
+
+local function updateCash()
+	CashBalance.Text = formatCash(Cash.Value)
+end
+
+local function setStatus(Text, Success)
+	Status.Text = Text
+	Status.TextColor3 = Success and Color3.fromRGB(78,220,120) or Color3.fromRGB(255,105,105)
+end
+
+local function openShop()
+	if Busy or ShopFrame.Visible then return end
+	Busy = true
+	ShopFrame.Position = ClosedPosition
+	ShopFrame.Visible = true
+	local Tween = TweenService:Create(ShopFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = OpenPosition})
+	Tween:Play()
+	Tween.Completed:Wait()
+	Busy = false
+end
+
+local function closeShop()
+	if Busy or not ShopFrame.Visible then return end
+	Busy = true
+	local Tween = TweenService:Create(ShopFrame, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = ClosedPosition})
+	Tween:Play()
+	Tween.Completed:Wait()
+	ShopFrame.Visible = false
+	ShopFrame.Position = OpenPosition
+	Busy = false
+end
+
+ShopButton.MouseEnter:Connect(function()
+	TweenService:Create(ShopButton, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(34,37,43)}):Play()
+end)
+ShopButton.MouseLeave:Connect(function()
+	TweenService:Create(ShopButton, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(18,20,24)}):Play()
+end)
+ShopButton.Activated:Connect(openShop)
+CloseButton.Activated:Connect(closeShop)
+
+for _, Item in ipairs(Items) do
+	local Button = ItemsFrame:WaitForChild(Item.Id)
+	Button.MouseEnter:Connect(function()
+		TweenService:Create(Button, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(36,40,47)}):Play()
+	end)
+	Button.MouseLeave:Connect(function()
+		TweenService:Create(Button, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(28,31,37)}):Play()
+	end)
+	Button.Activated:Connect(function()
+		if Busy then return end
+		Button.Active = false
+		setStatus("Purchasing...", true)
+		local CallSuccess, Purchased, Message = pcall(function()
+			local Result, ResultMessage = PurchaseRemote:InvokeServer(Item.Id)
+			return Result, ResultMessage
+		end)
+		Button.Active = true
+		if not CallSuccess then
+			setStatus("Purchase failed. Try again.", false)
+			return
+		end
+		if not Purchased then
+			setStatus(Message or "Purchase failed.", false)
+			return
+		end
+		setStatus(Message or "Purchase complete.", true)
+		updateCash()
+	end)
+end
+
+Cash:GetPropertyChangedSignal("Value"):Connect(updateCash)
+updateCash()
