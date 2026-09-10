@@ -86,27 +86,26 @@ end
 
 function WeaponFire:SetAiming(State) self.IsAiming = State == true end
 
-function WeaponFire:_GetDirection(Start)
+function WeaponFire:_GetAimPoint()
 	local Camera = Workspace.CurrentCamera
-	local MouseLocation = UserInputService:GetMouseLocation()
-	local AimDirection
-
-	if Camera then
-		-- GetMouseLocation() uses viewport coordinates. ViewportPointToRay()
-		-- uses the same coordinate space, so this keeps the ray aligned with
-		-- the actual mouse/crosshair position.
-		local CameraRay = Camera:ViewportPointToRay(MouseLocation.X, MouseLocation.Y)
-		local Params = RaycastParams.new()
-		Params.FilterType = Enum.RaycastFilterType.Exclude
-		Params.FilterDescendantsInstances = {self.Character, self.Tool}
-		Params.IgnoreWater = true
-
-		local CameraResult = Workspace:Raycast(CameraRay.Origin, CameraRay.Direction * 5000, Params)
-		local AimPoint = CameraResult and CameraResult.Position or (CameraRay.Origin + CameraRay.Direction * 5000)
-		AimDirection = (AimPoint - Start).Magnitude > 0 and (AimPoint - Start).Unit or CameraRay.Direction
-	else
-		AimDirection = (self.Mouse.Hit.Position - Start).Magnitude > 0 and (self.Mouse.Hit.Position - Start).Unit or Vector3.zAxis
+	if not Camera then
+		return self.Mouse.Hit.Position
 	end
+
+	local MouseLocation = UserInputService:GetMouseLocation()
+	local CameraRay = Camera:ViewportPointToRay(MouseLocation.X, MouseLocation.Y)
+	local Params = RaycastParams.new()
+	Params.FilterType = Enum.RaycastFilterType.Exclude
+	Params.FilterDescendantsInstances = {self.Character, self.Tool}
+	Params.IgnoreWater = true
+
+	local CameraResult = Workspace:Raycast(CameraRay.Origin, CameraRay.Direction * 5000, Params)
+	return CameraResult and CameraResult.Position or (CameraRay.Origin + CameraRay.Direction * 5000)
+end
+
+function WeaponFire:_GetDirection(Start)
+	local AimPoint = self:_GetAimPoint()
+	local AimDirection = (AimPoint - Start).Magnitude > 0 and (AimPoint - Start).Unit or Vector3.zAxis
 
 	local Spread = self.Module.Spread or 0
 	Spread *= (self.IsAiming and 1 - (self.Module.SpreadRedution or 0) or 1)
@@ -171,10 +170,14 @@ function WeaponFire:Fire(ShootingHandle)
 	local FireAnim = self.GetFireAnim and self.GetFireAnim() or self.FireAnim
 	if FireAnim then FireAnim:Play(nil, nil, Module.FireAnimationSpeed or 1) end
 	local Start = (self.Humanoid.Torso.CFrame * CFrame.new(0, 1.5, 0)).Position
-	local Direction = self:_GetDirection(Start)
+	local AimPoint = self:_GetAimPoint()
+	local Direction = (AimPoint - Start).Magnitude > 0 and (AimPoint - Start).Unit or Vector3.zAxis
+	local Spread = Module.Spread or 0
+	Spread *= (self.IsAiming and 1 - (Module.SpreadRedution or 0) or 1)
+	Direction = (CFrame.lookAt(Start, Start + Direction) * CFrame.Angles(math.rad(-Spread + math.random() * (Spread * 2)), math.rad(-Spread + math.random() * (Spread * 2)), 0)).LookVector
 	if Module.ProjectileType == "Projectile" then self:_FireProjectile(Start, Direction, ShootingHandle) return end
 
-	self.InflictTarget:FireServer(Start, Direction)
+	self.InflictTarget:FireServer(Start, AimPoint)
 	RaycastDebug:FireServer(self.Tool, Start, Direction)
 end
 
