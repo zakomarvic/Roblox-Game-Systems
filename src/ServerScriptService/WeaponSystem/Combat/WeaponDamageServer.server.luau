@@ -12,16 +12,16 @@ local ProjectileFired = Remotes:FindFirstChild("ProjectileFired") or Instance.ne
 ProjectileFired.Name = "ProjectileFired"
 ProjectileFired.Parent = Remotes
 
--- These are shared server-side services/modules, not ReplicatedStorage.Modules.
 local Combat = script.Parent
 local WeaponState = require(Combat:WaitForChild("WeaponStateService"))
 local Effects = WeaponSystem:WaitForChild("Effects")
 local BulletEffects = require(Effects:WaitForChild("BulletEffects"))
 local ExplosionEffects = require(Effects:WaitForChild("ExplosionEffects"))
+local CharacterSystem = game:GetService("ServerScriptService"):WaitForChild("CharacterSystem")
+local DownedDamageService = require(CharacterSystem:WaitForChild("Services"):WaitForChild("DownedDamageService"))
 local ProjectileRecords = {}
 local ShotTimes = {}
 local ExplosionTimes = {}
-local DAMAGE_OVERKILL_ATTRIBUTE = "DownedDamageOverkill"
 
 local function getOwnedWeapon(Player, Tool)
 	if not Tool or not Tool:IsA("Tool") then return nil, nil end
@@ -55,21 +55,7 @@ local function addCreator(TargetHumanoid, Player)
 end
 
 local function applyWeaponDamage(TargetHumanoid, Damage, Overkill)
-	local TargetCharacter = TargetHumanoid.Parent
-	if not TargetCharacter or not TargetCharacter:IsA("Model") then return end
-
-	local IsOverkill = Overkill == true
-	TargetCharacter:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, IsOverkill)
-	TargetHumanoid:TakeDamage(Damage)
-
-	-- Do not rely on HealthChanged firing while the temporary attribute is set.
-	-- If this weapon is explicitly Overkill, force the final lethal state after
-	-- applying its damage. This guarantees Overkill bypasses the down system.
-	if IsOverkill and TargetHumanoid.Health > 0 then
-		TargetHumanoid.Health = 0
-	end
-
-	TargetCharacter:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, nil)
+	return DownedDamageService.ApplyDamage(TargetHumanoid, Damage, Overkill)
 end
 
 ProjectileFired.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)

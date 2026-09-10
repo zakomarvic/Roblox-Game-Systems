@@ -1,6 +1,8 @@
 local MeleeUtility = {}
 
-local DAMAGE_OVERKILL_ATTRIBUTE = "DownedDamageOverkill"
+local CharacterSystem = game:GetService("ServerScriptService"):WaitForChild("CharacterSystem")
+local Services = CharacterSystem:WaitForChild("Services")
+local DownedDamageService = require(Services:WaitForChild("DownedDamageService"))
 
 function MeleeUtility.GetHumanoid(Character)
 	return Character and Character:FindFirstChildOfClass("Humanoid")
@@ -40,7 +42,7 @@ function MeleeUtility.GetPromptPart(Visual)
 end
 
 function MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris, Overkill)
-	if Damage <= 0 or not TargetHumanoid or TargetHumanoid.Health <= 0 then return end
+	if Damage <= 0 or not TargetHumanoid or TargetHumanoid.Health <= 0 then return false end
 	local Creator = TargetHumanoid:FindFirstChild("creator")
 	if Creator then Creator:Destroy() end
 	Creator = Instance.new("ObjectValue")
@@ -49,11 +51,7 @@ function MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris, Overki
 	Creator.Parent = TargetHumanoid
 	if Debris then Debris:AddItem(Creator, 5) end
 
-	local TargetCharacter = TargetHumanoid.Parent
-	if not TargetCharacter or not TargetCharacter:IsA("Model") then return end
-	TargetCharacter:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, Overkill == true)
-	TargetHumanoid:TakeDamage(Damage)
-	TargetCharacter:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, nil)
+	return DownedDamageService.ApplyDamage(TargetHumanoid, Damage, Overkill)
 end
 
 function MeleeUtility.GetOwnedEquippedWeapon(Player, Tool)
