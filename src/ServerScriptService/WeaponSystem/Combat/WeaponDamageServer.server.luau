@@ -11,6 +11,9 @@ Explosion.Parent = Remotes
 local ProjectileFired = Remotes:FindFirstChild("ProjectileFired") or Instance.new("RemoteEvent")
 ProjectileFired.Name = "ProjectileFired"
 ProjectileFired.Parent = Remotes
+local RaycastDebug = Remotes:FindFirstChild("RaycastDebug") or Instance.new("RemoteEvent")
+RaycastDebug.Name = "RaycastDebug"
+RaycastDebug.Parent = Remotes
 
 local Combat = script.Parent
 local WeaponState = require(Combat:WaitForChild("WeaponStateService"))
@@ -22,8 +25,8 @@ local DamageService = require(CombatSystem:WaitForChild("DamageService"))
 
 -- DEBUG: Set this to true while investigating hit-registration/raycast issues.
 -- Every server-side weapon ray is drawn, including misses.
--- Green = the raycast hit the requested target character.
--- Red = the raycast missed the requested target (including hitting an obstruction).
+-- Green = the raycast hit a character.
+-- Red = the raycast did not hit a character (including hitting an obstruction).
 local DEBUG_RAYCASTS = false
 local DEBUG_RAYCAST_DURATION = 2
 
@@ -103,6 +106,36 @@ local function addCreator(TargetHumanoid, Player)
 	Debris:AddItem(Creator, 5)
 end
 
+RaycastDebug.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
+	if not DEBUG_RAYCASTS then return end
+	if typeof(Origin) ~= "Vector3" or typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return end
+	local OwnedTool, Module = getOwnedWeapon(Player, Tool)
+	if not OwnedTool or Module.ProjectileType == "Projectile" then return end
+	local Character = Player.Character
+	local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+	local ShooterTorso = getTorso(Character)
+	if not Humanoid or Humanoid.Health <= 0 or not ShooterTorso then return end
+	local ExpectedOrigin = (ShooterTorso.CFrame * CFrame.new(0, 1.5, 0)).Position
+	if (Origin - ExpectedOrigin).Magnitude > 8 then return end
+
+	Direction = Direction.Unit
+	local Params = RaycastParams.new()
+	Params.FilterType = Enum.RaycastFilterType.Exclude
+	Params.FilterDescendantsInstances = {Character, Tool}
+	Params.IgnoreWater = true
+
+	local Result = workspace:Raycast(Origin, Direction * 5000, Params)
+	local HitCharacter = false
+	if Result then
+		local HitModel = Result.Instance:FindFirstAncestorOfClass("Model")
+		local HitHumanoid = HitModel and HitModel:FindFirstChildOfClass("Humanoid")
+		HitCharacter = HitHumanoid ~= nil and HitModel ~= Character
+	end
+
+	local EndPosition = Result and Result.Position or (Origin + Direction * 5000)
+	debugRay(Origin, EndPosition, Result and Result.Position or nil, HitCharacter)
+end)
+
 ProjectileFired.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
 	if typeof(Origin) ~= "Vector3" or typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return end
 	local OwnedTool, Module = getOwnedWeapon(Player, Tool)
@@ -145,11 +178,6 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	local Result = workspace:Raycast(Start, ToTarget, Params)
 	local HitTarget = Result ~= nil and Result.Instance:FindFirstAncestorOfClass("Model") == TargetCharacter
 	local RayEnd = Result and Result.Position or (Start + ToTarget)
-
-	-- Draw every server-side ray. Green means the requested target was hit;
-	-- red means the ray missed the target or was stopped by an obstruction.
-	debugRay(Start, RayEnd, Result and Result.Position or nil, HitTarget)
-
 	if not HitTarget then return end
 	local AlongShot = ToTarget:Dot(Direction)
 	if AlongShot <= 0 or AlongShot > 5000 or (HitPart.Position - (Start + Direction * AlongShot)).Magnitude > 8 then return end
