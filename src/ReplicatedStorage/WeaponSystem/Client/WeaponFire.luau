@@ -103,6 +103,15 @@ function WeaponFire:_GetAimPoint()
 	return CameraResult and CameraResult.Position or (CameraRay.Origin + CameraRay.Direction * 5000)
 end
 
+function WeaponFire:_GetMuzzleOrigin(ShootingHandle)
+	if not ShootingHandle or not ShootingHandle:IsA("BasePart") then return nil end
+	local Offset = self.Module.MuzzleOffset
+	if typeof(Offset) == "Vector3" then
+		return ShootingHandle.CFrame:PointToWorldSpace(Offset)
+	end
+	return ShootingHandle.Position
+end
+
 function WeaponFire:_GetDirection(Start)
 	local AimPoint = self:_GetAimPoint()
 	local AimDirection = (AimPoint - Start).Magnitude > 0 and (AimPoint - Start).Unit or Vector3.zAxis
@@ -169,15 +178,22 @@ function WeaponFire:Fire(ShootingHandle)
 	WeaponFireEffects.PlayFirePresentation(self.Tool, ShootingHandle, WeaponEffects)
 	local FireAnim = self.GetFireAnim and self.GetFireAnim() or self.FireAnim
 	if FireAnim then FireAnim:Play(nil, nil, Module.FireAnimationSpeed or 1) end
-	local Start = (self.Humanoid.Torso.CFrame * CFrame.new(0, 1.5, 0)).Position
+
+	local Start = self:_GetMuzzleOrigin(ShootingHandle)
+	if not Start then return end
+
 	local AimPoint = self:_GetAimPoint()
 	local Direction = (AimPoint - Start).Magnitude > 0 and (AimPoint - Start).Unit or Vector3.zAxis
 	local Spread = Module.Spread or 0
 	Spread *= (self.IsAiming and 1 - (Module.SpreadRedution or 0) or 1)
 	Direction = (CFrame.lookAt(Start, Start + Direction) * CFrame.Angles(math.rad(-Spread + math.random() * (Spread * 2)), math.rad(-Spread + math.random() * (Spread * 2)), 0)).LookVector
-	if Module.ProjectileType == "Projectile" then self:_FireProjectile(Start, Direction, ShootingHandle) return end
 
-	self.InflictTarget:FireServer(Start, AimPoint)
+	if Module.ProjectileType == "Projectile" then
+		self:_FireProjectile(Start, Direction, ShootingHandle)
+		return
+	end
+
+	self.InflictTarget:FireServer(Start, AimPoint, Direction)
 	RaycastDebug:FireServer(self.Tool, Start, Direction)
 end
 
