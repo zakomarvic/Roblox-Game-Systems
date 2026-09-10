@@ -57,8 +57,18 @@ end
 local function applyWeaponDamage(TargetHumanoid, Damage, Overkill)
 	local TargetCharacter = TargetHumanoid.Parent
 	if not TargetCharacter or not TargetCharacter:IsA("Model") then return end
-	TargetCharacter:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, Overkill == true)
+
+	local IsOverkill = Overkill == true
+	TargetCharacter:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, IsOverkill)
 	TargetHumanoid:TakeDamage(Damage)
+
+	-- Do not rely on HealthChanged firing while the temporary attribute is set.
+	-- If this weapon is explicitly Overkill, force the final lethal state after
+	-- applying its damage. This guarantees Overkill bypasses the down system.
+	if IsOverkill and TargetHumanoid.Health > 0 then
+		TargetHumanoid.Health = 0
+	end
+
 	TargetCharacter:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, nil)
 end
 
