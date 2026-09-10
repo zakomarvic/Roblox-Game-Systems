@@ -1,4 +1,5 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = workspace
 
 local WeaponFire = {}
@@ -55,9 +56,27 @@ end
 function WeaponFire:SetAiming(State) self.IsAiming = State == true end
 
 function WeaponFire:_GetDirection(Start)
+	local Camera = Workspace.CurrentCamera
+	local MouseLocation = UserInputService:GetMouseLocation()
+	local AimDirection
+
+	if Camera then
+		local CameraRay = Camera:ViewportPointToRay(MouseLocation.X, MouseLocation.Y)
+		local Params = RaycastParams.new()
+		Params.FilterType = Enum.RaycastFilterType.Exclude
+		Params.FilterDescendantsInstances = {self.Character, self.Tool}
+		Params.IgnoreWater = true
+
+		local CameraResult = Workspace:Raycast(CameraRay.Origin, CameraRay.Direction * 5000, Params)
+		local AimPoint = CameraResult and CameraResult.Position or (CameraRay.Origin + CameraRay.Direction * 5000)
+		AimDirection = (AimPoint - Start).Magnitude > 0 and (AimPoint - Start).Unit or CameraRay.Direction
+	else
+		AimDirection = (self.Mouse.Hit.Position - Start).Magnitude > 0 and (self.Mouse.Hit.Position - Start).Unit or Vector3.zAxis
+	end
+
 	local Spread = self.Module.Spread or 0
 	Spread *= (self.IsAiming and 1 - (self.Module.SpreadRedution or 0) or 1)
-	return (CFrame.new(Start, self.Mouse.Hit.Position) * CFrame.Angles(math.rad(-Spread + math.random() * (Spread * 2)), math.rad(-Spread + math.random() * (Spread * 2)), 0)).LookVector
+	return (CFrame.lookAt(Start, Start + AimDirection) * CFrame.Angles(math.rad(-Spread + math.random() * (Spread * 2)), math.rad(-Spread + math.random() * (Spread * 2)), 0)).LookVector
 end
 
 function WeaponFire:_GetRaycastParams()
@@ -130,9 +149,6 @@ function WeaponFire:Fire(ShootingHandle)
 		local Hit, EndPos = self.Raycast(Start, Direction, 5000, self.Character, self.PiercedHumanoid)
 		if not Module.ExplosiveEnabled then
 			if Hit and Hit.Parent then
-				-- Resolve the character from any descendant hit, not only Hit.Parent.
-				-- This prevents intermittent misses on accessories, nested parts, and
-				-- character models whose Humanoid is not directly under the hit part.
 				local TargetModel = Hit:FindFirstAncestorOfClass("Model")
 				local TargetHumanoid = TargetModel and TargetModel:FindFirstChildOfClass("Humanoid")
 				local TargetTorso = TargetModel and (TargetModel:FindFirstChild("Torso") or TargetModel:FindFirstChild("HumanoidRootPart"))
