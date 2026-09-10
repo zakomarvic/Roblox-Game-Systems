@@ -12,7 +12,7 @@ local DOWNED_IMAGE = "rbxassetid://8121963838"
 local DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE = "DownedInvulnerableUntil"
 
 local CharacterConnections = {}
-local DamageInProgress = {}
+local DamageContext = {}
 
 local function removeDownedIndicator(character)
 	local head = character:FindFirstChild("Head")
@@ -81,8 +81,6 @@ local function setupCharacter(character)
 	clearDowned(character)
 	humanoid.MaxHealth = MAX_HEALTH
 	humanoid.Health = MAX_HEALTH
-	-- Death must remain enabled. BreakJointsOnDeath is intentionally false,
-	-- but the Humanoid itself must still be allowed to enter Dead for Overkill.
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
 	humanoid.BreakJointsOnDeath = false
 
@@ -93,9 +91,11 @@ local function setupCharacter(character)
 	humanoid:GetPropertyChangedSignal("Health"):Connect(function()
 		if not character.Parent then return end
 
-		-- Weapon damage owns this HealthChanged event. Overkill is allowed to
-		-- reach normal Roblox death without the downed conversion interfering.
-		if DamageInProgress[humanoid] then
+		local context = DamageContext[humanoid]
+
+		-- Only Overkill damage bypasses the down conversion. Normal weapon
+		-- damage still needs this event so 110 -> 10 (or less) enters Downed.
+		if context == "Overkill" then
 			return
 		end
 
@@ -109,6 +109,8 @@ local function setupCharacter(character)
 		end
 
 		if humanoid.Health <= 0 then
+			-- This is only a fallback for damage that did not go through
+			-- ApplyDamage. Weapon Overkill damage never reaches this branch.
 			humanoid.Health = DOWNED_HEALTH
 			setDowned(character)
 			return
@@ -135,6 +137,12 @@ local function setupCharacter(character)
 	end)
 end
 
+local function takeDamage(targetHumanoid, damage, context)
+	DamageContext[targetHumanoid] = context
+	targetHumanoid:TakeDamage(damage)
+	DamageContext[targetHumanoid] = nil
+end
+
 function DownedDamageService.ApplyDamage(targetHumanoid, damage, overkill)
 	if not targetHumanoid or not targetHumanoid:IsA("Humanoid") then return false end
 	if type(damage) ~= "number" or damage <= 0 or targetHumanoid.Health <= 0 then return false end
@@ -150,15 +158,19 @@ function DownedDamageService.ApplyDamage(targetHumanoid, damage, overkill)
 		end
 
 		if isOverkill then
-			-- Overkill ends the custom Downed state and restores the Humanoid's
-			-- normal death state before applying damage.
+			-- Remove the custom Downed state first, then let the Humanoid receive
+			-- real lethal damage. We do NOT force Health to zero here.
 			clearDowned(character)
 			targetHumanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
 		end
 
-		DamageInProgress[targetHumanoid] = true
-		targetHumanoid:TakeDamage(damage)
-		DamageInProgress[targetHumanoid] = nil
+		takeDamage(targetHumanoid, damage, isOverkill and "Overkill" or "Normal")
+
+		-- TakeDamage is still the actual killing mechanism. If it reduced the
+		-- Humanoid to zero, explicitly allow the normal Dead state to settle.
+		if isOverkill and targetHumanoid.Health <= 0 then
+			targetHumanoid:ChangeState(Enum.HumanoidStateType.Dead)
+		end
 		return true
 	end
 
@@ -167,13 +179,13 @@ function DownedDamageService.ApplyDamage(targetHumanoid, damage, overkill)
 		return true
 	end
 
-	if isOverkill then
-		targetHumanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+	targetHumanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+	takeDamage(targetHumanoid, damage, isOverkill and "Overkill" or "Normal")
+
+	if isOverkill and targetHumanoid.Health <= 0 then
+		targetHumanoid:ChangeState(Enum.HumanoidStateType.Dead)
 	end
 
-	DamageInProgress[targetHumanoid] = true
-	targetHumanoid:TakeDamage(damage)
-	DamageInProgress[targetHumanoid] = nil
 	return true
 end
 
