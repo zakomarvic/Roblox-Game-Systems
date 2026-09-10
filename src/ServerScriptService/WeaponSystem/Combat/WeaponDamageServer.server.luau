@@ -17,8 +17,8 @@ local WeaponState = require(Combat:WaitForChild("WeaponStateService"))
 local Effects = WeaponSystem:WaitForChild("Effects")
 local BulletEffects = require(Effects:WaitForChild("BulletEffects"))
 local ExplosionEffects = require(Effects:WaitForChild("ExplosionEffects"))
-local CharacterSystem = game:GetService("ServerScriptService"):WaitForChild("CharacterSystem")
-local DownedDamageService = require(CharacterSystem:WaitForChild("Services"):WaitForChild("DownedDamageService"))
+local CombatSystem = game:GetService("ServerScriptService"):WaitForChild("CombatSystem")
+local DamageService = require(CombatSystem:WaitForChild("DamageService"))
 local ProjectileRecords = {}
 local ShotTimes = {}
 local ExplosionTimes = {}
@@ -52,10 +52,6 @@ local function addCreator(TargetHumanoid, Player)
 	Creator.Value = Player
 	Creator.Parent = TargetHumanoid
 	Debris:AddItem(Creator, 5)
-end
-
-local function applyWeaponDamage(TargetHumanoid, Damage, Overkill)
-	return DownedDamageService.ApplyDamage(TargetHumanoid, Damage, Overkill)
 end
 
 ProjectileFired.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
@@ -108,7 +104,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	local Knockback = tonumber(Module.Knockback) or 0
 	local Lifesteal = tonumber(Module.Lifesteal) or 0
 	addCreator(TargetHumanoid, Player)
-	applyWeaponDamage(TargetHumanoid, Damage, Module.Overkill)
+	DamageService.ApplyDamage(TargetHumanoid, Damage, Module.Overkill)
 	if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += Direction * Knockback end
 	if Lifesteal > 0 and ShooterHumanoid.Health > 0 then ShooterHumanoid.Health += Damage * Lifesteal end
 	if Module.FlamingBullet == true then BulletEffects.Apply("Incendiary", {Player=Player, Tool=Tool, Module=Module, TargetCharacter=TargetCharacter, TargetHumanoid=TargetHumanoid, TargetTorso=TargetTorso, HitPart=HitPart, Direction=Direction, Duration=Module.FlamingBulletDuration}) end
@@ -166,7 +162,7 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool, Clie
 				local ExplosionDirection = Distance > 0 and Offset.Unit or Direction
 				if AppliedDamage > 0 then
 					addCreator(TargetHumanoid, Player)
-					applyWeaponDamage(TargetHumanoid, AppliedDamage, Module.Overkill)
+					DamageService.ApplyDamage(TargetHumanoid, AppliedDamage, Module.Overkill)
 				end
 				if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += ExplosionDirection * (Knockback * Falloff) end
 			end
