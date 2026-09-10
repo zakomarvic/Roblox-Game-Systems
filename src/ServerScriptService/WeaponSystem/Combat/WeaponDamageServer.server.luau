@@ -170,14 +170,15 @@ ProjectileFired.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
 	ProjectileRecords[Player][Tool] = {Time = os.clock(), Origin = Origin, Direction = Direction.Unit, Speed = tonumber(Module.ProjectileSpeed) or 500, Lifetime = tonumber(Module.ProjectileLifetime) or 10}
 end)
 
-InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
+InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint)
 	local function reject(Reason)
 		debugDamage(Player, "REJECT", Reason)
 	end
 
 	if not Player then return end
 	if typeof(Origin) ~= "Vector3" then return reject("invalid shot origin") end
-	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return reject("invalid shot direction") end
+	if typeof(AimPoint) ~= "Vector3" then return reject("invalid aim point") end
+	if AimPoint.X ~= AimPoint.X or AimPoint.Y ~= AimPoint.Y or AimPoint.Z ~= AimPoint.Z then return reject("invalid aim point") end
 
 	local Character = Player.Character
 	local ShooterHumanoid = Character and Character:FindFirstChildOfClass("Humanoid")
@@ -191,6 +192,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
 
 	local ExpectedOrigin = (ShooterTorso.CFrame * CFrame.new(0, 1.5, 0)).Position
 	if (Origin - ExpectedOrigin).Magnitude > 8 then return reject("shot origin too far from shooter") end
+	if (AimPoint - ExpectedOrigin).Magnitude > 5000 then return reject("aim point too far from shooter") end
 
 	ShotTimes[Player] = ShotTimes[Player] or {}
 	local Now = os.clock()
@@ -199,7 +201,9 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
 	if Now - LastShot < FireRate then return reject(string.format("fire-rate gate: %.3fs remaining", FireRate - (Now - LastShot))) end
 	ShotTimes[Player][Tool] = Now
 
-	Direction = Direction.Unit
+	local DirectionVector = AimPoint - ExpectedOrigin
+	if DirectionVector.Magnitude <= 0 then return reject("aim point is at shooter origin") end
+	local Direction = DirectionVector.Unit
 	local RayStart = ExpectedOrigin
 	local PierceRemaining = math.max(math.floor(tonumber(Module.Piercing) or 0), 0)
 	local FilterInstances = {Character, Tool}
