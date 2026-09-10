@@ -124,19 +124,24 @@ function WeaponFire:Fire(ShootingHandle)
 	if Module.ProjectileType == "Projectile" then self:_FireProjectile(Start, Direction, ShootingHandle) return end
 
 	-- Always send the hitscan shot for server-side raycast debugging.
-	-- This happens before the local hit check, so misses are included too.
 	RaycastDebug:FireServer(self.Tool, Start, Direction)
 
 	while PierceAvailable >= 0 do
 		local Hit, EndPos = self.Raycast(Start, Direction, 5000, self.Character, self.PiercedHumanoid)
 		if not Module.ExplosiveEnabled then
 			if Hit and Hit.Parent then
-				local TargetHumanoid = Hit.Parent:FindFirstChild("Humanoid")
-				local TargetTorso = Hit.Parent:FindFirstChild("Torso")
-				if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
+				-- Resolve the character from any descendant hit, not only Hit.Parent.
+				-- This prevents intermittent misses on accessories, nested parts, and
+				-- character models whose Humanoid is not directly under the hit part.
+				local TargetModel = Hit:FindFirstAncestorOfClass("Model")
+				local TargetHumanoid = TargetModel and TargetModel:FindFirstChildOfClass("Humanoid")
+				local TargetTorso = TargetModel and (TargetModel:FindFirstChild("Torso") or TargetModel:FindFirstChild("HumanoidRootPart"))
+				if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso and TargetModel ~= self.Character then
 					self.InflictTarget:FireServer(TargetHumanoid, TargetTorso, Hit, Direction)
 					self.PiercedHumanoid[TargetHumanoid] = true
-				else PierceAvailable = 0 end
+				else
+					PierceAvailable = 0
+				end
 			end
 		else
 			local ExplosionInstance = Instance.new("Explosion")
