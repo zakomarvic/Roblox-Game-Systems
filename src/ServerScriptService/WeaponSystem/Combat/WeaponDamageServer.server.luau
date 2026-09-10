@@ -109,6 +109,19 @@ local function addCreator(TargetHumanoid, Player)
 	Debris:AddItem(Creator, 5)
 end
 
+local function shouldSkipHit(HitPart)
+	if not HitPart then return false end
+	if HitPart.Transparency > 0.75 then return true end
+	local Name = string.lower(HitPart.Name)
+	return Name == "handle"
+		or Name == "effect"
+		or Name == "bullet"
+		or Name == "laser"
+		or Name == "water"
+		or Name == "rail"
+		or Name == "arrow"
+end
+
 RaycastDebug.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
 	if not DEBUG_RAYCASTS then return end
 	if typeof(Origin) ~= "Vector3" or typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return end
@@ -127,7 +140,7 @@ RaycastDebug.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
 	Params.FilterDescendantsInstances = {Character, Tool}
 	Params.IgnoreWater = true
 
-	local Result = workspace:Raycast(Origin, Direction * 5000, Params)
+	local Result = workspace:Raycast(ExpectedOrigin, Direction * 5000, Params)
 	local HitCharacter = false
 	if Result then
 		local HitModel = Result.Instance:FindFirstAncestorOfClass("Model")
@@ -135,8 +148,8 @@ RaycastDebug.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
 		HitCharacter = HitHumanoid ~= nil and HitModel ~= Character
 	end
 
-	local EndPosition = Result and Result.Position or (Origin + Direction * 5000)
-	debugRay(Origin, EndPosition, Result and Result.Position or nil, HitCharacter)
+	local EndPosition = Result and Result.Position or (ExpectedOrigin + Direction * 5000)
+	debugRay(ExpectedOrigin, EndPosition, Result and Result.Position or nil, HitCharacter)
 end)
 
 ProjectileFired.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
@@ -154,29 +167,15 @@ ProjectileFired.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
 	ProjectileRecords[Player][Tool] = {Time = os.clock(), Origin = Origin, Direction = Direction.Unit, Speed = tonumber(Module.ProjectileSpeed) or 500, Lifetime = tonumber(Module.ProjectileLifetime) or 10}
 end)
 
-InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso, HitPart, Direction)
+InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
 	local function reject(Reason)
 		debugDamage(Player, "REJECT", Reason)
 	end
 
 	if not Player then return end
-	debugDamage(Player, "RECEIVED", string.format("target=%s hit=%s", TargetHumanoid and TargetHumanoid:GetFullName() or "nil", HitPart and HitPart:GetFullName() or "nil"))
+	if typeof(Origin) ~= "Vector3" then return reject("invalid shot origin") end
+	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return reject("invalid shot direction") end
 
-	if not TargetHumanoid or not TargetHumanoid:IsA("Humanoid") then return reject("invalid TargetHumanoid") end
-	if not TargetTorso or not TargetTorso:IsA("BasePart") then return reject("invalid TargetTorso") end
-	if not HitPart or not HitPart:IsA("BasePart") then return reject("invalid HitPart") end
-	if TargetHumanoid.Health <= 0 then return reject("target already dead") end
-
-	local TargetCharacter = TargetHumanoid.Parent
-	if not TargetCharacter or not TargetCharacter:IsA("Model") then return reject("target is not a Model") end
-	if HitPart:FindFirstAncestorOfClass("Model") ~= TargetCharacter then return reject("HitPart belongs to a different Model") end
-	if TargetCharacter:FindFirstChildOfClass("Humanoid") ~= TargetHumanoid then return reject("target Humanoid mismatch") end
-	if not HitPart:IsDescendantOf(TargetCharacter) then return reject("HitPart not descendant of target") end
-	if not TargetTorso:IsDescendantOf(TargetCharacter) then return reject("TargetTorso not descendant of target") end
-	if TargetCharacter == Player.Character then return reject("shot own character") end
-	if typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return reject("invalid Direction") end
-
-	Direction = Direction.Unit
 	local Character = Player.Character
 	local ShooterHumanoid = Character and Character:FindFirstChildOfClass("Humanoid")
 	local ShooterTorso = getTorso(Character)
@@ -184,6 +183,11 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 
 	local Tool, Module = getEquippedWeapon(Player)
 	if not Tool then return reject("no equipped weapon/Setting") end
+	if Module.ProjectileType == "Projectile" then return reject("projectile sent to hitscan remote") end
+	if Module.ExplosiveEnabled == true then return reject("explosive weapon sent to hitscan remote") end
+
+	local ExpectedOrigin = (ShooterTorso.CFrame * CFrame.new(0, 1.5, 0)).Position
+	if (Origin - ExpectedOrigin).Magnitude > 8 then return reject("shot origin too far from shooter") end
 
 	ShotTimes[Player] = ShotTimes[Player] or {}
 	local Now = os.clock()
@@ -191,46 +195,87 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	local FireRate = math.max(tonumber(Module.FireRate) or 0, 0.03)
 	if Now - LastShot < FireRate then return reject(string.format("fire-rate gate: %.3fs remaining", FireRate - (Now - LastShot))) end
 
-	local Start = (ShooterTorso.CFrame * CFrame.new(0, 1.5, 0)).Position
+	Direction = Direction.Unit
+	local RayStart = ExpectedOrigin
+	local PierceRemaining = math.max(math.floor(tonumber(Module.Piercing) or 0), 0)
+	local FilterInstances = {Character, Tool}
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
-	Params.FilterDescendantsInstances = {Character, Tool}
+	Params.FilterDescendantsInstances = FilterInstances
 	Params.IgnoreWater = true
 
-	local ToTarget = HitPart.Position - Start
-	if ToTarget.Magnitude <= 0 or ToTarget.Magnitude > 5000 then return reject("target out of range") end
+	local AppliedAny = false
 
-	local Result = workspace:Raycast(Start, ToTarget, Params)
-	local HitTarget = Result ~= nil and Result.Instance:FindFirstAncestorOfClass("Model") == TargetCharacter
-	if not HitTarget then
-		return reject(string.format("server raycast mismatch: result=%s", Result and Result.Instance:GetFullName() or "nil"))
+	while true do
+		local Result = workspace:Raycast(RayStart, Direction * 5000, Params)
+		if not Result then
+			debugDamage(Player, "MISS", "server raycast found no hit")
+			break
+		end
+
+		local HitPart = Result.Instance
+		if shouldSkipHit(HitPart) then
+			table.insert(FilterInstances, HitPart)
+			Params.FilterDescendantsInstances = FilterInstances
+			RayStart = Result.Position + Direction * 0.01
+			continue
+		end
+
+		local TargetCharacter = HitPart:FindFirstAncestorOfClass("Model")
+		local TargetHumanoid = TargetCharacter and TargetCharacter:FindFirstChildOfClass("Humanoid")
+		local TargetTorso = getTorso(TargetCharacter)
+
+		if not TargetCharacter or not TargetHumanoid then
+			debugDamage(Player, "MISS", string.format("server ray stopped on %s", HitPart:GetFullName()))
+			break
+		end
+
+		if TargetCharacter == Character then
+			debugDamage(Player, "MISS", "server ray hit shooter")
+			break
+		end
+
+		if TargetHumanoid.Health <= 0 or not TargetTorso then
+			debugDamage(Player, "MISS", string.format("target %s is dead or has no torso", TargetCharacter.Name))
+			break
+		end
+
+		local Damage = tonumber(Module.BaseDamage)
+		if not Damage or Damage <= 0 then return reject("invalid BaseDamage") end
+
+		if HitPart.Name == "Head" and Module.HeadshotEnabled then
+			Damage *= tonumber(Module.HeadshotDamageMultiplier) or 1
+		end
+
+		local Knockback = tonumber(Module.Knockback) or 0
+		local Lifesteal = tonumber(Module.Lifesteal) or 0
+		local BeforeHealth = TargetHumanoid.Health
+		local DownedBefore = TargetCharacter:GetAttribute("Downed") == true
+		debugDamage(Player, "APPLY", string.format("weapon=%s target=%s hit=%s damage=%.2f overkill=%s healthBefore=%.2f downedBefore=%s", Tool.Name, TargetCharacter.Name, HitPart.Name, Damage, tostring(Module.Overkill == true), BeforeHealth, tostring(DownedBefore)))
+
+		addCreator(TargetHumanoid, Player)
+		local Applied = DamageService.ApplyDamage(TargetHumanoid, Damage, Module.Overkill)
+		local AfterHealth = TargetHumanoid.Health
+		local DownedAfter = TargetCharacter:GetAttribute("Downed") == true
+		debugDamage(Player, "RESULT", string.format("target=%s DamageService=%s healthAfter=%.2f downedAfter=%s", TargetCharacter.Name, tostring(Applied), AfterHealth, tostring(DownedAfter)))
+		AppliedAny = AppliedAny or Applied == true
+
+		if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += Direction * Knockback end
+		if Lifesteal > 0 and ShooterHumanoid.Health > 0 then ShooterHumanoid.Health += Damage * Lifesteal end
+		if Module.FlamingBullet == true then
+			BulletEffects.Apply("Incendiary", {Player=Player, Tool=Tool, Module=Module, TargetCharacter=TargetCharacter, TargetHumanoid=TargetHumanoid, TargetTorso=TargetTorso, HitPart=HitPart, Direction=Direction, Duration=Module.FlamingBulletDuration})
+		end
+
+		if PierceRemaining <= 0 then break end
+		PierceRemaining -= 1
+		table.insert(FilterInstances, TargetCharacter)
+		Params.FilterDescendantsInstances = FilterInstances
+		RayStart = Result.Position + Direction * 0.01
 	end
 
-	local AlongShot = ToTarget:Dot(Direction)
-	local AimError = (HitPart.Position - (Start + Direction * AlongShot)).Magnitude
-	if AlongShot <= 0 or AlongShot > 5000 then return reject("invalid shot distance/direction") end
-	if AimError > 8 then return reject(string.format("aim error too large: %.2f studs", AimError)) end
-
-	local Damage = tonumber(Module.BaseDamage)
-	if not Damage or Damage <= 0 then return reject("invalid BaseDamage") end
-
-	ShotTimes[Player][Tool] = Now
-	if HitPart.Name == "Head" and Module.HeadshotEnabled then Damage *= tonumber(Module.HeadshotDamageMultiplier) or 1 end
-	local Knockback = tonumber(Module.Knockback) or 0
-	local Lifesteal = tonumber(Module.Lifesteal) or 0
-	local BeforeHealth = TargetHumanoid.Health
-	local DownedBefore = TargetCharacter:GetAttribute("Downed") == true
-	debugDamage(Player, "APPLY", string.format("weapon=%s damage=%.2f overkill=%s targetHealthBefore=%.2f downedBefore=%s", Tool.Name, Damage, tostring(Module.Overkill == true), BeforeHealth, tostring(DownedBefore)))
-
-	addCreator(TargetHumanoid, Player)
-	local Applied = DamageService.ApplyDamage(TargetHumanoid, Damage, Module.Overkill)
-	local AfterHealth = TargetHumanoid.Health
-	local DownedAfter = TargetCharacter:GetAttribute("Downed") == true
-	debugDamage(Player, "RESULT", string.format("DamageService=%s targetHealthAfter=%.2f downedAfter=%s", tostring(Applied), AfterHealth, tostring(DownedAfter)))
-
-	if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += Direction * Knockback end
-	if Lifesteal > 0 and ShooterHumanoid.Health > 0 then ShooterHumanoid.Health += Damage * Lifesteal end
-	if Module.FlamingBullet == true then BulletEffects.Apply("Incendiary", {Player=Player, Tool=Tool, Module=Module, TargetCharacter=TargetCharacter, TargetHumanoid=TargetHumanoid, TargetTorso=TargetTorso, HitPart=HitPart, Direction=Direction, Duration=Module.FlamingBulletDuration}) end
+	if AppliedAny then
+		ShotTimes[Player][Tool] = Now
+	end
 end)
 
 Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool, ClientOrigin)
