@@ -13,6 +13,11 @@ local DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE = "DownedInvulnerableUntil"
 
 local CharacterConnections = {}
 
+-- Tracks damage that is currently being applied by this service.
+-- This deliberately stays server-side instead of using a Character Attribute:
+-- the damage request itself is what determines whether Overkill is allowed.
+local DamageInProgress = {}
+
 local function removeDownedIndicator(character)
 	local head = character:FindFirstChild("Head")
 	if not head then return end
@@ -88,6 +93,14 @@ local function setupCharacter(character)
 
 	humanoid:GetPropertyChangedSignal("Health"):Connect(function()
 		if not character.Parent then return end
+
+		-- A damage request made through ApplyDamage owns the decision for this
+		-- HealthChanged event. In particular, Overkill must be allowed to reach
+		-- normal Humanoid death without being converted back into Downed.
+		if DamageInProgress[humanoid] then
+			return
+		end
+
 		if character:GetAttribute(DOWNED_ATTRIBUTE) then
 			if isDownedInvulnerable(character) and humanoid.Health < DOWNED_HEALTH then
 				humanoid.Health = DOWNED_HEALTH
@@ -98,9 +111,8 @@ local function setupCharacter(character)
 		end
 
 		if humanoid.Health <= 0 then
-			-- Damage routed through DownedDamageService decides whether a lethal
-			-- hit becomes Downed or remains a normal Humanoid death. This fallback
-			-- keeps direct external Health changes using the normal downed behavior.
+			-- Direct external Health changes still use the normal downed behavior.
+			-- Weapon damage should go through ApplyDamage so Overkill can bypass it.
 			humanoid.Health = DOWNED_HEALTH
 			setDowned(character)
 			return
@@ -136,24 +148,32 @@ function DownedDamageService.ApplyDamage(targetHumanoid, damage, overkill)
 
 	local isOverkill = overkill == true
 
-	-- Overkill explicitly bypasses the 0.3 second protection after Downed.
+	-- Normal damage cannot affect a freshly downed target during the 0.3s
+	-- protection window. Overkill explicitly bypasses that protection.
 	if character:GetAttribute(DOWNED_ATTRIBUTE) then
 		if not isOverkill and isDownedInvulnerable(character) then
 			return false
 		end
 
+		DamageInProgress[targetHumanoid] = true
 		targetHumanoid:TakeDamage(damage)
+		DamageInProgress[targetHumanoid] = nil
 		return true
 	end
 
-	-- For normal weapons, never let a lethal hit pass through to Roblox death.
-	-- Convert it directly to Downed using the damage request's Overkill value.
+	-- Non-overkill lethal damage is converted directly to Downed, so it never
+	-- reaches normal Roblox death.
 	if not isOverkill and targetHumanoid.Health - damage <= 0 then
 		setDowned(character)
 		return true
 	end
 
+	-- Overkill damage is allowed to pass through normally. The HealthChanged
+	-- handler sees DamageInProgress and therefore does not convert Health <= 0
+	-- into Downed. Roblox handles the resulting Humanoid death normally.
+	DamageInProgress[targetHumanoid] = true
 	targetHumanoid:TakeDamage(damage)
+	DamageInProgress[targetHumanoid] = nil
 	return true
 end
 
