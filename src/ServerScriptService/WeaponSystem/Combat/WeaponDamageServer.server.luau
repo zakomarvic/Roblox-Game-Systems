@@ -21,7 +21,9 @@ local CombatSystem = game:GetService("ServerScriptService"):WaitForChild("Combat
 local DamageService = require(CombatSystem:WaitForChild("DamageService"))
 
 -- DEBUG: Set this to true while investigating hit-registration/raycast issues.
--- It draws the exact server-side ray used for weapon hit validation.
+-- Every server-side weapon ray is drawn, including misses.
+-- Green = the raycast hit the requested target character.
+-- Red = the raycast missed the requested target (including hitting an obstruction).
 local DEBUG_RAYCASTS = false
 local DEBUG_RAYCAST_DURATION = 2
 
@@ -29,7 +31,7 @@ local ProjectileRecords = {}
 local ShotTimes = {}
 local ExplosionTimes = {}
 
-local function debugRay(Start, Finish, HitPosition)
+local function debugRay(Start, Finish, HitPosition, DidHitTarget)
 	if not DEBUG_RAYCASTS then return end
 	if typeof(Start) ~= "Vector3" or typeof(Finish) ~= "Vector3" then return end
 
@@ -38,14 +40,14 @@ local function debugRay(Start, Finish, HitPosition)
 	if Length <= 0 then return end
 
 	local BeamPart = Instance.new("Part")
-	BeamPart.Name = "DEBUG_GunRay"
+	BeamPart.Name = DidHitTarget and "DEBUG_GunRay_Hit" or "DEBUG_GunRay_Miss"
 	BeamPart.Anchored = true
 	BeamPart.CanCollide = false
 	BeamPart.CanTouch = false
 	BeamPart.CanQuery = false
 	BeamPart.CastShadow = false
 	BeamPart.Material = Enum.Material.Neon
-	BeamPart.Color = Color3.fromRGB(255, 70, 70)
+	BeamPart.Color = DidHitTarget and Color3.fromRGB(70, 255, 90) or Color3.fromRGB(255, 70, 70)
 	BeamPart.Transparency = 0.2
 	BeamPart.Size = Vector3.new(0.08, 0.08, Length)
 	BeamPart.CFrame = CFrame.lookAt(Start + Offset * 0.5, Finish)
@@ -141,12 +143,14 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	local ToTarget = HitPart.Position - Start
 	if ToTarget.Magnitude <= 0 or ToTarget.Magnitude > 5000 then return end
 	local Result = workspace:Raycast(Start, ToTarget, Params)
+	local HitTarget = Result ~= nil and Result.Instance:FindFirstAncestorOfClass("Model") == TargetCharacter
+	local RayEnd = Result and Result.Position or (Start + ToTarget)
 
-	-- Draw the exact ray the server tested. A yellow marker shows where the
-	-- ray actually stopped when it hit something.
-	debugRay(Start, Start + ToTarget, Result and Result.Position or nil)
+	-- Draw every server-side ray. Green means the requested target was hit;
+	-- red means the ray missed the target or was stopped by an obstruction.
+	debugRay(Start, RayEnd, Result and Result.Position or nil, HitTarget)
 
-	if Result and Result.Instance:FindFirstAncestorOfClass("Model") ~= TargetCharacter then return end
+	if not HitTarget then return end
 	local AlongShot = ToTarget:Dot(Direction)
 	if AlongShot <= 0 or AlongShot > 5000 or (HitPart.Position - (Start + Direction * AlongShot)).Magnitude > 8 then return end
 	local Damage = tonumber(Module.BaseDamage)
