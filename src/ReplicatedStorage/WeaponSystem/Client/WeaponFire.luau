@@ -142,6 +142,9 @@ function WeaponFire:Fire(ShootingHandle)
 	local Direction = self:_GetDirection(Start)
 	if Module.ProjectileType == "Projectile" then self:_FireProjectile(Start, Direction, ShootingHandle) return end
 
+	-- The server now owns hitscan target selection. The client only supplies the shot origin and direction.
+	self.InflictTarget:FireServer(Start, Direction)
+
 	-- Always send the hitscan shot for server-side raycast debugging.
 	RaycastDebug:FireServer(self.Tool, Start, Direction)
 
@@ -151,9 +154,7 @@ function WeaponFire:Fire(ShootingHandle)
 			if Hit and Hit.Parent then
 				local TargetModel = Hit:FindFirstAncestorOfClass("Model")
 				local TargetHumanoid = TargetModel and TargetModel:FindFirstChildOfClass("Humanoid")
-				local TargetTorso = TargetModel and (TargetModel:FindFirstChild("Torso") or TargetModel:FindFirstChild("HumanoidRootPart"))
-				if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso and TargetModel ~= self.Character then
-					self.InflictTarget:FireServer(TargetHumanoid, TargetTorso, Hit, Direction)
+				if TargetHumanoid and TargetHumanoid.Health > 0 and TargetModel ~= self.Character then
 					self.PiercedHumanoid[TargetHumanoid] = true
 				else
 					PierceAvailable = 0
