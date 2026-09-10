@@ -93,7 +93,7 @@ function WeaponFire:_GetAimPoint()
 	end
 
 	local MouseLocation = UserInputService:GetMouseLocation()
-	local CameraRay = Camera:ScreenPointToRay(MouseLocation.X, MouseLocation.Y)
+	local CameraRay = Camera:ViewportPointToRay(MouseLocation.X, MouseLocation.Y)
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
 	Params.FilterDescendantsInstances = {self.Character, self.Tool}
