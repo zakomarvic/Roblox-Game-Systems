@@ -19,9 +19,56 @@ local BulletEffects = require(Effects:WaitForChild("BulletEffects"))
 local ExplosionEffects = require(Effects:WaitForChild("ExplosionEffects"))
 local CombatSystem = game:GetService("ServerScriptService"):WaitForChild("CombatSystem")
 local DamageService = require(CombatSystem:WaitForChild("DamageService"))
+
+-- DEBUG: Set this to true while investigating hit-registration/raycast issues.
+-- It draws the exact server-side ray used for weapon hit validation.
+local DEBUG_RAYCASTS = false
+local DEBUG_RAYCAST_DURATION = 2
+
 local ProjectileRecords = {}
 local ShotTimes = {}
 local ExplosionTimes = {}
+
+local function debugRay(Start, Finish, HitPosition)
+	if not DEBUG_RAYCASTS then return end
+	if typeof(Start) ~= "Vector3" or typeof(Finish) ~= "Vector3" then return end
+
+	local Offset = Finish - Start
+	local Length = Offset.Magnitude
+	if Length <= 0 then return end
+
+	local BeamPart = Instance.new("Part")
+	BeamPart.Name = "DEBUG_GunRay"
+	BeamPart.Anchored = true
+	BeamPart.CanCollide = false
+	BeamPart.CanTouch = false
+	BeamPart.CanQuery = false
+	BeamPart.CastShadow = false
+	BeamPart.Material = Enum.Material.Neon
+	BeamPart.Color = Color3.fromRGB(255, 70, 70)
+	BeamPart.Transparency = 0.2
+	BeamPart.Size = Vector3.new(0.08, 0.08, Length)
+	BeamPart.CFrame = CFrame.lookAt(Start + Offset * 0.5, Finish)
+	BeamPart.Parent = workspace
+	Debris:AddItem(BeamPart, DEBUG_RAYCAST_DURATION)
+
+	if HitPosition then
+		local Marker = Instance.new("Part")
+		Marker.Name = "DEBUG_GunRayHit"
+		Marker.Shape = Enum.PartType.Ball
+		Marker.Anchored = true
+		Marker.CanCollide = false
+		Marker.CanTouch = false
+		Marker.CanQuery = false
+		Marker.CastShadow = false
+		Marker.Material = Enum.Material.Neon
+		Marker.Color = Color3.fromRGB(255, 255, 0)
+		Marker.Size = Vector3.new(0.35, 0.35, 0.35)
+		Marker.Position = HitPosition
+		Marker.Parent = workspace
+		Debris:AddItem(Marker, DEBUG_RAYCAST_DURATION)
+	end
+end
 
 local function getOwnedWeapon(Player, Tool)
 	if not Tool or not Tool:IsA("Tool") then return nil, nil end
@@ -94,6 +141,11 @@ InflictTarget.OnServerEvent:Connect(function(Player, TargetHumanoid, TargetTorso
 	local ToTarget = HitPart.Position - Start
 	if ToTarget.Magnitude <= 0 or ToTarget.Magnitude > 5000 then return end
 	local Result = workspace:Raycast(Start, ToTarget, Params)
+
+	-- Draw the exact ray the server tested. A yellow marker shows where the
+	-- ray actually stopped when it hit something.
+	debugRay(Start, Start + ToTarget, Result and Result.Position or nil)
+
 	if Result and Result.Instance:FindFirstAncestorOfClass("Model") ~= TargetCharacter then return end
 	local AlongShot = ToTarget:Dot(Direction)
 	if AlongShot <= 0 or AlongShot > 5000 or (HitPart.Position - (Start + Direction * AlongShot)).Magnitude > 8 then return end
@@ -124,7 +176,7 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool, Clie
 	if Radius <= 0 or Damage <= 0 then return end
 	ExplosionTimes[Player] = ExplosionTimes[Player] or {}
 	local Now = os.clock()
-	local FireRate = math.max(tonumber(Module.FireRate) or 0, 0.03)
+	local FireRate = math.max(tonumber(Module.FireRate) or 0.03, 0.03)
 	local LastExplosion = ExplosionTimes[Player][Tool] or 0
 	if Now - LastExplosion < FireRate then return end
 	local Record = ProjectileRecords[Player] and ProjectileRecords[Player][Tool]
