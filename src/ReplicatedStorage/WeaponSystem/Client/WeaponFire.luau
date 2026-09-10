@@ -49,8 +49,6 @@ function WeaponFire.new(Config)
 			HitSound = HitSounds[math.random(1, #HitSounds)]
 		end
 
-		-- The server chose this endpoint. Do not perform another client raycast and
-		-- do not send the visual back to the server again.
 		BulletVisualizer.Visualize(
 			ShootingHandle,
 			Module.MuzzleOffset,
@@ -94,7 +92,10 @@ function WeaponFire:_GetDirection(Start)
 	local AimDirection
 
 	if Camera then
-		local CameraRay = Camera:ViewportPointToRay(MouseLocation.X, MouseLocation.Y)
+		-- GetMouseLocation returns screen coordinates, so ScreenPointToRay is
+		-- the matching camera API. ViewportPointToRay would introduce the GUI
+		-- inset and can shift the server ray away from the crosshair.
+		local CameraRay = Camera:ScreenPointToRay(MouseLocation.X, MouseLocation.Y)
 		local Params = RaycastParams.new()
 		Params.FilterType = Enum.RaycastFilterType.Exclude
 		Params.FilterDescendantsInstances = {self.Character, self.Tool}
@@ -173,12 +174,7 @@ function WeaponFire:Fire(ShootingHandle)
 	local Direction = self:_GetDirection(Start)
 	if Module.ProjectileType == "Projectile" then self:_FireProjectile(Start, Direction, ShootingHandle) return end
 
-	-- Hitscan is now fully server-authoritative. The client only supplies the
-	-- shot origin and direction; the server selects the hit and sends the final
-	-- endpoint back for the tracer.
 	self.InflictTarget:FireServer(Start, Direction)
-
-	-- Optional diagnostic ray. This is never involved in damage or visuals.
 	RaycastDebug:FireServer(self.Tool, Start, Direction)
 end
 
