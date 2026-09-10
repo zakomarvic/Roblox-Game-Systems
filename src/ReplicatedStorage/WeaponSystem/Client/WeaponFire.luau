@@ -92,10 +92,10 @@ function WeaponFire:_GetDirection(Start)
 	local AimDirection
 
 	if Camera then
-		-- GetMouseLocation returns screen coordinates, so ScreenPointToRay is
-		-- the matching camera API. ViewportPointToRay would introduce the GUI
-		-- inset and can shift the server ray away from the crosshair.
-		local CameraRay = Camera:ScreenPointToRay(MouseLocation.X, MouseLocation.Y)
+		-- GetMouseLocation() uses viewport coordinates. ViewportPointToRay()
+		-- uses the same coordinate space, so this keeps the ray aligned with
+		-- the actual mouse/crosshair position.
+		local CameraRay = Camera:ViewportPointToRay(MouseLocation.X, MouseLocation.Y)
 		local Params = RaycastParams.new()
 		Params.FilterType = Enum.RaycastFilterType.Exclude
 		Params.FilterDescendantsInstances = {self.Character, self.Tool}
