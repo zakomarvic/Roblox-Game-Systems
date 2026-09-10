@@ -117,40 +117,40 @@ local function setupCharacter(character)
 	local originalAutoRotate = humanoid.AutoRotate
 
 	humanoid:GetPropertyChangedSignal("Health"):Connect(function()
-		if not character.Parent then
-			return
-		end
+	if not character.Parent then
+		return
+	end
 
-		if character:GetAttribute(DOWNED_ATTRIBUTE) then
-			if isDownedInvulnerable(character) and humanoid.Health < DOWNED_HEALTH then
-				humanoid.Health = DOWNED_HEALTH
-			end
-
-			if humanoid.WalkSpeed ~= 0 then
-				humanoid.WalkSpeed = 0
-			end
-			if humanoid.JumpPower ~= 0 then
-				humanoid.JumpPower = 0
-			end
-			return
-		end
-
-		if humanoid.Health <= 0 then
-			-- Overkill is supplied by the weapon that applied the damage.
-			-- When enabled, allow the Humanoid to actually die.
-			if humanoid:GetAttribute(DAMAGE_OVERKILL_ATTRIBUTE) == true then
-				return
-			end
-
+	if character:GetAttribute(DOWNED_ATTRIBUTE) then
+		if isDownedInvulnerable(character) and humanoid.Health < DOWNED_HEALTH then
 			humanoid.Health = DOWNED_HEALTH
-			setDowned(character)
+		end
+
+		if humanoid.WalkSpeed ~= 0 then
+			humanoid.WalkSpeed = 0
+		end
+		if humanoid.JumpPower ~= 0 then
+			humanoid.JumpPower = 0
+		end
+		return
+	end
+
+	if humanoid.Health <= 0 then
+		-- Overkill is supplied by the weapon that applied the damage.
+		-- When enabled, allow the Humanoid to actually die.
+		if character:GetAttribute(DAMAGE_OVERKILL_ATTRIBUTE) == true then
 			return
 		end
 
-		if humanoid.Health <= DOWNED_HEALTH_THRESHOLD and not character:GetAttribute(REVIVING_ATTRIBUTE) then
-			setDowned(character)
-		end
-	end)
+		humanoid.Health = DOWNED_HEALTH
+		setDowned(character)
+		return
+	end
+
+	if humanoid.Health <= DOWNED_HEALTH_THRESHOLD and not character:GetAttribute(REVIVING_ATTRIBUTE) then
+		setDowned(character)
+	end
+end)
 
 	character:GetAttributeChangedSignal(DOWNED_ATTRIBUTE):Connect(function()
 		if character:GetAttribute(DOWNED_ATTRIBUTE) then
