@@ -194,6 +194,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
 	local LastShot = ShotTimes[Player][Tool] or 0
 	local FireRate = math.max(tonumber(Module.FireRate) or 0, 0.03)
 	if Now - LastShot < FireRate then return reject(string.format("fire-rate gate: %.3fs remaining", FireRate - (Now - LastShot))) end
+	ShotTimes[Player][Tool] = Now
 
 	Direction = Direction.Unit
 	local RayStart = ExpectedOrigin
@@ -203,8 +204,6 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
 	Params.FilterType = Enum.RaycastFilterType.Exclude
 	Params.FilterDescendantsInstances = FilterInstances
 	Params.IgnoreWater = true
-
-	local AppliedAny = false
 
 	while true do
 		local Result = workspace:Raycast(RayStart, Direction * 5000, Params)
@@ -235,8 +234,17 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
 			break
 		end
 
-		if TargetHumanoid.Health <= 0 or not TargetTorso then
-			debugDamage(Player, "MISS", string.format("target %s is dead or has no torso", TargetCharacter.Name))
+		-- Match the client WeaponRaycast behavior: dead humanoid models are not valid blockers.
+		-- This is important during Dummy/player respawns, when the old dead model can briefly remain in Workspace.
+		if TargetHumanoid.Health <= 0 then
+			table.insert(FilterInstances, TargetCharacter)
+			Params.FilterDescendantsInstances = FilterInstances
+			RayStart = Result.Position + Direction * 0.01
+			continue
+		end
+
+		if not TargetTorso then
+			debugDamage(Player, "MISS", string.format("target %s has no torso", TargetCharacter.Name))
 			break
 		end
 
@@ -258,7 +266,6 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
 		local AfterHealth = TargetHumanoid.Health
 		local DownedAfter = TargetCharacter:GetAttribute("Downed") == true
 		debugDamage(Player, "RESULT", string.format("target=%s DamageService=%s healthAfter=%.2f downedAfter=%s", TargetCharacter.Name, tostring(Applied), AfterHealth, tostring(DownedAfter)))
-		AppliedAny = AppliedAny or Applied == true
 
 		if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += Direction * Knockback end
 		if Lifesteal > 0 and ShooterHumanoid.Health > 0 then ShooterHumanoid.Health += Damage * Lifesteal end
@@ -271,10 +278,6 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
 		table.insert(FilterInstances, TargetCharacter)
 		Params.FilterDescendantsInstances = FilterInstances
 		RayStart = Result.Position + Direction * 0.01
-	end
-
-	if AppliedAny then
-		ShotTimes[Player][Tool] = Now
 	end
 end)
 
