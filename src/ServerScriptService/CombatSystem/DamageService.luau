@@ -31,18 +31,32 @@ function DamageService.ApplyDamage(targetHumanoid, damage, overkill)
 	if not character then return false end
 
 	local isOverkill = overkill == true
+	local currentlyDowned = isDowned(character)
 	local currentHealth = targetHumanoid.Health
 
 	-- A Downed character has a short protection window after entering Downed.
-	-- Overkill does not bypass this rule for a non-lethal hit; it only controls
-	-- what happens when the incoming hit would actually kill the character.
-	if isDowned(character) and not isOverkill and isInvulnerable(character) then
+	-- Overkill bypasses this protection because it is specifically allowed to
+	-- execute a Downed character immediately.
+	if currentlyDowned and not isOverkill and isInvulnerable(character) then
 		return false
 	end
 
 	local resultingHealth = currentHealth - damage
 
 	if resultingHealth <= 0 then
+		if currentlyDowned then
+			-- The target is already Downed. Once the protection window has ended,
+			-- normal weapons are allowed to finish them. Clear the custom state
+			-- first so the Humanoid can receive normal lethal damage.
+			DownedService.Clear(targetHumanoid)
+			targetHumanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+			targetHumanoid:TakeDamage(damage)
+			if targetHumanoid.Health <= 0 then
+				targetHumanoid:ChangeState(Enum.HumanoidStateType.Dead)
+			end
+			return true
+		end
+
 		if isOverkill then
 			-- Remove the custom Downed state and let the Humanoid receive the
 			-- lethal damage normally. No forced Health = 0 is used.
