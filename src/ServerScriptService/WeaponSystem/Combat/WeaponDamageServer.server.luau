@@ -55,9 +55,11 @@ local function addCreator(TargetHumanoid, Player)
 end
 
 local function applyWeaponDamage(TargetHumanoid, Damage, Overkill)
-	TargetHumanoid:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, Overkill == true)
+	local TargetCharacter = TargetHumanoid.Parent
+	if not TargetCharacter or not TargetCharacter:IsA("Model") then return end
+	TargetCharacter:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, Overkill == true)
 	TargetHumanoid:TakeDamage(Damage)
-	TargetHumanoid:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, nil)
+	TargetCharacter:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, nil)
 end
 
 ProjectileFired.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
