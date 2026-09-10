@@ -49,9 +49,11 @@ function MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris, Overki
 	Creator.Parent = TargetHumanoid
 	if Debris then Debris:AddItem(Creator, 5) end
 
-	TargetHumanoid:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, Overkill == true)
+	local TargetCharacter = TargetHumanoid.Parent
+	if not TargetCharacter or not TargetCharacter:IsA("Model") then return end
+	TargetCharacter:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, Overkill == true)
 	TargetHumanoid:TakeDamage(Damage)
-	TargetHumanoid:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, nil)
+	TargetCharacter:SetAttribute(DAMAGE_OVERKILL_ATTRIBUTE, nil)
 end
 
 function MeleeUtility.GetOwnedEquippedWeapon(Player, Tool)
