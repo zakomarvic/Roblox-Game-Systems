@@ -3,7 +3,7 @@ local Players = game:GetService("Players")
 local MAX_HEALTH = 110
 local DOWNED_HEALTH_THRESHOLD = 10
 local DOWNED_HEALTH = 1
-local DOWNED_INVULNERABILITY_DURATION = 1
+local DOWNED_INVULNERABILITY_DURATION = 0.3
 local DOWNED_ATTRIBUTE = "Downed"
 local REVIVING_ATTRIBUTE = "Reviving"
 local DOWNED_IMAGE = "rbxassetid://8121963838"
@@ -137,8 +137,8 @@ local function setupCharacter(character)
 
 		if humanoid.Health <= 0 then
 			-- Overkill is supplied by the weapon that applied the damage.
-			-- When disabled, convert lethal damage into a downed state.
-			if character:GetAttribute(DAMAGE_OVERKILL_ATTRIBUTE) == true then
+			-- When enabled, allow the Humanoid to actually die.
+			if humanoid:GetAttribute(DAMAGE_OVERKILL_ATTRIBUTE) == true then
 				return
 			end
 
