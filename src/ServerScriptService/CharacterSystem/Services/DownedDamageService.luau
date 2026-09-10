@@ -12,10 +12,6 @@ local DOWNED_IMAGE = "rbxassetid://8121963838"
 local DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE = "DownedInvulnerableUntil"
 
 local CharacterConnections = {}
-
--- Tracks damage that is currently being applied by this service.
--- This deliberately stays server-side instead of using a Character Attribute:
--- the damage request itself is what determines whether Overkill is allowed.
 local DamageInProgress = {}
 
 local function removeDownedIndicator(character)
@@ -85,6 +81,9 @@ local function setupCharacter(character)
 	clearDowned(character)
 	humanoid.MaxHealth = MAX_HEALTH
 	humanoid.Health = MAX_HEALTH
+	-- Death must remain enabled. BreakJointsOnDeath is intentionally false,
+	-- but the Humanoid itself must still be allowed to enter Dead for Overkill.
+	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
 	humanoid.BreakJointsOnDeath = false
 
 	local originalWalkSpeed = humanoid.WalkSpeed
@@ -94,9 +93,8 @@ local function setupCharacter(character)
 	humanoid:GetPropertyChangedSignal("Health"):Connect(function()
 		if not character.Parent then return end
 
-		-- A damage request made through ApplyDamage owns the decision for this
-		-- HealthChanged event. In particular, Overkill must be allowed to reach
-		-- normal Humanoid death without being converted back into Downed.
+		-- Weapon damage owns this HealthChanged event. Overkill is allowed to
+		-- reach normal Roblox death without the downed conversion interfering.
 		if DamageInProgress[humanoid] then
 			return
 		end
@@ -111,8 +109,6 @@ local function setupCharacter(character)
 		end
 
 		if humanoid.Health <= 0 then
-			-- Direct external Health changes still use the normal downed behavior.
-			-- Weapon damage should go through ApplyDamage so Overkill can bypass it.
 			humanoid.Health = DOWNED_HEALTH
 			setDowned(character)
 			return
@@ -148,11 +144,16 @@ function DownedDamageService.ApplyDamage(targetHumanoid, damage, overkill)
 
 	local isOverkill = overkill == true
 
-	-- Normal damage cannot affect a freshly downed target during the 0.3s
-	-- protection window. Overkill explicitly bypasses that protection.
 	if character:GetAttribute(DOWNED_ATTRIBUTE) then
 		if not isOverkill and isDownedInvulnerable(character) then
 			return false
+		end
+
+		if isOverkill then
+			-- Overkill ends the custom Downed state and restores the Humanoid's
+			-- normal death state before applying damage.
+			clearDowned(character)
+			targetHumanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
 		end
 
 		DamageInProgress[targetHumanoid] = true
@@ -161,16 +162,15 @@ function DownedDamageService.ApplyDamage(targetHumanoid, damage, overkill)
 		return true
 	end
 
-	-- Non-overkill lethal damage is converted directly to Downed, so it never
-	-- reaches normal Roblox death.
 	if not isOverkill and targetHumanoid.Health - damage <= 0 then
 		setDowned(character)
 		return true
 	end
 
-	-- Overkill damage is allowed to pass through normally. The HealthChanged
-	-- handler sees DamageInProgress and therefore does not convert Health <= 0
-	-- into Downed. Roblox handles the resulting Humanoid death normally.
+	if isOverkill then
+		targetHumanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+	end
+
 	DamageInProgress[targetHumanoid] = true
 	targetHumanoid:TakeDamage(damage)
 	DamageInProgress[targetHumanoid] = nil
