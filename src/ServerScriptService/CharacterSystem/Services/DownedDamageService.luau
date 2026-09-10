@@ -1,9 +1,8 @@
-local DownedDamageService = {}
+local DownedService = {}
 
 local Players = game:GetService("Players")
 
 local MAX_HEALTH = 110
-local DOWNED_HEALTH_THRESHOLD = 10
 local DOWNED_HEALTH = 1
 local DOWNED_INVULNERABILITY_DURATION = 0.3
 local DOWNED_ATTRIBUTE = "Downed"
@@ -12,7 +11,6 @@ local DOWNED_IMAGE = "rbxassetid://8121963838"
 local DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE = "DownedInvulnerableUntil"
 
 local CharacterConnections = {}
-local DamageContext = {}
 
 local function removeDownedIndicator(character)
 	local head = character:FindFirstChild("Head")
@@ -43,16 +41,9 @@ local function addDownedIndicator(character)
 	image.Parent = billboard
 end
 
-local function isDownedInvulnerable(character)
-	local untilTime = character:GetAttribute(DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE)
-	return type(untilTime) == "number" and os.clock() < untilTime
-end
-
-local function setDowned(character)
-	if not character.Parent then return end
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.Health <= 0 then return end
-	if character:GetAttribute(DOWNED_ATTRIBUTE) then return end
+local function setDowned(character, humanoid)
+	if not character.Parent or not humanoid or humanoid.Health <= 0 then return false end
+	if character:GetAttribute(DOWNED_ATTRIBUTE) then return false end
 
 	character:SetAttribute(DOWNED_ATTRIBUTE, true)
 	character:SetAttribute(DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE, os.clock() + DOWNED_INVULNERABILITY_DURATION)
@@ -63,13 +54,16 @@ local function setDowned(character)
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
 	humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 	addDownedIndicator(character)
+	return true
 end
 
-local function clearDowned(character)
-	if not character then return end
+local function clearDowned(character, humanoid)
+	if not character then return false end
+	local wasDowned = character:GetAttribute(DOWNED_ATTRIBUTE) == true
 	character:SetAttribute(DOWNED_ATTRIBUTE, false)
 	character:SetAttribute(DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE, nil)
 	removeDownedIndicator(character)
+	return wasDowned
 end
 
 local function setupCharacter(character)
@@ -78,48 +72,15 @@ local function setupCharacter(character)
 	if not humanoid then return end
 
 	CharacterConnections[character] = true
-	clearDowned(character)
+	clearDowned(character, humanoid)
 	humanoid.MaxHealth = MAX_HEALTH
 	humanoid.Health = MAX_HEALTH
-	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
 	humanoid.BreakJointsOnDeath = false
+	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
 
 	local originalWalkSpeed = humanoid.WalkSpeed
 	local originalJumpPower = humanoid.JumpPower
 	local originalAutoRotate = humanoid.AutoRotate
-
-	humanoid:GetPropertyChangedSignal("Health"):Connect(function()
-		if not character.Parent then return end
-
-		local context = DamageContext[humanoid]
-
-		-- Only Overkill damage bypasses the down conversion. Normal weapon
-		-- damage still needs this event so 110 -> 10 (or less) enters Downed.
-		if context == "Overkill" then
-			return
-		end
-
-		if character:GetAttribute(DOWNED_ATTRIBUTE) then
-			if isDownedInvulnerable(character) and humanoid.Health < DOWNED_HEALTH then
-				humanoid.Health = DOWNED_HEALTH
-			end
-			if humanoid.WalkSpeed ~= 0 then humanoid.WalkSpeed = 0 end
-			if humanoid.JumpPower ~= 0 then humanoid.JumpPower = 0 end
-			return
-		end
-
-		if humanoid.Health <= 0 then
-			-- This is only a fallback for damage that did not go through
-			-- ApplyDamage. Weapon Overkill damage never reaches this branch.
-			humanoid.Health = DOWNED_HEALTH
-			setDowned(character)
-			return
-		end
-
-		if humanoid.Health <= DOWNED_HEALTH_THRESHOLD and not character:GetAttribute(REVIVING_ATTRIBUTE) then
-			setDowned(character)
-		end
-	end)
 
 	character:GetAttributeChangedSignal(DOWNED_ATTRIBUTE):Connect(function()
 		if character:GetAttribute(DOWNED_ATTRIBUTE) then return end
@@ -137,56 +98,34 @@ local function setupCharacter(character)
 	end)
 end
 
-local function takeDamage(targetHumanoid, damage, context)
-	DamageContext[targetHumanoid] = context
-	targetHumanoid:TakeDamage(damage)
-	DamageContext[targetHumanoid] = nil
-end
-
-function DownedDamageService.ApplyDamage(targetHumanoid, damage, overkill)
+function DownedService.Down(targetHumanoid)
 	if not targetHumanoid or not targetHumanoid:IsA("Humanoid") then return false end
-	if type(damage) ~= "number" or damage <= 0 or targetHumanoid.Health <= 0 then return false end
-
 	local character = targetHumanoid.Parent
 	if not character or not character:IsA("Model") then return false end
+	return setDowned(character, targetHumanoid)
+end
 
-	local isOverkill = overkill == true
+function DownedService.Clear(targetHumanoid)
+	if not targetHumanoid or not targetHumanoid:IsA("Humanoid") then return false end
+	local character = targetHumanoid.Parent
+	if not character or not character:IsA("Model") then return false end
+	return clearDowned(character, targetHumanoid)
+end
 
-	if character:GetAttribute(DOWNED_ATTRIBUTE) then
-		if not isOverkill and isDownedInvulnerable(character) then
-			return false
-		end
+function DownedService.IsDowned(targetHumanoid)
+	local character = targetHumanoid and targetHumanoid.Parent
+	return character ~= nil and character:IsA("Model") and character:GetAttribute(DOWNED_ATTRIBUTE) == true
+end
 
-		if isOverkill then
-			-- Remove the custom Downed state first, then let the Humanoid receive
-			-- real lethal damage. We do NOT force Health to zero here.
-			clearDowned(character)
-			targetHumanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
-		end
+function DownedService.IsInvulnerable(targetHumanoid)
+	local character = targetHumanoid and targetHumanoid.Parent
+	if not character or not character:IsA("Model") then return false end
+	local untilTime = character:GetAttribute(DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE)
+	return type(untilTime) == "number" and os.clock() < untilTime
+end
 
-		takeDamage(targetHumanoid, damage, isOverkill and "Overkill" or "Normal")
-
-		-- TakeDamage is still the actual killing mechanism. If it reduced the
-		-- Humanoid to zero, explicitly allow the normal Dead state to settle.
-		if isOverkill and targetHumanoid.Health <= 0 then
-			targetHumanoid:ChangeState(Enum.HumanoidStateType.Dead)
-		end
-		return true
-	end
-
-	if not isOverkill and targetHumanoid.Health - damage <= 0 then
-		setDowned(character)
-		return true
-	end
-
-	targetHumanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
-	takeDamage(targetHumanoid, damage, isOverkill and "Overkill" or "Normal")
-
-	if isOverkill and targetHumanoid.Health <= 0 then
-		targetHumanoid:ChangeState(Enum.HumanoidStateType.Dead)
-	end
-
-	return true
+function DownedService.SetupCharacter(character)
+	setupCharacter(character)
 end
 
 for _, player in ipairs(Players:GetPlayers()) do
@@ -213,4 +152,4 @@ workspace.DescendantAdded:Connect(function(descendant)
 	end
 end)
 
-return DownedDamageService
+return DownedService
