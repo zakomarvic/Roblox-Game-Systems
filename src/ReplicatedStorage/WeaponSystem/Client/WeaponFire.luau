@@ -9,6 +9,7 @@ local Remotes = WeaponSystem:WaitForChild("Remotes")
 local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
 local Explosion = Remotes:WaitForChild("Explosion")
 local ProjectileFired = Remotes:WaitForChild("ProjectileFired")
+local RaycastDebug = Remotes:WaitForChild("RaycastDebug")
 local BulletVisualizer = require(WeaponSystem.Effects:WaitForChild("BulletVisualizer"))
 local ProjectileController = require(WeaponSystem.Projectile:WaitForChild("ProjectileController"))
 local WeaponFireEffects = require(WeaponSystem.Effects:WaitForChild("WeaponFireEffects"))
@@ -121,6 +122,10 @@ function WeaponFire:Fire(ShootingHandle)
 	local Start = (self.Humanoid.Torso.CFrame * CFrame.new(0, 1.5, 0)).Position
 	local Direction = self:_GetDirection(Start)
 	if Module.ProjectileType == "Projectile" then self:_FireProjectile(Start, Direction, ShootingHandle) return end
+
+	-- Always send the hitscan shot for server-side raycast debugging.
+	-- This happens before the local hit check, so misses are included too.
+	RaycastDebug:FireServer(self.Tool, Start, Direction)
 
 	while PierceAvailable >= 0 do
 		local Hit, EndPos = self.Raycast(Start, Direction, 5000, self.Character, self.PiercedHumanoid)
