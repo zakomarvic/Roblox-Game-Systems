@@ -5,6 +5,9 @@ local Debris = game:GetService("Debris")
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local Remotes = WeaponSystem:WaitForChild("Remotes")
 local InflictTarget = Remotes:WaitForChild("InflictTarget")
+local ShotResult = Remotes:FindFirstChild("ShotResult") or Instance.new("RemoteEvent")
+ShotResult.Name = "ShotResult"
+ShotResult.Parent = Remotes
 local Explosion = Remotes:FindFirstChild("Explosion") or Instance.new("RemoteEvent")
 Explosion.Name = "Explosion"
 Explosion.Parent = Remotes
@@ -145,7 +148,7 @@ RaycastDebug.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
 	if Result then
 		local HitModel = Result.Instance:FindFirstAncestorOfClass("Model")
 		local HitHumanoid = HitModel and HitModel:FindFirstChildOfClass("Humanoid")
-		HitCharacter = HitHumanoid ~= nil and HitModel ~= Character
+		HitCharacter = HitHumanoid ~= nil and HitHumanoid.Health > 0 and HitModel ~= Character
 	end
 
 	local EndPosition = Result and Result.Position or (ExpectedOrigin + Direction * 5000)
@@ -205,6 +208,9 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
 	Params.FilterDescendantsInstances = FilterInstances
 	Params.IgnoreWater = true
 
+	local ShotEndPosition = ExpectedOrigin + Direction * 5000
+	local HitAnyCharacter = false
+
 	while true do
 		local Result = workspace:Raycast(RayStart, Direction * 5000, Params)
 		if not Result then
@@ -213,6 +219,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
 		end
 
 		local HitPart = Result.Instance
+		ShotEndPosition = Result.Position
 		if shouldSkipHit(HitPart) then
 			table.insert(FilterInstances, HitPart)
 			Params.FilterDescendantsInstances = FilterInstances
@@ -234,8 +241,6 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
 			break
 		end
 
-		-- Match the client WeaponRaycast behavior: dead humanoid models are not valid blockers.
-		-- This is important during Dummy/player respawns, when the old dead model can briefly remain in Workspace.
 		if TargetHumanoid.Health <= 0 then
 			table.insert(FilterInstances, TargetCharacter)
 			Params.FilterDescendantsInstances = FilterInstances
@@ -266,6 +271,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
 		local AfterHealth = TargetHumanoid.Health
 		local DownedAfter = TargetCharacter:GetAttribute("Downed") == true
 		debugDamage(Player, "RESULT", string.format("target=%s DamageService=%s healthAfter=%.2f downedAfter=%s", TargetCharacter.Name, tostring(Applied), AfterHealth, tostring(DownedAfter)))
+		HitAnyCharacter = true
 
 		if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += Direction * Knockback end
 		if Lifesteal > 0 and ShooterHumanoid.Health > 0 then ShooterHumanoid.Health += Damage * Lifesteal end
@@ -279,6 +285,8 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, Direction)
 		Params.FilterDescendantsInstances = FilterInstances
 		RayStart = Result.Position + Direction * 0.01
 	end
+
+	ShotResult:FireClient(Player, Tool, ShotEndPosition, HitAnyCharacter)
 end)
 
 Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool, ClientOrigin)
