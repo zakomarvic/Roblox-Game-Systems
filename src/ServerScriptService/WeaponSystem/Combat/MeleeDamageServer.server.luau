@@ -110,7 +110,7 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetOrOrigin,
 		if not validateLineOfSight(Character, Tool, Handle, HitPart, TargetCharacter) then return end
 
 		Attack.HitTargets[TargetOrOrigin] = true
-		MeleeUtility.ApplyDamage(Player, TargetOrOrigin, tonumber(Module.BaseDamage) or 0, Debris)
+		MeleeUtility.ApplyDamage(Player, TargetOrOrigin, tonumber(Module.BaseDamage) or 0, Debris, Module.Overkill)
 
 		local Knockback = tonumber(Module.MeleeKnockback) or 0
 		if Knockback > 0 then

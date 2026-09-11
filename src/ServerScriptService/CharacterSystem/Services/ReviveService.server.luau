@@ -127,12 +127,15 @@ end
 
 local function stopAllNPCAnimations(character, except)
 	local animator = getNPCAnimator(character)
-	if animator then
-		local exceptTrack = NPCTracks[character] and NPCTracks[character][except]
-		for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-			if track ~= exceptTrack then
-				track:Stop(0)
-			end
+	if not animator then
+		return
+	end
+
+	local exceptTrack = NPCTracks[character] and NPCTracks[character][except]
+
+	for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+		if track ~= exceptTrack then
+			track:Stop(0)
 		end
 	end
 end
@@ -210,18 +213,19 @@ local function stopNPCAnimationGuard(character)
 end
 
 local function maintainNPCIdle(character, idle)
-	task.spawn(function()
-		while character.Parent and isDowned(character) and not character:GetAttribute(REVIVING_ATTRIBUTE) do
-			if not idle.IsPlaying then
-				idle.Looped = true
-				idle:Play(0, 1, Animations.DownedIdle.Speed or 1)
-				idle:AdjustSpeed(Animations.DownedIdle.Speed or 1)
-			elseif idle.Length > 0 and idle.TimePosition >= math.max(0, idle.Length - LOOP_RESET_LEAD_TIME) then
-				idle.TimePosition = 0
-			end
-			RunService.Heartbeat:Wait()
-		end
-	end)
+	if not character.Parent then
+		return
+	end
+
+	if not isDowned(character) or character:GetAttribute(REVIVING_ATTRIBUTE) then
+		return
+	end
+
+	if not idle.IsPlaying then
+		idle.Looped = true
+		idle:Play(0.05, 1, Animations.DownedIdle.Speed or 1)
+		idle:AdjustSpeed(Animations.DownedIdle.Speed or 1)
+	end
 end
 
 local function beginNPCDownedAnimation(character)
@@ -229,58 +233,89 @@ local function beginNPCDownedAnimation(character)
 		return
 	end
 
+	-- Don't restart the downed animation if this NPC is already playing it.
+	local existingTracks = NPCTracks[character]
+	if existingTracks then
+		local transition = existingTracks.PlayerDowned
+		local idle = existingTracks.DownedIdle
+
+		if transition and transition.IsPlaying then
+			return
+		end
+
+		if idle and idle.IsPlaying then
+			return
+		end
+	end
+
 	setNPCAnimateEnabled(character, false)
 	startNPCAnimationGuard(character)
-	stopAllNPCAnimations(character, nil)
+	stopAllNPCAnimations(character)
 
 	local transition = getNPCTrack(character, "PlayerDowned")
 	local idle = getNPCTrack(character, "DownedIdle")
+
 	if not idle then
+		warn("[ReviveService] Missing DownedIdle track for NPC:", character:GetFullName())
 		return
 	end
 
 	idle.Looped = true
 
+	-- If the transition animation is unavailable, go straight to idle.
 	if not transition then
-		idle:Play(0, 1, Animations.DownedIdle.Speed or 1)
-		idle:AdjustSpeed(Animations.DownedIdle.Speed or 1)
 		maintainNPCIdle(character, idle)
 		return
 	end
 
 	transition.Looped = false
-	transition:Play(0, 1, Animations.PlayerDowned.Speed or 1)
+	transition:Play(0.05, 1, Animations.PlayerDowned.Speed or 1)
 	transition:AdjustSpeed(Animations.PlayerDowned.Speed or 1)
 
+	-- Wait for the actual animation to finish instead of calculating
+	-- a transition time from Length/TimePosition.
 	task.spawn(function()
-		local length = transition.Length
-		local waited = 0
-		while length <= 0 and transition.IsPlaying and waited < 2 do
-			waited += task.wait()
-			length = transition.Length
+		local finished = false
+
+		local connection
+		connection = transition.Ended:Connect(function()
+			finished = true
+
+			if connection then
+				connection:Disconnect()
+				connection = nil
+			end
+		end)
+
+		-- Wait until the animation actually ends.
+		while character.Parent
+			and isDowned(character)
+			and not character:GetAttribute(REVIVING_ATTRIBUTE)
+			and not finished
+			and transition.IsPlaying do
+
+			RunService.Heartbeat:Wait()
 		end
 
-		if not character.Parent or not isDowned(character) or character:GetAttribute(REVIVING_ATTRIBUTE) then
+		if connection then
+			connection:Disconnect()
+		end
+
+		if not character.Parent
+			or not isDowned(character)
+			or character:GetAttribute(REVIVING_ATTRIBUTE) then
 			return
 		end
 
-		local switchTime = math.max(0, length - TRANSITION_LEAD_TIME)
-		if switchTime > 0 then
-			task.wait(switchTime)
-		end
-
-		if not character.Parent or not isDowned(character) or character:GetAttribute(REVIVING_ATTRIBUTE) then
-			return
+		-- Make absolutely sure the transition is no longer controlling
+		-- the animator before starting the looping idle.
+		if transition.IsPlaying then
+			transition:Stop(0)
 		end
 
 		idle.Looped = true
-		idle:Play(TRANSITION_FADE_TIME, 1, Animations.DownedIdle.Speed or 1)
+		idle:Play(0.05, 1, Animations.DownedIdle.Speed or 1)
 		idle:AdjustSpeed(Animations.DownedIdle.Speed or 1)
-		if transition.IsPlaying then
-			transition:Stop(TRANSITION_FADE_TIME)
-		end
-
-		maintainNPCIdle(character, idle)
 	end)
 end
 

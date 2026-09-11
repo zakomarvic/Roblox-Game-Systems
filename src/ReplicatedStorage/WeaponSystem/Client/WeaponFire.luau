@@ -1,4 +1,5 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = workspace
 
 local WeaponFire = {}
@@ -9,6 +10,8 @@ local Remotes = WeaponSystem:WaitForChild("Remotes")
 local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
 local Explosion = Remotes:WaitForChild("Explosion")
 local ProjectileFired = Remotes:WaitForChild("ProjectileFired")
+local RaycastDebug = Remotes:WaitForChild("RaycastDebug")
+local ShotResult = Remotes:WaitForChild("ShotResult")
 local BulletVisualizer = require(WeaponSystem.Effects:WaitForChild("BulletVisualizer"))
 local ProjectileController = require(WeaponSystem.Projectile:WaitForChild("ProjectileController"))
 local WeaponFireEffects = require(WeaponSystem.Effects:WaitForChild("WeaponFireEffects"))
@@ -30,6 +33,36 @@ function WeaponFire.new(Config)
 	self.PiercedHumanoid = {}
 	self.IsAiming = false
 	self.Projectiles = ProjectileController.new()
+
+	self.ShotResultConnection = ShotResult.OnClientEvent:Connect(function(ResultTool, EndPosition, DidHitTarget)
+		if ResultTool ~= self.Tool then return end
+		if typeof(EndPosition) ~= "Vector3" then return end
+		if not self.Tool or not self.Tool.Parent then return end
+
+		local ShootingHandle = self.Tool:FindFirstChild("Handle") or self.Tool:FindFirstChild("Handle2")
+		if not ShootingHandle or not ShootingHandle:IsA("BasePart") then return end
+
+		local Module = self.Module
+		local HitSounds = Module.HitSoundIDs
+		local HitSound = nil
+		if typeof(HitSounds) == "table" and #HitSounds > 0 then
+			HitSound = HitSounds[math.random(1, #HitSounds)]
+		end
+
+		BulletVisualizer.Visualize(
+			ShootingHandle,
+			Module.MuzzleOffset,
+			EndPosition,
+			self.MuzzleEffect,
+			self.HitEffect,
+			HitSound,
+			{false, 0, 0},
+			{Module.BulletSpeed, Module.BulletSize, Module.BulletColor, Module.BulletTransparency, Module.BulletMaterial, Module.FadeTime},
+			false,
+			Module.VisualizerEnabled == true
+		)
+	end)
+
 	return self
 end
 
@@ -53,10 +86,39 @@ end
 
 function WeaponFire:SetAiming(State) self.IsAiming = State == true end
 
+function WeaponFire:_GetAimPoint()
+	local Camera = Workspace.CurrentCamera
+	if not Camera then
+		return self.Mouse.Hit.Position
+	end
+
+	local MouseLocation = UserInputService:GetMouseLocation()
+	local CameraRay = Camera:ViewportPointToRay(MouseLocation.X, MouseLocation.Y)
+	local Params = RaycastParams.new()
+	Params.FilterType = Enum.RaycastFilterType.Exclude
+	Params.FilterDescendantsInstances = {self.Character, self.Tool}
+	Params.IgnoreWater = true
+
+	local CameraResult = Workspace:Raycast(CameraRay.Origin, CameraRay.Direction * 5000, Params)
+	return CameraResult and CameraResult.Position or (CameraRay.Origin + CameraRay.Direction * 5000)
+end
+
+function WeaponFire:_GetMuzzleOrigin(ShootingHandle)
+	if not ShootingHandle or not ShootingHandle:IsA("BasePart") then return nil end
+	local Offset = self.Module.MuzzleOffset
+	if typeof(Offset) == "Vector3" then
+		return ShootingHandle.CFrame:PointToWorldSpace(Offset)
+	end
+	return ShootingHandle.Position
+end
+
 function WeaponFire:_GetDirection(Start)
+	local AimPoint = self:_GetAimPoint()
+	local AimDirection = (AimPoint - Start).Magnitude > 0 and (AimPoint - Start).Unit or Vector3.zAxis
+
 	local Spread = self.Module.Spread or 0
 	Spread *= (self.IsAiming and 1 - (self.Module.SpreadRedution or 0) or 1)
-	return (CFrame.new(Start, self.Mouse.Hit.Position) * CFrame.Angles(math.rad(-Spread + math.random() * (Spread * 2)), math.rad(-Spread + math.random() * (Spread * 2)), 0)).LookVector
+	return (CFrame.lookAt(Start, Start + AimDirection) * CFrame.Angles(math.rad(-Spread + math.random() * (Spread * 2)), math.rad(-Spread + math.random() * (Spread * 2)), 0)).LookVector
 end
 
 function WeaponFire:_GetRaycastParams()
@@ -113,48 +175,33 @@ end
 
 function WeaponFire:Fire(ShootingHandle)
 	local Module = self.Module
-	local PierceAvailable = Module.Piercing or 0
-	self.PiercedHumanoid = {}
 	WeaponFireEffects.PlayFirePresentation(self.Tool, ShootingHandle, WeaponEffects)
 	local FireAnim = self.GetFireAnim and self.GetFireAnim() or self.FireAnim
 	if FireAnim then FireAnim:Play(nil, nil, Module.FireAnimationSpeed or 1) end
-	local Start = (self.Humanoid.Torso.CFrame * CFrame.new(0, 1.5, 0)).Position
-	local Direction = self:_GetDirection(Start)
-	if Module.ProjectileType == "Projectile" then self:_FireProjectile(Start, Direction, ShootingHandle) return end
 
-	while PierceAvailable >= 0 do
-		local Hit, EndPos = self.Raycast(Start, Direction, 5000, self.Character, self.PiercedHumanoid)
-		if not Module.ExplosiveEnabled then
-			if Hit and Hit.Parent then
-				local TargetHumanoid = Hit.Parent:FindFirstChild("Humanoid")
-				local TargetTorso = Hit.Parent:FindFirstChild("Torso")
-				if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then
-					self.InflictTarget:FireServer(TargetHumanoid, TargetTorso, Hit, Direction)
-					self.PiercedHumanoid[TargetHumanoid] = true
-				else PierceAvailable = 0 end
-			end
-		else
-			local ExplosionInstance = Instance.new("Explosion")
-			ExplosionInstance.BlastRadius = Module.Radius or Module.ExplosionRadius or 0
-			ExplosionInstance.BlastPressure = 0
-			ExplosionInstance.Position = EndPos
-			ExplosionInstance.Parent = Workspace.CurrentCamera
-			ExplosionInstance.Hit:Connect(function(HitPart)
-				if HitPart and HitPart.Parent and HitPart.Name == "Torso" then
-					local TargetHumanoid = HitPart.Parent:FindFirstChild("Humanoid")
-					local TargetTorso = HitPart.Parent:FindFirstChild("Torso")
-					if TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso then self.InflictTarget:FireServer(TargetHumanoid, TargetTorso, HitPart, Direction) end
-				end
-			end)
-			PierceAvailable = 0
-		end
-		PierceAvailable = Hit and (PierceAvailable - 1) or -1
-		self:_VisualizeHit(ShootingHandle, EndPos, PierceAvailable == -1, {Module.ExplosiveEnabled == true, Module.BlastRadius or Module.ExplosionRadius or 0, Module.BlastPressure or 0})
-		Start = EndPos + Direction * 0.01
+	local Start = self:_GetMuzzleOrigin(ShootingHandle)
+	if not Start then return end
+
+	local AimPoint = self:_GetAimPoint()
+	local Direction = (AimPoint - Start).Magnitude > 0 and (AimPoint - Start).Unit or Vector3.zAxis
+	local Spread = Module.Spread or 0
+	Spread *= (self.IsAiming and 1 - (Module.SpreadRedution or 0) or 1)
+	Direction = (CFrame.lookAt(Start, Start + Direction) * CFrame.Angles(math.rad(-Spread + math.random() * (Spread * 2)), math.rad(-Spread + math.random() * (Spread * 2)), 0)).LookVector
+
+	if Module.ProjectileType == "Projectile" then
+		self:_FireProjectile(Start, Direction, ShootingHandle)
+		return
 	end
+
+	self.InflictTarget:FireServer(Start, AimPoint, Direction)
+	RaycastDebug:FireServer(self.Tool, Start, Direction)
 end
 
 function WeaponFire:Destroy()
+	if self.ShotResultConnection then
+		self.ShotResultConnection:Disconnect()
+		self.ShotResultConnection = nil
+	end
 	if self.Projectiles then self.Projectiles:Destroy(); self.Projectiles = nil end
 	WeaponProjectileVisual.Clear(self.Tool)
 end

@@ -3,7 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharacterSystem = ReplicatedStorage:WaitForChild("CharacterSystem")
 local CharacterRagdoll = require(CharacterSystem.Modules:WaitForChild("CharacterRagdoll"))
 
-local RagdollService = {}
+local RagdollServiceModule = {}
 local ActiveRagdolls = {}
 local RagdollTimers = {}
 
@@ -37,7 +37,7 @@ local function scheduleRecovery(Character, Duration)
 	end)
 end
 
-function RagdollService:Ragdoll(Character, Duration)
+function RagdollServiceModule:Ragdoll(Character, Duration)
 	if not Character or not Character:IsDescendantOf(workspace) then
 		return false
 	end
@@ -58,7 +58,7 @@ function RagdollService:Ragdoll(Character, Duration)
 	return true
 end
 
-function RagdollService:ApplyImpulse(Character, Direction, Force)
+function RagdollServiceModule:ApplyImpulse(Character, Direction, Force)
 	if not Character or typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then
 		return false
 	end
@@ -75,7 +75,7 @@ function RagdollService:ApplyImpulse(Character, Direction, Force)
 	return Ragdoll:ApplyImpulse(Direction, Force)
 end
 
-function RagdollService:Knockdown(Character, Direction, Force, Duration)
+function RagdollServiceModule:Knockdown(Character, Direction, Force, Duration)
 	if not Character or typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then
 		return false
 	end
@@ -93,7 +93,7 @@ function RagdollService:Knockdown(Character, Direction, Force, Duration)
 	return self:ApplyImpulse(Character, Direction, Force)
 end
 
-function RagdollService:KnockdownFromPosition(Character, Origin, Force, Duration)
+function RagdollServiceModule:KnockdownFromPosition(Character, Origin, Force, Duration)
 	if typeof(Origin) ~= "Vector3" then
 		return false
 	end
@@ -111,7 +111,7 @@ function RagdollService:KnockdownFromPosition(Character, Origin, Force, Duration
 	return self:Knockdown(Character, Direction, Force, Duration)
 end
 
-function RagdollService:Recover(Character)
+function RagdollServiceModule:Recover(Character)
 	local Ragdoll = ActiveRagdolls[Character]
 	if not Ragdoll then
 		return false
@@ -122,7 +122,7 @@ function RagdollService:Recover(Character)
 	return true
 end
 
-function RagdollService:Destroy(Character)
+function RagdollServiceModule:Destroy(Character)
 	local Ragdoll = ActiveRagdolls[Character]
 	if Ragdoll then
 		Ragdoll:Destroy()
@@ -131,4 +131,4 @@ function RagdollService:Destroy(Character)
 	end
 end
 
-return RagdollService
+return RagdollServiceModule
