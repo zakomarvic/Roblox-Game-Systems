@@ -14,9 +14,6 @@ Explosion.Parent = Remotes
 local ProjectileFired = Remotes:FindFirstChild("ProjectileFired") or Instance.new("RemoteEvent")
 ProjectileFired.Name = "ProjectileFired"
 ProjectileFired.Parent = Remotes
-local RaycastDebug = Remotes:FindFirstChild("RaycastDebug") or Instance.new("RemoteEvent")
-RaycastDebug.Name = "RaycastDebug"
-RaycastDebug.Parent = Remotes
 
 local Combat = script.Parent
 local WeaponState = require(Combat:WaitForChild("WeaponStateService"))
@@ -138,31 +135,6 @@ local function resolveTarget(HitPart)
 	return nil, nil
 end
 
-RaycastDebug.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
-	if not DEBUG_RAYCASTS then return end
-	if typeof(Origin) ~= "Vector3" or typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return end
-	local OwnedTool, Module = getOwnedWeapon(Player, Tool)
-	if not OwnedTool or Module.ProjectileType == "Projectile" then return end
-	local Character = Player.Character
-	local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-	if not Humanoid or Humanoid.Health <= 0 then return end
-	local ExpectedOrigin = getMuzzleOrigin(Tool, Module)
-	if not ExpectedOrigin or (Origin - ExpectedOrigin).Magnitude > MAX_ORIGIN_ERROR then return end
-	Direction = Direction.Unit
-	local Params = RaycastParams.new()
-	Params.FilterType = Enum.RaycastFilterType.Exclude
-	Params.FilterDescendantsInstances = {Character, Tool}
-	Params.IgnoreWater = true
-	local Result = workspace:Raycast(Origin, Direction * MAX_SHOT_DISTANCE, Params)
-	local HitCharacter = false
-	if Result then
-		local HitModel, HitHumanoid = resolveTarget(Result.Instance)
-		HitCharacter = HitHumanoid ~= nil and HitHumanoid.Health > 0 and HitModel ~= Character
-	end
-	local EndPosition = Result and Result.Position or (Origin + Direction * MAX_SHOT_DISTANCE)
-	debugRay(Origin, EndPosition, Result and Result.Position or nil, HitCharacter)
-end)
-
 ProjectileFired.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
 	if typeof(Origin) ~= "Vector3" or typeof(Direction) ~= "Vector3" or Direction.Magnitude <= 0 then return end
 	local OwnedTool, Module = getOwnedWeapon(Player, Tool)
@@ -229,7 +201,10 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 
 	local ShotEndPosition = Origin + Direction * MAX_SHOT_DISTANCE
 	local HitAnyCharacter = false
+	local LastHitPosition = nil
 	local RayStart = Origin
+
+	debugDamage(Player, "RAY", string.format("origin=(%.2f, %.2f, %.2f) aim=(%.2f, %.2f, %.2f) direction=(%.4f, %.4f, %.4f)", Origin.X, Origin.Y, Origin.Z, AimPoint.X, AimPoint.Y, AimPoint.Z, Direction.X, Direction.Y, Direction.Z))
 
 	while true do
 		local Result = workspace:Raycast(RayStart, Direction * MAX_SHOT_DISTANCE, Params)
@@ -240,6 +215,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 
 		local HitPart = Result.Instance
 		ShotEndPosition = Result.Position
+		LastHitPosition = Result.Position
 		if shouldSkipHit(HitPart) then
 			table.insert(FilterInstances, HitPart)
 			Params.FilterDescendantsInstances = FilterInstances
@@ -293,6 +269,10 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 		Params.FilterDescendantsInstances = FilterInstances
 		RayStart = Result.Position + Direction * 0.01
 	end
+
+	-- This visualization uses the exact final result of the same raycast loop above.
+	-- There is intentionally no second debug raycast.
+	debugRay(Origin, ShotEndPosition, LastHitPosition, HitAnyCharacter)
 	ShotResult:FireClient(Player, Tool, ShotEndPosition, HitAnyCharacter)
 end)
 
