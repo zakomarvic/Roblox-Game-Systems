@@ -309,7 +309,11 @@ function WeaponStateService.ClearPlayer(Player)
 	for Key in pairs(States) do
 		if string.sub(Key, 1, #Prefix) == Prefix then
 			States[Key] = nil
-			disconnectCharacter(Player, Key)
+			local Connection = Connections[Key]
+			if Connection then
+				Connection:Disconnect()
+				Connections[Key] = nil
+			end
 		end
 	end
 end
