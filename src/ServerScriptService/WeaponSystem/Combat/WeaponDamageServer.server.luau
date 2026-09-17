@@ -216,6 +216,67 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 		local HitPart = Result.Instance
 		ShotEndPosition = Result.Position
 		LastHitPosition = Result.Position
+
+		-- Resolve a character BEFORE applying the generic skip rules. This is
+		-- important because body parts may be transparent or use names that
+		-- overlap with generic visual/decorative parts. A valid character hit
+		-- must always be treated as a character hit.
+		local TargetCharacter, TargetHumanoid = resolveTarget(HitPart)
+		local TargetTorso = getTorso(TargetCharacter)
+
+		if TargetCharacter and TargetHumanoid then
+			if TargetCharacter == Character then
+				debugDamage(Player, "MISS", "server ray hit shooter")
+				break
+			end
+
+			if TargetHumanoid.Health <= 0 then
+				if PierceRemaining <= 0 then break end
+				table.insert(FilterInstances, TargetCharacter)
+				Params.FilterDescendantsInstances = FilterInstances
+				PierceRemaining -= 1
+				RayStart = Result.Position + Direction * 0.01
+				continue
+			end
+
+			if not TargetTorso then
+				debugDamage(Player, "MISS", string.format("target %s has no torso", TargetCharacter.Name))
+				break
+			end
+
+			local Damage = tonumber(Module.BaseDamage)
+			if not Damage or Damage <= 0 then return reject("invalid BaseDamage") end
+			if HitPart.Name == "Head" and Module.HeadshotEnabled then
+				Damage *= tonumber(Module.HeadshotDamageMultiplier) or 1
+			end
+			local Knockback = tonumber(Module.Knockback) or 0
+			local Lifesteal = tonumber(Module.Lifesteal) or 0
+			local BeforeHealth = TargetHumanoid.Health
+			local DownedBefore = TargetCharacter:GetAttribute("Downed") == true
+			debugDamage(Player, "APPLY", string.format("weapon=%s target=%s hit=%s damage=%.2f overkill=%s healthBefore=%.2f downedBefore=%s", Tool.Name, TargetCharacter.Name, HitPart.Name, Damage, tostring(Module.Overkill == true), BeforeHealth, tostring(DownedBefore)))
+			addCreator(TargetHumanoid, Player)
+			local Applied = DamageService.ApplyDamage(TargetHumanoid, Damage, Module.Overkill)
+			debugDamage(Player, "RESULT", string.format("target=%s DamageService=%s healthAfter=%.2f downedAfter=%s", TargetCharacter.Name, tostring(Applied), TargetHumanoid.Health, tostring(TargetCharacter:GetAttribute("Downed") == true)))
+			HitAnyCharacter = true
+			if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += Direction * Knockback end
+			if Lifesteal > 0 and ShooterHumanoid.Health > 0 then ShooterHumanoid.Health += Damage * Lifesteal end
+			if Module.FlamingBullet == true then
+				BulletEffects.Apply("Incendiary", {Player=Player, Tool=Tool, Module=Module, TargetCharacter=TargetCharacter, TargetHumanoid=TargetHumanoid, TargetTorso=TargetTorso, HitPart=HitPart, Direction=Direction, Duration=Module.FlamingBulletDuration})
+			end
+
+			-- Piercing is now handled only after a successful character hit.
+			-- A normal non-piercing shot stops immediately on the character,
+			-- regardless of which body part was hit.
+			if PierceRemaining <= 0 then break end
+			PierceRemaining -= 1
+			table.insert(FilterInstances, TargetCharacter)
+			Params.FilterDescendantsInstances = FilterInstances
+			RayStart = Result.Position + Direction * 0.01
+			continue
+		end
+
+		-- Only non-character parts reach the generic skip rules. This prevents
+		-- the penetration/filter logic from accidentally skipping body parts.
 		if shouldSkipHit(HitPart) then
 			table.insert(FilterInstances, HitPart)
 			Params.FilterDescendantsInstances = FilterInstances
@@ -223,55 +284,11 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 			continue
 		end
 
-		local TargetCharacter, TargetHumanoid = resolveTarget(HitPart)
-		local TargetTorso = getTorso(TargetCharacter)
-		if not TargetCharacter or not TargetHumanoid then
-			debugDamage(Player, "MISS", string.format("server ray stopped on %s", HitPart:GetFullName()))
-			break
-		end
-		if TargetCharacter == Character then
-			debugDamage(Player, "MISS", "server ray hit shooter")
-			break
-		end
-		if TargetHumanoid.Health <= 0 then
-			table.insert(FilterInstances, TargetCharacter)
-			Params.FilterDescendantsInstances = FilterInstances
-			RayStart = Result.Position + Direction * 0.01
-			continue
-		end
-		if not TargetTorso then
-			debugDamage(Player, "MISS", string.format("target %s has no torso", TargetCharacter.Name))
-			break
-		end
-
-		local Damage = tonumber(Module.BaseDamage)
-		if not Damage or Damage <= 0 then return reject("invalid BaseDamage") end
-		if HitPart.Name == "Head" and Module.HeadshotEnabled then
-			Damage *= tonumber(Module.HeadshotDamageMultiplier) or 1
-		end
-		local Knockback = tonumber(Module.Knockback) or 0
-		local Lifesteal = tonumber(Module.Lifesteal) or 0
-		local BeforeHealth = TargetHumanoid.Health
-		local DownedBefore = TargetCharacter:GetAttribute("Downed") == true
-		debugDamage(Player, "APPLY", string.format("weapon=%s target=%s hit=%s damage=%.2f overkill=%s healthBefore=%.2f downedBefore=%s", Tool.Name, TargetCharacter.Name, HitPart.Name, Damage, tostring(Module.Overkill == true), BeforeHealth, tostring(DownedBefore)))
-		addCreator(TargetHumanoid, Player)
-		local Applied = DamageService.ApplyDamage(TargetHumanoid, Damage, Module.Overkill)
-		debugDamage(Player, "RESULT", string.format("target=%s DamageService=%s healthAfter=%.2f downedAfter=%s", TargetCharacter.Name, tostring(Applied), TargetHumanoid.Health, tostring(TargetCharacter:GetAttribute("Downed") == true)))
-		HitAnyCharacter = true
-		if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += Direction * Knockback end
-		if Lifesteal > 0 and ShooterHumanoid.Health > 0 then ShooterHumanoid.Health += Damage * Lifesteal end
-		if Module.FlamingBullet == true then
-			BulletEffects.Apply("Incendiary", {Player=Player, Tool=Tool, Module=Module, TargetCharacter=TargetCharacter, TargetHumanoid=TargetHumanoid, TargetTorso=TargetTorso, HitPart=HitPart, Direction=Direction, Duration=Module.FlamingBulletDuration})
-		end
-		if PierceRemaining <= 0 then break end
-		PierceRemaining -= 1
-		table.insert(FilterInstances, TargetCharacter)
-		Params.FilterDescendantsInstances = FilterInstances
-		RayStart = Result.Position + Direction * 0.01
+		-- A solid non-character object stops the shot.
+		debugDamage(Player, "MISS", string.format("server ray stopped on %s", HitPart:GetFullName()))
+		break
 	end
 
-	-- This visualization uses the exact final result of the same raycast loop above.
-	-- There is intentionally no second debug raycast.
 	debugRay(Origin, ShotEndPosition, LastHitPosition, HitAnyCharacter)
 	ShotResult:FireClient(Player, Tool, ShotEndPosition, HitAnyCharacter)
 end)
