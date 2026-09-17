@@ -7,6 +7,15 @@ AnimationController.__index = AnimationController
 
 local Controllers = setmetatable({}, {__mode = "k"})
 
+local PriorityProfiles = {
+	Idle = Enum.AnimationPriority.Movement,
+	Fire = Enum.AnimationPriority.Action,
+	Reload = Enum.AnimationPriority.Action,
+	ShotgunClipin = Enum.AnimationPriority.Action,
+	Attack = Enum.AnimationPriority.Action2,
+	Throw = Enum.AnimationPriority.Action2,
+}
+
 local function getAnimator(character)
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then
@@ -38,13 +47,15 @@ function AnimationController.new(character)
 	return self
 end
 
--- Explicitly named accessor so it cannot be confused with the instance Get()
--- method below. Both character-state and weapon systems share this singleton.
 function AnimationController.GetController(character)
 	if not character then
 		return nil
 	end
 	return Controllers[character] or AnimationController.new(character)
+end
+
+function AnimationController:GetPriorityProfile(profileName)
+	return PriorityProfiles[profileName]
 end
 
 function AnimationController:SetCharacter(character)
