@@ -7,6 +7,7 @@ local CharacterStateService = require(Services:WaitForChild("CharacterStateServi
 
 local MAX_HEALTH = 110
 local DOWNED_HEALTH_THRESHOLD = 10
+local DOWNED_INVULNERABILITY_DURATION = 0.3
 
 local function getCharacter(humanoid)
 	local character = humanoid and humanoid.Parent
@@ -92,15 +93,6 @@ function DamageService.ApplyDamage(targetHumanoid, damage, overkill)
 		DownedService.Down(targetHumanoid)
 	end
 
-	return true
-end
-
-function DamageService.ApplyHealing(targetHumanoid, amount)
-	if not targetHumanoid or not targetHumanoid:IsA("Humanoid") then return false end
-	if type(amount) ~= "number" or amount <= 0 then return false end
-	if targetHumanoid.Health <= 0 then return false end
-
-	targetHumanoid.Health = math.min(targetHumanoid.Health + amount, targetHumanoid.MaxHealth)
 	return true
 end
 
