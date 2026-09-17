@@ -12,6 +12,8 @@ function WeaponReload.new(Options)
 	self.Module = Options.Module
 	self.Controller = Options.Controller
 	self.Handle = Options.Handle
+	self.PlayReloadAnim = Options.PlayReloadAnim
+	self.PlayShotgunClipinAnim = Options.PlayShotgunClipinAnim
 	self.GetReloadAnim = Options.GetReloadAnim
 	self.GetShotgunClipinAnim = Options.GetShotgunClipinAnim
 	self.ReloadEffects = Options.ReloadEffects
@@ -29,46 +31,33 @@ function WeaponReload:Start()
 	local Module = self.Module
 	local Controller = self.Controller
 
-	if self.IsSprinting and self.IsSprinting() then
-		return false
-	end
+	if self.IsSprinting and self.IsSprinting() then return false end
+	if not Controller:CanReload() then return false end
+	if not Controller:StartReload() then return false end
 
-	if not Controller:CanReload() then
-		return false
-	end
+	if self.IsAiming and self.IsAiming() and self.ResetAim then self.ResetAim() end
+	if self.UpdateGUI then self.UpdateGUI() end
 
-	if not Controller:StartReload() then
-		return false
-	end
-
-	if self.IsAiming and self.IsAiming() and self.ResetAim then
-		self.ResetAim()
-	end
-
-	if self.UpdateGUI then
-		self.UpdateGUI()
-	end
-
-	local ShotgunClipinAnim = self.GetShotgunClipinAnim and self.GetShotgunClipinAnim() or nil
-	local ReloadAnim = self.GetReloadAnim and self.GetReloadAnim() or nil
-
+	local Shells = Module.AmmoPerClip - Controller:GetAmmo()
 	if Module.ShotgunReload then
-		local Shells = Module.AmmoPerClip - Controller:GetAmmo()
 		for _ = 1, Shells do
-			if ShotgunClipinAnim then
-				ShotgunClipinAnim:Play(nil, nil, Module.ShotgunClipinAnimationSpeed)
+			if self.PlayShotgunClipinAnim then
+				self.PlayShotgunClipinAnim(Module.ShotgunClipinAnimationSpeed)
+			elseif self.GetShotgunClipinAnim then
+				local Track = self.GetShotgunClipinAnim()
+				if Track then Track:Play(nil, nil, Module.ShotgunClipinAnimationSpeed) end
 			end
 
-			if self.ReloadEffects then
-				self.ReloadEffects.PlayShotgunInsert(self.Handle)
-			end
-
+			if self.ReloadEffects then self.ReloadEffects.PlayShotgunInsert(self.Handle) end
 			self.Wait(Module.ShellClipinSpeed)
 		end
 	end
 
-	if ReloadAnim then
-		ReloadAnim:Play(nil, nil, Module.ReloadAnimationSpeed)
+	if self.PlayReloadAnim then
+		self.PlayReloadAnim(Module.ReloadAnimationSpeed)
+	elseif self.GetReloadAnim then
+		local Track = self.GetReloadAnim()
+		if Track then Track:Play(nil, nil, Module.ReloadAnimationSpeed) end
 	end
 
 	if self.ReloadEffects then
@@ -79,11 +68,7 @@ function WeaponReload:Start()
 	self.Wait(Module.ReloadTime)
 	Controller:FinishReload()
 	WeaponProjectileVisual.Restore(self.Tool, Module)
-
-	if self.UpdateGUI then
-		self.UpdateGUI()
-	end
-
+	if self.UpdateGUI then self.UpdateGUI() end
 	return true
 end
 
