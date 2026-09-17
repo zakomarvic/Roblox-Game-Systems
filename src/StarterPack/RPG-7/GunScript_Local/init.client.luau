@@ -34,7 +34,7 @@ local Handle2 = Bootstrap:GetHandle2()
 local GUI,AimSensitivity = Bootstrap:GetGUI()
 local WeaponEffects,InflictTarget = Bootstrap:GetRemotes()
 local WeaponCameraInstance = WeaponCamera.new(Camera,Humanoid,Character,Setting)
-local WeaponAnimationInstance = WeaponAnimation.new({Tool=Tool,Humanoid=Humanoid,Module=Setting})
+local WeaponAnimationInstance = WeaponAnimation.new({Tool=Tool,Humanoid=Humanoid,Module=Setting,IdleAnimationSpeed=Setting.IdleAnimationSpeed})
 local WeaponGUIInstance = WeaponGUI.new(GUI,Setting,Controller)
 local WeaponFireInstance
 local WeaponCharacterInstance
@@ -53,7 +53,7 @@ WeaponCharacterInstance.FireCycle=FireCycle
 
 local WeaponInputInstance = WeaponInput.new(Mouse,{OnFireDown=function() FireCycle:FireDown() end,OnFireUp=function() FireCycle:FireUp() end,OnReload=function() Reload:Start() end,OnAim=function() if not Controller:GetReloading() and Setting.SniperEnabled then WeaponAimInstance:Toggle() end end})
 
-local WeaponLifecycleInstance = WeaponLifecycle.new({Controller=Controller,Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,Script=script,PlayIdleAnim=function(Speed) WeaponAnimationInstance:Play("IdleAnim",Speed) end,StopIdleAnim=function() WeaponAnimationInstance:Stop("IdleAnim") end,IdleAnimationSpeed=Setting.IdleAnimationSpeed,TriggerReleased=function() FireCycle:FireUp() end,SprintChanged=CharacterControllerInstance.SprintChanged,OnCharacterChanged=function(NewCharacter,NewHumanoid)
+local WeaponLifecycleInstance = WeaponLifecycle.new({Controller=Controller,Camera=WeaponCameraInstance,Aim=WeaponAimInstance,Input=WeaponInputInstance,Script=script,TriggerReleased=function() FireCycle:FireUp() end,SprintChanged=CharacterControllerInstance.SprintChanged,OnCharacterChanged=function(NewCharacter,NewHumanoid)
 	WeaponCameraInstance:SetCharacter(NewCharacter,NewHumanoid)
 	WeaponFireInstance:SetCharacter(NewCharacter,NewHumanoid)
 	FireCycle:SetHumanoid(NewHumanoid)
@@ -61,11 +61,12 @@ local WeaponLifecycleInstance = WeaponLifecycle.new({Controller=Controller,Camer
 	WeaponCharacterInstance:SetCharacter(NewCharacter,NewHumanoid)
 end,OnSprint=function(IsSprinting) if IsSprinting then Controller:SetTriggerHeld(false);if Controller:GetReloading() then Controller:SetReloading(false) end;if Controller:IsCurrentlyFiring() then Controller:StopFiring() end;WeaponAimInstance:Reset() end end,OnEquip=function()
 	FireCycle:SetEquipped(true)
+	WeaponAnimationInstance:SetEquipped(true)
 	WeaponGUIInstance:Update()
 	WeaponCharacterInstance:EquipPose()
 	WeaponGUIInstance:Show()
 	Mouse.Icon="rbxassetid://"..Setting.MouseIconID
-end,OnUnequip=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose();WeaponGUIInstance:Hide() end,OnDeath=function() FireCycle:SetEquipped(false);WeaponCharacterInstance:ClearPose();WeaponGUIInstance:Hide() end,Player=Player,Tool=Tool,RunService=RunService})
+end,OnUnequip=function() FireCycle:SetEquipped(false);WeaponAnimationInstance:SetEquipped(false);WeaponCharacterInstance:ClearPose();WeaponGUIInstance:Hide() end,OnDeath=function() FireCycle:SetEquipped(false);WeaponAnimationInstance:SetEquipped(false);WeaponCharacterInstance:ClearPose();WeaponGUIInstance:Hide() end,Player=Player,Tool=Tool,RunService=RunService})
 WeaponCharacterInstance.IsEquipped=function() return WeaponLifecycleInstance:IsEquipped() end
 
 WeaponLifecycleInstance:BindCharacter(Player,RunService,Tool)
