@@ -78,6 +78,20 @@ function WeaponLifecycle:BindCharacter(Player, RunService, Tool)
 		end))
 	end
 
+	local function BindReviveState(Character, Humanoid)
+		self:AddPersistentConnection(Character:GetAttributeChangedSignal("Reviving"):Connect(function()
+			if Character:GetAttribute("Reviving") == false and not self.Equipped and Humanoid.Parent then
+				Humanoid.AutoRotate = true
+			elseif Character:GetAttribute("Reviving") == false and self.Equipped and Humanoid.Parent then
+				local D = self.Dependencies
+				if D.GetIdleAnim then
+					local IdleAnim = D.GetIdleAnim()
+					if IdleAnim then IdleAnim:Play(nil, nil, D.IdleAnimationSpeed or 1) end
+				end
+			end
+		end))
+	end
+
 	local Character = Player.Character or Player.CharacterAdded:Wait()
 	local Humanoid = Character:WaitForChild("Humanoid")
 	if Humanoid.Health <= 0 then
@@ -88,6 +102,7 @@ function WeaponLifecycle:BindCharacter(Player, RunService, Tool)
 	end
 	self:SetCharacter(Character, Humanoid)
 	BindDeath(Humanoid)
+	BindReviveState(Character, Humanoid)
 
 	self:AddPersistentConnection(Player.CharacterAdded:Connect(function(NewCharacter)
 		local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
@@ -101,6 +116,7 @@ function WeaponLifecycle:BindCharacter(Player, RunService, Tool)
 
 		self:SetCharacter(NewCharacter, NewHumanoid)
 		BindDeath(NewHumanoid)
+		BindReviveState(NewCharacter, NewHumanoid)
 
 		if NewHumanoid.Health > 0 then
 			RunService.Heartbeat:Wait()
@@ -159,9 +175,15 @@ function WeaponLifecycle:Unequip()
 		local IdleAnim = D.GetIdleAnim()
 		if IdleAnim then IdleAnim:Stop() end
 	end
+	if self.Humanoid and self.Humanoid.Parent and self.Character and self.Character:GetAttribute("Reviving") ~= true then
+		self.Humanoid.AutoRotate = true
+	end
 	if D.Controller then D.Controller:SetEnabled(not self.Blocked) end
 	self:CleanupConnections()
 	if D.OnUnequip then D.OnUnequip(self) end
+	if self.Humanoid and self.Humanoid.Parent and self.Character and self.Character:GetAttribute("Reviving") == true then
+		self.Humanoid.AutoRotate = true
+	end
 end
 
 function WeaponLifecycle:Block()
