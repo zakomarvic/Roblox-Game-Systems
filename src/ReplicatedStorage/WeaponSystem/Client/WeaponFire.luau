@@ -1,6 +1,5 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
-local GuiService = game:GetService("GuiService")
 local Workspace = workspace
 
 local WeaponFire = {}
@@ -92,13 +91,10 @@ function WeaponFire:_GetAimPoint()
 		return self.Mouse.Hit.Position
 	end
 
-	-- GetMouseLocation() is in screen coordinates and includes the GUI inset.
-	-- ViewportPointToRay() expects viewport coordinates, so remove the inset first.
+	-- GetMouseLocation() returns screen coordinates. ScreenPointToRay()
+	-- uses the same screen coordinate space and handles the GUI inset.
 	local MouseLocation = UserInputService:GetMouseLocation()
-	local GuiInset = GuiService:GetGuiInset()
-	local ViewportX = MouseLocation.X - GuiInset.X
-	local ViewportY = MouseLocation.Y - GuiInset.Y
-	local CameraRay = Camera:ViewportPointToRay(ViewportX, ViewportY)
+	local CameraRay = Camera:ScreenPointToRay(MouseLocation.X, MouseLocation.Y)
 
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
