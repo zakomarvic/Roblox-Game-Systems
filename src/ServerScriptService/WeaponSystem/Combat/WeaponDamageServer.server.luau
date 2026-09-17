@@ -31,7 +31,6 @@ local MAX_ORIGIN_ERROR = 8
 local MAX_SHOT_DISTANCE = 5000
 
 local ProjectileRecords = {}
-local ShotTimes = {}
 local ExplosionTimes = {}
 
 local function debugDamage(Player, Stage, Message)
@@ -143,8 +142,10 @@ ProjectileFired.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
 	if not Humanoid or Humanoid.Health <= 0 then return end
 	local ExpectedOrigin = getMuzzleOrigin(Tool, Module)
 	if not ExpectedOrigin or (Origin - ExpectedOrigin).Magnitude > MAX_ORIGIN_ERROR then return end
-	local State = WeaponState.Get(Player, Tool)
-	if State and State.Reloading then return end
+
+	local Accepted = WeaponState.TryFire(Player, Tool)
+	if not Accepted then return end
+
 	ProjectileRecords[Player] = ProjectileRecords[Player] or {}
 	ProjectileRecords[Player][Tool] = {Time = os.clock(), Origin = Origin, Direction = Direction.Unit, Speed = tonumber(Module.ProjectileSpeed) or 500, Lifetime = tonumber(Module.ProjectileLifetime) or 10}
 end)
@@ -172,13 +173,6 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 	if (Origin - ExpectedOrigin).Magnitude > MAX_ORIGIN_ERROR then return reject("shot origin too far from weapon muzzle") end
 	if (AimPoint - Origin).Magnitude > MAX_SHOT_DISTANCE then return reject("aim point too far from muzzle") end
 
-	ShotTimes[Player] = ShotTimes[Player] or {}
-	local Now = os.clock()
-	local LastShot = ShotTimes[Player][Tool] or 0
-	local FireRate = math.max(tonumber(Module.FireRate) or 0, 0.03)
-	if Now - LastShot < FireRate then return reject(string.format("fire-rate gate: %.3fs remaining", FireRate - (Now - LastShot))) end
-	ShotTimes[Player][Tool] = Now
-
 	local AimVector = AimPoint - Origin
 	if AimVector.Magnitude <= 0 then return reject("aim point is at shooter origin") end
 	local AimDirection = AimVector.Unit
@@ -190,6 +184,12 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 		local MaxSpread = tonumber(Module.Spread) or 0
 		if Angle > MaxSpread + 2 then return reject(string.format("shot direction outside spread: %.2f deg", Angle)) end
 	end
+
+	local Damage = tonumber(Module.BaseDamage)
+	if not Damage or Damage <= 0 then return reject("invalid BaseDamage") end
+
+	local Accepted = WeaponState.TryFire(Player, Tool)
+	if not Accepted then return reject("weapon state rejected firing") end
 
 	local PierceRemaining = math.max(math.floor(tonumber(Module.Piercing) or 0), 0)
 	local FilterInstances = {Character, Tool}
@@ -239,22 +239,21 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 				break
 			end
 
-			local Damage = tonumber(Module.BaseDamage)
-			if not Damage or Damage <= 0 then return reject("invalid BaseDamage") end
+			local AppliedDamage = Damage
 			if HurtboxBodyPart == "Head" and Module.HeadshotEnabled then
-				Damage *= tonumber(Module.HeadshotDamageMultiplier) or 1
+				AppliedDamage *= tonumber(Module.HeadshotDamageMultiplier) or 1
 			end
 			local Knockback = tonumber(Module.Knockback) or 0
 			local Lifesteal = tonumber(Module.Lifesteal) or 0
 			local BeforeHealth = TargetHumanoid.Health
 			local DownedBefore = TargetCharacter:GetAttribute("Downed") == true
-			debugDamage(Player, "APPLY", string.format("weapon=%s target=%s hit=%s damage=%.2f overkill=%s healthBefore=%.2f downedBefore=%s", Tool.Name, TargetCharacter.Name, HurtboxBodyPart, Damage, tostring(Module.Overkill == true), BeforeHealth, tostring(DownedBefore)))
+			debugDamage(Player, "APPLY", string.format("weapon=%s target=%s hit=%s damage=%.2f overkill=%s healthBefore=%.2f downedBefore=%s", Tool.Name, TargetCharacter.Name, HurtboxBodyPart, AppliedDamage, tostring(Module.Overkill == true), BeforeHealth, tostring(DownedBefore)))
 			addCreator(TargetHumanoid, Player)
-			local Applied = DamageService.ApplyDamage(TargetHumanoid, Damage, Module.Overkill)
+			local Applied = DamageService.ApplyDamage(TargetHumanoid, AppliedDamage, Module.Overkill)
 			debugDamage(Player, "RESULT", string.format("target=%s DamageService=%s healthAfter=%.2f downedAfter=%s", TargetCharacter.Name, tostring(Applied), TargetHumanoid.Health, tostring(TargetCharacter:GetAttribute("Downed") == true)))
 			HitAnyCharacter = true
 			if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += Direction * Knockback end
-			if Lifesteal > 0 and ShooterHumanoid.Health > 0 then ShooterHumanoid.Health += Damage * Lifesteal end
+			if Lifesteal > 0 and ShooterHumanoid.Health > 0 then ShooterHumanoid.Health += AppliedDamage * Lifesteal end
 			if Module.FlamingBullet == true then
 				BulletEffects.Apply("Incendiary", {Player=Player, Tool=Tool, Module=Module, TargetCharacter=TargetCharacter, TargetHumanoid=TargetHumanoid, TargetTorso=TargetTorso, HitPart=HitPart, Direction=Direction, Duration=Module.FlamingBulletDuration})
 			end
@@ -278,6 +277,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 		break
 	end
 
+	WeaponState.StopFiring(Player, Tool)
 	debugRay(Origin, ShotEndPosition, LastHitPosition, HitAnyCharacter)
 	ShotResult:FireClient(Player, Tool, ShotEndPosition, HitAnyCharacter)
 end)
@@ -313,14 +313,12 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool, Clie
 	ExplosionTimes[Player][Tool] = Now
 	if ProjectileRecords[Player] then ProjectileRecords[Player][Tool] = nil end
 	Direction = Direction.Unit
+	WeaponState.StopFiring(Player, Tool)
 	ExplosionEffects.Create(Position, {Radius = Radius, Tool = Tool})
-	local OverlapParams = OverlapParams.new()
-	OverlapParams.FilterType = Enum.RaycastFilterType.Exclude
-	OverlapParams.FilterDescendantsInstances = {Character, Tool}
-	local Parts = HitboxService.GetPartsInRadius(Position, Radius, OverlapParams)
+	local Parts = HitboxService.GetPartsInRadius(Position, Radius, {Character, Tool})
 	local Processed = {}
 	for _, Part in ipairs(Parts) do
-		local TargetCharacter, TargetHumanoid = resolveTarget(Part)
+		local TargetCharacter, TargetHumanoid = HitboxService.GetCharacter(Part), HitboxService.GetHumanoid(Part)
 		local TargetTorso = getTorso(TargetCharacter)
 		if TargetCharacter and TargetCharacter ~= Character and TargetHumanoid and TargetHumanoid.Health > 0 and TargetTorso and not Processed[TargetCharacter] then
 			Processed[TargetCharacter] = true
@@ -332,9 +330,7 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool, Clie
 				local ExplosionDirection = Distance > 0 and Offset.Unit or Direction
 				if AppliedDamage > 0 then
 					addCreator(TargetHumanoid, Player)
-					local BeforeHealth = TargetHumanoid.Health
-					local Applied = DamageService.ApplyDamage(TargetHumanoid, AppliedDamage, Module.Overkill)
-					debugDamage(Player, "EXPLOSION", string.format("target=%s damage=%.2f applied=%s health %.2f -> %.2f", TargetCharacter.Name, AppliedDamage, tostring(Applied), BeforeHealth, TargetHumanoid.Health))
+					DamageService.ApplyDamage(TargetHumanoid, AppliedDamage, Module.Overkill)
 				end
 				if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += ExplosionDirection * (Knockback * Falloff) end
 			end
@@ -344,7 +340,6 @@ end)
 
 Players.PlayerRemoving:Connect(function(Player)
 	ProjectileRecords[Player] = nil
-	ShotTimes[Player] = nil
 	ExplosionTimes[Player] = nil
 	WeaponState.ClearPlayer(Player)
 end)
