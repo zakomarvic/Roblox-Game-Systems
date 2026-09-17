@@ -38,7 +38,12 @@ function AnimationController.new(character)
 	return self
 end
 
-function AnimationController.Get(character)
+-- Explicitly named accessor so it cannot be confused with the instance Get()
+-- method below. Both character-state and weapon systems share this singleton.
+function AnimationController.GetController(character)
+	if not character then
+		return nil
+	end
 	return Controllers[character] or AnimationController.new(character)
 end
 
