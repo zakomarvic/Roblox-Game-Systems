@@ -20,10 +20,19 @@ function WeaponAnimation.new(Config)
 	return self
 end
 
+function WeaponAnimation:_unloadTracks()
+	if self.CharacterAnimationController then
+		for _, ControllerName in pairs(self.TrackNames) do
+			self.CharacterAnimationController:Unload(ControllerName)
+		end
+	end
+	self.TrackNames = {}
+end
+
 function WeaponAnimation:_bindAnimator(Humanoid)
+	self:_unloadTracks()
 	self.Humanoid = Humanoid
 	self.CharacterAnimationController = nil
-	self.TrackNames = {}
 	if not Humanoid then return nil end
 
 	local Character = Humanoid.Parent
@@ -57,7 +66,6 @@ function WeaponAnimation:_load()
 end
 
 function WeaponAnimation:SetHumanoid(Humanoid)
-	self:StopAll()
 	self:_bindAnimator(Humanoid)
 end
 
@@ -95,13 +103,9 @@ function WeaponAnimation:StopAll()
 end
 
 function WeaponAnimation:Destroy()
-	if self.CharacterAnimationController then
-		for _, ControllerName in pairs(self.TrackNames) do
-			self.CharacterAnimationController:Unload(ControllerName)
-		end
-	end
-	self.TrackNames = {}
+	self:_unloadTracks()
 	self.CharacterAnimationController = nil
+	self.Humanoid = nil
 end
 
 return WeaponAnimation
