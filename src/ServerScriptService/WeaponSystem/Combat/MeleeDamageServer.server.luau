@@ -6,6 +6,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local ServerWeaponSystem = ServerScriptService:WaitForChild("WeaponSystem")
 local ServerModules = ServerWeaponSystem:WaitForChild("Modules")
+local CombatSystem = ServerScriptService:WaitForChild("CombatSystem")
 local Remotes = WeaponSystem:FindFirstChild("Remotes") or Instance.new("Folder")
 Remotes.Name = "Remotes"
 Remotes.Parent = WeaponSystem
@@ -17,7 +18,8 @@ MeleeRemote.Parent = Remotes
 
 local MeleeUtility = require(ServerModules:WaitForChild("MeleeUtility"))
 local ProjectileThrower = require(ServerModules:WaitForChild("ProjectileThrower"))
-local HitboxService = require(ServerScriptService:WaitForChild("CombatSystem"):WaitForChild("HitboxService"))
+local WeaponStateService = require(script.Parent:WaitForChild("WeaponStateService"))
+local HitboxService = require(CombatSystem:WaitForChild("HitboxService"))
 local DestructibleService = require(ServerScriptService.Destruction.Modules:WaitForChild("DestructibleService"))
 local Thrower = ProjectileThrower.new()
 
@@ -79,7 +81,13 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetOrOrigin,
 	if not OwnedTool then return end
 
 	if Action == "Throw" then
-		Thrower:Throw(Player, Tool, TargetOrOrigin, HitOrDirection, Module)
+		local Accepted = WeaponStateService.TryThrow(Player, Tool)
+		if not Accepted then return end
+
+		local Projectile = Thrower:Throw(Player, Tool, TargetOrOrigin, HitOrDirection, Module)
+		if not Projectile then
+			WeaponStateService.StopAction(Player, Tool)
+		end
 		return
 	end
 
@@ -93,7 +101,22 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetOrOrigin,
 	local Duration = math.clamp(tonumber(Module.AttackDuration) or 0, 0, 2)
 
 	if Action == "Start" then
-		createAttack(Player, Tool, Now, Cooldown, Duration)
+		local Accepted = WeaponStateService.TryMeleeAttack(Player, Tool)
+		if not Accepted then return end
+
+		local Attack = createAttack(Player, Tool, Now, Cooldown, Duration)
+		if not Attack then
+			WeaponStateService.StopAction(Player, Tool)
+			return
+		end
+
+		task.delay(Duration + 0.05, function()
+			local PlayerAttacks = ActiveAttacks[Player]
+			if PlayerAttacks and PlayerAttacks[Tool] == Attack then
+				clearAttack(Player, Tool)
+				WeaponStateService.StopAction(Player, Tool)
+			end
+		end)
 		return
 	end
 	if Action ~= "Hit" then return end
@@ -102,6 +125,7 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetOrOrigin,
 	local Attack = PlayerAttacks and PlayerAttacks[Tool]
 	if not Attack or Now > Attack.EndTime + 0.05 then
 		clearAttack(Player, Tool)
+		WeaponStateService.StopAction(Player, Tool)
 		return
 	end
 
