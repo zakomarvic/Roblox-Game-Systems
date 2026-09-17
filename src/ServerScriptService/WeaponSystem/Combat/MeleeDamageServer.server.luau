@@ -85,9 +85,8 @@ MeleeRemote.OnServerEvent:Connect(function(Player, Action, Tool, TargetOrOrigin,
 		if not Accepted then return end
 
 		local Projectile = Thrower:Throw(Player, Tool, TargetOrOrigin, HitOrDirection, Module)
-		if not Projectile then
-			WeaponStateService.StopAction(Player, Tool)
-		end
+		WeaponStateService.StopAction(Player, Tool)
+		if not Projectile then return end
 		return
 	end
 
