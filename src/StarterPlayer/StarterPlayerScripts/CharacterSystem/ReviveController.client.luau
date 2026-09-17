@@ -22,6 +22,7 @@ local AnimationPlayedConnection
 local RecoveryPlaying = false
 local CharacterAnimationController
 local InterruptedAnimations = false
+local RestoringAnimations = false
 
 local function isOwnedTrack(track)
 	for _, ownedTrack in pairs(Tracks) do
@@ -52,9 +53,6 @@ local function stopConflictingTracks(except)
 		return
 	end
 
-	-- Capture the tracks that were active before the revive/downed animation
-	-- took control. This lets weapon idle and other character animations resume
-	-- after the state animation finishes.
 	if CharacterAnimationController and not InterruptedAnimations then
 		CharacterAnimationController:InterruptOtherTracks(except)
 		InterruptedAnimations = true
@@ -72,7 +70,9 @@ local function restoreInterruptedAnimations()
 		return
 	end
 
+	RestoringAnimations = true
 	CharacterAnimationController:RestoreInterruptedTracks()
+	RestoringAnimations = false
 	InterruptedAnimations = false
 end
 
@@ -83,6 +83,7 @@ local function loadTracks(character)
 	Tracks = {}
 	RecoveryPlaying = false
 	InterruptedAnimations = false
+	RestoringAnimations = false
 
 	if CharacterAnimationController then
 		CharacterAnimationController:Destroy()
@@ -99,6 +100,9 @@ local function loadTracks(character)
 	end
 
 	AnimationPlayedConnection = Animator.AnimationPlayed:Connect(function(track)
+		if RestoringAnimations then
+			return
+		end
 		if not Character then
 			return
 		end
