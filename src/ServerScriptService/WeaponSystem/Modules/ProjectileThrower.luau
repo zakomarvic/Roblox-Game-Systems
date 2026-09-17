@@ -1,12 +1,10 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerScriptService = game:GetService("ServerScriptService")
 local Debris = game:GetService("Debris")
 
 local WeaponSystem = ReplicatedStorage:WaitForChild("WeaponSystem")
 local ProjectileController = require(WeaponSystem.Projectile:WaitForChild("ProjectileController"))
 local MeleeUtility = require(script.Parent:WaitForChild("MeleeUtility"))
 local ProjectilePickup = require(script.Parent:WaitForChild("ProjectilePickup"))
-local WeaponStateService = require(ServerScriptService:WaitForChild("WeaponSystem"):WaitForChild("Combat"):WaitForChild("WeaponStateService"))
 
 local ProjectileThrower = {}
 ProjectileThrower.__index = ProjectileThrower
