@@ -14,10 +14,31 @@ function WeaponAnimation.new(Config)
 	self.Tool = Config.Tool
 	self.Humanoid = Config.Humanoid
 	self.Module = Config.Module
+	self.IdleAnimationSpeed = Config.IdleAnimationSpeed or 1
+	self.Equipped = false
 	self.CharacterAnimationController = nil
 	self.TrackNames = {}
+	self.ReviveConnection = nil
 	self:_bindAnimator(self.Humanoid)
 	return self
+end
+
+function WeaponAnimation:_disconnectReviveConnection()
+	if self.ReviveConnection and self.ReviveConnection.Connected then
+		self.ReviveConnection:Disconnect()
+	end
+	self.ReviveConnection = nil
+end
+
+function WeaponAnimation:_bindReviveState(Character)
+	self:_disconnectReviveConnection()
+	if not Character then return end
+
+	self.ReviveConnection = Character:GetAttributeChangedSignal("Reviving"):Connect(function()
+		if Character:GetAttribute("Reviving") == false and self.Equipped then
+			self:Play("IdleAnim", self.IdleAnimationSpeed)
+		end
+	end)
 end
 
 function WeaponAnimation:_unloadTracks()
@@ -30,6 +51,7 @@ function WeaponAnimation:_unloadTracks()
 end
 
 function WeaponAnimation:_bindAnimator(Humanoid)
+	self:_disconnectReviveConnection()
 	self:_unloadTracks()
 	self.Humanoid = Humanoid
 	self.CharacterAnimationController = nil
@@ -39,6 +61,7 @@ function WeaponAnimation:_bindAnimator(Humanoid)
 	if not Character or not Character:IsA("Model") then return nil end
 
 	self.CharacterAnimationController = AnimationController.Get(Character)
+	self:_bindReviveState(Character)
 	self:_load()
 	return self.CharacterAnimationController.Animator
 end
@@ -67,6 +90,18 @@ end
 
 function WeaponAnimation:SetHumanoid(Humanoid)
 	self:_bindAnimator(Humanoid)
+end
+
+function WeaponAnimation:SetEquipped(Equipped)
+	self.Equipped = Equipped == true
+	if not self.Equipped then
+		self:Stop("IdleAnim")
+	elseif self.Humanoid and self.Humanoid.Parent then
+		local Character = self.Humanoid.Parent
+		if Character:GetAttribute("Reviving") ~= true then
+			self:Play("IdleAnim", self.IdleAnimationSpeed)
+		end
+	end
 end
 
 function WeaponAnimation:Get(Name)
@@ -103,9 +138,11 @@ function WeaponAnimation:StopAll()
 end
 
 function WeaponAnimation:Destroy()
+	self:_disconnectReviveConnection()
 	self:_unloadTracks()
 	self.CharacterAnimationController = nil
 	self.Humanoid = nil
+	self.Equipped = false
 end
 
 return WeaponAnimation
