@@ -71,21 +71,23 @@ function WeaponAnimation:_load()
 	local Controller = self.CharacterAnimationController
 	if not Controller then return end
 
-	local function load(Name, AnimationId, Enabled, Priority, Looped)
+	local function load(Name, AnimationId, Enabled, PriorityProfile, Looped)
 		if not Enabled or AnimationId == nil then return nil end
+
 		local ControllerName = GetAnimationName(self.Tool, Name)
+		local Priority = PriorityProfile and Controller:GetPriorityProfile(PriorityProfile) or nil
 		local Track = Controller:Load(ControllerName, AnimationId, Priority, Looped)
 		self.TrackNames[Name] = ControllerName
 		return Track
 	end
 
 	local IdleId = Module.DualEnabled and 53610688 or Module.IdleAnimationID
-	load("IdleAnim", IdleId, IdleId ~= nil, nil, true)
-	load("FireAnim", Module.FireAnimationID, Module.FireAnimationID ~= nil)
-	load("ReloadAnim", Module.ReloadAnimationID, Module.ReloadAnimationID ~= nil)
-	load("ShotgunClipinAnim", Module.ShotgunClipinAnimationID, Module.ShotgunClipinAnimationID ~= nil)
-	load("AttackAnim", Module.AttackAnimationID, Module.AttackAnimationID ~= nil, Enum.AnimationPriority.Action)
-	load("ThrowAnim", Module.ThrowAnimationID, Module.ThrowAnimationID ~= nil, Enum.AnimationPriority.Action)
+	load("IdleAnim", IdleId, IdleId ~= nil, "Idle", true)
+	load("FireAnim", Module.FireAnimationID, Module.FireAnimationID ~= nil, "Fire")
+	load("ReloadAnim", Module.ReloadAnimationID, Module.ReloadAnimationID ~= nil, "Reload")
+	load("ShotgunClipinAnim", Module.ShotgunClipinAnimationID, Module.ShotgunClipinAnimationID ~= nil, "ShotgunClipin")
+	load("AttackAnim", Module.AttackAnimationID, Module.AttackAnimationID ~= nil, "Attack")
+	load("ThrowAnim", Module.ThrowAnimationID, Module.ThrowAnimationID ~= nil, "Throw")
 end
 
 function WeaponAnimation:SetHumanoid(Humanoid)
