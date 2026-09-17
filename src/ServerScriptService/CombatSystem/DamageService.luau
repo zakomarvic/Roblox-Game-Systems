@@ -1,7 +1,9 @@
 local DamageService = {}
 
 local CharacterSystem = game:GetService("ServerScriptService"):WaitForChild("CharacterSystem")
-local DownedService = require(CharacterSystem:WaitForChild("Services"):WaitForChild("DownedDamageService"))
+local Services = CharacterSystem:WaitForChild("Services")
+local DownedService = require(Services:WaitForChild("DownedDamageService"))
+local CharacterStateService = require(Services:WaitForChild("CharacterStateService"))
 
 local MAX_HEALTH = 110
 local DOWNED_HEALTH_THRESHOLD = 10
@@ -14,7 +16,9 @@ local function getCharacter(humanoid)
 end
 
 local function isDowned(character)
-	return character:GetAttribute("Downed") == true
+	local state = CharacterStateService.Get(character)
+	return state == CharacterStateService.States.Downed
+		or state == CharacterStateService.States.BeingRevived
 end
 
 local function isInvulnerable(character)
@@ -29,6 +33,8 @@ function DamageService.ApplyDamage(targetHumanoid, damage, overkill)
 
 	local character = getCharacter(targetHumanoid)
 	if not character then return false end
+
+	CharacterStateService.Initialize(character)
 
 	local isOverkill = overkill == true
 	local currentlyDowned = isDowned(character)
@@ -83,7 +89,7 @@ function DamageService.ApplyDamage(targetHumanoid, damage, overkill)
 	if targetHumanoid.Health > 0
 		and targetHumanoid.Health <= DOWNED_HEALTH_THRESHOLD
 		and not isDowned(character)
-		and character:GetAttribute("Reviving") ~= true then
+		and CharacterStateService.Get(character) ~= CharacterStateService.States.Reviving then
 		DownedService.Down(targetHumanoid)
 	end
 
@@ -94,6 +100,7 @@ function DamageService.SetupCharacter(character)
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return end
 
+	CharacterStateService.Initialize(character)
 	humanoid.MaxHealth = MAX_HEALTH
 	humanoid.Health = MAX_HEALTH
 	humanoid.BreakJointsOnDeath = false
