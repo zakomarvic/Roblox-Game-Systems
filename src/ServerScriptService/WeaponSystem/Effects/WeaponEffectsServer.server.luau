@@ -66,9 +66,6 @@ WeaponEffects.OnServerEvent:Connect(function(Player, Tool, Effect, ...)
 	end
 
 	if Effect ~= "Fire" then return end
-	local Accepted = WeaponState.TryFire(Player, Tool)
-	if not Accepted then return end
-
 	for _, OtherPlayer in ipairs(Players:GetPlayers()) do
 		if OtherPlayer ~= Player then
 			WeaponEffects:FireClient(OtherPlayer, "Fire", Player, Tool, Tool:FindFirstChild("Handle"))
