@@ -1,23 +1,12 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local WeaponAnimation = {}
 WeaponAnimation.__index = WeaponAnimation
 
-local function HumanoidLabel(Humanoid)
-	if not Humanoid then return "nil" end
-	return Humanoid.Name .. "@" .. (Humanoid.Parent and Humanoid.Parent.Name or "no-parent")
-end
+local AnimationController = require(ReplicatedStorage.CharacterSystem.Modules:WaitForChild("AnimationController"))
 
-local function GetAnimation(Tool, Name, AnimationId)
-	if AnimationId == nil then return nil end
-
-	local Animation = Tool:FindFirstChild(Name)
-	if not Animation then
-		Animation = Instance.new("Animation")
-		Animation.Name = Name
-		Animation.Parent = Tool
-	end
-
-	Animation.AnimationId = "rbxassetid://" .. tostring(AnimationId)
-	return Animation
+local function GetAnimationName(Tool, Name)
+	return "Weapon:" .. Tool.Name .. ":" .. Name
 end
 
 function WeaponAnimation.new(Config)
@@ -25,88 +14,137 @@ function WeaponAnimation.new(Config)
 	self.Tool = Config.Tool
 	self.Humanoid = Config.Humanoid
 	self.Module = Config.Module
-	self.Animator = nil
-	self.Tracks = {}
+	self.IdleAnimationSpeed = Config.IdleAnimationSpeed or 1
+	self.Equipped = false
+	self.CharacterAnimationController = nil
+	self.TrackNames = {}
+	self.ReviveConnection = nil
 	self:_bindAnimator(self.Humanoid)
 	return self
 end
 
+function WeaponAnimation:_disconnectReviveConnection()
+	if self.ReviveConnection and self.ReviveConnection.Connected then
+		self.ReviveConnection:Disconnect()
+	end
+	self.ReviveConnection = nil
+end
+
+function WeaponAnimation:_bindReviveState(Character)
+	self:_disconnectReviveConnection()
+	if not Character then return end
+
+	self.ReviveConnection = Character:GetAttributeChangedSignal("Reviving"):Connect(function()
+		if Character:GetAttribute("Reviving") == false and self.Equipped then
+			self:Play("IdleAnim", self.IdleAnimationSpeed)
+		end
+	end)
+end
+
+function WeaponAnimation:_unloadTracks()
+	if self.CharacterAnimationController then
+		for _, ControllerName in pairs(self.TrackNames) do
+			self.CharacterAnimationController:Unload(ControllerName)
+		end
+	end
+	self.TrackNames = {}
+end
+
 function WeaponAnimation:_bindAnimator(Humanoid)
+	self:_disconnectReviveConnection()
+	self:_unloadTracks()
 	self.Humanoid = Humanoid
-	self.Animator = nil
+	self.CharacterAnimationController = nil
 	if not Humanoid then return nil end
 
-	local Animator = Humanoid:FindFirstChildOfClass("Animator")
-	if not Animator then
-		Animator = Instance.new("Animator")
-		Animator.Parent = Humanoid
-	end
+	local Character = Humanoid.Parent
+	if not Character or not Character:IsA("Model") then return nil end
 
-	self.Animator = Animator
-	self.Tracks = {}
+	self.CharacterAnimationController = AnimationController.GetController(Character)
+	self:_bindReviveState(Character)
 	self:_load()
-	return Animator
+	return self.CharacterAnimationController.Animator
 end
 
 function WeaponAnimation:_load()
 	local Module = self.Module
-	local Animator = self.Animator
-	if not Animator then return end
+	local Controller = self.CharacterAnimationController
+	if not Controller then return end
 
-	local function load(Name, AnimationId, Enabled, Priority)
+	local function load(Name, AnimationId, Enabled, PriorityProfile, Looped)
 		if not Enabled or AnimationId == nil then return nil end
-		local Animation = GetAnimation(self.Tool, Name, AnimationId)
-		if not Animation then return nil end
 
-		local Track = Animator:LoadAnimation(Animation)
-		if Priority then Track.Priority = Priority end
-		self.Tracks[Name] = Track
-		--print(string.format("[WeaponAnimation] Loaded %s on %s Animator=%s Priority=%s", Name, HumanoidLabel(self.Humanoid), Animator.Name, tostring(Track.Priority)))
+		local ControllerName = GetAnimationName(self.Tool, Name)
+		local Priority = PriorityProfile and Controller:GetPriorityProfile(PriorityProfile) or nil
+		local Track = Controller:Load(ControllerName, AnimationId, Priority, Looped)
+		self.TrackNames[Name] = ControllerName
 		return Track
 	end
 
 	local IdleId = Module.DualEnabled and 53610688 or Module.IdleAnimationID
-	load("IdleAnim", IdleId, IdleId ~= nil)
-	load("FireAnim", Module.FireAnimationID, Module.FireAnimationID ~= nil)
-	load("ReloadAnim", Module.ReloadAnimationID, Module.ReloadAnimationID ~= nil)
-	load("ShotgunClipinAnim", Module.ShotgunClipinAnimationID, Module.ShotgunClipinAnimationID ~= nil)
-	load("AttackAnim", Module.AttackAnimationID, Module.AttackAnimationID ~= nil, Enum.AnimationPriority.Action)
-	load("ThrowAnim", Module.ThrowAnimationID, Module.ThrowAnimationID ~= nil, Enum.AnimationPriority.Action)
+	load("IdleAnim", IdleId, IdleId ~= nil, "Idle", true)
+	load("FireAnim", Module.FireAnimationID, Module.FireAnimationID ~= nil, "Fire")
+	load("ReloadAnim", Module.ReloadAnimationID, Module.ReloadAnimationID ~= nil, "Reload")
+	load("ShotgunClipinAnim", Module.ShotgunClipinAnimationID, Module.ShotgunClipinAnimationID ~= nil, "ShotgunClipin")
+	load("AttackAnim", Module.AttackAnimationID, Module.AttackAnimationID ~= nil, "Attack")
+	load("ThrowAnim", Module.ThrowAnimationID, Module.ThrowAnimationID ~= nil, "Throw")
 end
 
 function WeaponAnimation:SetHumanoid(Humanoid)
-	self:StopAll()
 	self:_bindAnimator(Humanoid)
 end
 
+function WeaponAnimation:SetEquipped(Equipped)
+	self.Equipped = Equipped == true
+	if not self.Equipped then
+		self:Stop("IdleAnim")
+	elseif self.Humanoid and self.Humanoid.Parent then
+		local Character = self.Humanoid.Parent
+		if Character:GetAttribute("Reviving") ~= true then
+			self:Play("IdleAnim", self.IdleAnimationSpeed)
+		end
+	end
+end
+
 function WeaponAnimation:Get(Name)
-	return self.Tracks[Name]
+	local ControllerName = self.TrackNames[Name]
+	return ControllerName and self.CharacterAnimationController and self.CharacterAnimationController:Get(ControllerName) or nil
 end
 
 function WeaponAnimation:GetAll()
-	return self.Tracks
+	local Tracks = {}
+	for Name in pairs(self.TrackNames) do
+		Tracks[Name] = self:Get(Name)
+	end
+	return Tracks
 end
 
-function WeaponAnimation:Play(Name, Speed, FadeTime)
-	local Track = self.Tracks[Name]
-	if not Track then return false end
-	if Track.IsPlaying then Track:Stop(FadeTime or 0) end
-	Track:Play(FadeTime or 0.05, 1, Speed or 1)
-	return true
+function WeaponAnimation:Play(Name, Speed, FadeTime, Weight)
+	local ControllerName = self.TrackNames[Name]
+	if not ControllerName or not self.CharacterAnimationController then return false end
+	return self.CharacterAnimationController:Play(ControllerName, Speed, FadeTime, Weight) ~= nil
 end
 
 function WeaponAnimation:Stop(Name, FadeTime)
-	local Track = self.Tracks[Name]
-	if not Track then return false end
-	Track:Stop(FadeTime or 0.05)
+	local ControllerName = self.TrackNames[Name]
+	if not ControllerName or not self.CharacterAnimationController then return false end
+	self.CharacterAnimationController:Stop(ControllerName, FadeTime)
 	return true
 end
 
 function WeaponAnimation:StopAll()
-	for _, Track in pairs(self.Tracks) do
-		if Track then Track:Stop() end
+	if not self.CharacterAnimationController then return end
+	for _, ControllerName in pairs(self.TrackNames) do
+		self.CharacterAnimationController:Stop(ControllerName)
 	end
-	table.clear(self.Tracks)
+end
+
+function WeaponAnimation:Destroy()
+	self:_disconnectReviveConnection()
+	self:_unloadTracks()
+	self.CharacterAnimationController = nil
+	self.Humanoid = nil
+	self.Equipped = false
 end
 
 return WeaponAnimation

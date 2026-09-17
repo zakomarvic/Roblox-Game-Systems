@@ -6,6 +6,7 @@ local Setting = {
 	BaseDamage = 35;
 	AttackCooldown = 1.2;
 	AttackDuration = 0.5;
+	Overkill = false;
 
 	--==================================================
 	-- SHAPECAST HITBOX

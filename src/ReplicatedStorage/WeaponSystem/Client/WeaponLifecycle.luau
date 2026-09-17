@@ -41,11 +41,8 @@ function WeaponLifecycle:SetCharacter(Character, Humanoid)
 	if not Character or not Humanoid then return false end
 	self.Character = Character
 	self.Humanoid = Humanoid
-
 	local D = self.Dependencies
-	if D.OnCharacterChanged then
-		D.OnCharacterChanged(Character, Humanoid, self)
-	end
+	if D.OnCharacterChanged then D.OnCharacterChanged(Character, Humanoid, self) end
 	return true
 end
 
@@ -57,12 +54,8 @@ end
 
 function WeaponLifecycle:BindTool(Tool)
 	if not Tool then return false end
-	self:AddPersistentConnection(Tool.Equipped:Connect(function()
-		self:Equip()
-	end))
-	self:AddPersistentConnection(Tool.Unequipped:Connect(function()
-		self:Unequip()
-	end))
+	self:AddPersistentConnection(Tool.Equipped:Connect(function() self:Equip() end))
+	self:AddPersistentConnection(Tool.Unequipped:Connect(function() self:Unequip() end))
 	return true
 end
 
@@ -91,14 +84,10 @@ function WeaponLifecycle:BindCharacter(Player, RunService, Tool)
 
 	self:AddPersistentConnection(Player.CharacterAdded:Connect(function(NewCharacter)
 		local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
-
 		self:Block()
 		self:SetBackpackEnabled(false)
 		NewHumanoid:UnequipTools()
-		if Tool and Tool.Parent == NewCharacter then
-			Tool.Parent = Player.Backpack
-		end
-
+		if Tool and Tool.Parent == NewCharacter then Tool.Parent = Player.Backpack end
 		self:SetCharacter(NewCharacter, NewHumanoid)
 		BindDeath(NewHumanoid)
 
@@ -120,23 +109,16 @@ function WeaponLifecycle:Equip()
 	self.HasActiveState = true
 	local D = self.Dependencies
 	if D.Controller then D.Controller:SetEnabled(true) end
-	if D.Camera then
-		D.Camera:SetEquipped(true)
-		D.Camera:Start()
-	end
+	if D.Camera then D.Camera:SetEquipped(true); D.Camera:Start() end
 	if D.Aim then D.Aim:Reset() end
 	if D.Input then D.Input:Bind() end
-	if D.GetIdleAnim then
-		local IdleAnim = D.GetIdleAnim()
-		if IdleAnim then IdleAnim:Play(nil, nil, D.IdleAnimationSpeed or 1) end
-	end
+	if D.OnEquip then D.OnEquip(self) end
 	if D.SprintChanged and D.OnSprint then
 		local SprintEvent = D.SprintChanged
 		self:AddConnection(SprintEvent.Event:Connect(function(IsSprinting)
 			if self.Equipped and not self.Blocked then D.OnSprint(IsSprinting) end
 		end))
 	end
-	if D.OnEquip then D.OnEquip(self) end
 	return true
 end
 
@@ -150,15 +132,8 @@ function WeaponLifecycle:Unequip()
 	local D = self.Dependencies
 	if D.TriggerReleased then D.TriggerReleased() end
 	if D.Input then D.Input:Unbind() end
-	if D.Camera then
-		D.Camera:SetEquipped(false)
-		D.Camera:Stop()
-	end
+	if D.Camera then D.Camera:SetEquipped(false); D.Camera:Stop() end
 	if D.Aim then D.Aim:Reset() end
-	if D.GetIdleAnim then
-		local IdleAnim = D.GetIdleAnim()
-		if IdleAnim then IdleAnim:Stop() end
-	end
 	if D.Controller then D.Controller:SetEnabled(not self.Blocked) end
 	self:CleanupConnections()
 	if D.OnUnequip then D.OnUnequip(self) end

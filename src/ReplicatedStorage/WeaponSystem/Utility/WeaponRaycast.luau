@@ -8,7 +8,6 @@ function WeaponRaycast.Cast(Start, Direction, Range, Ignore, PiercedHumanoid)
 	if Hit then
 		local Parent = Hit.Parent
 		local ParentHumanoid = Parent and Parent:FindFirstChild("Humanoid")
-		local ParentTeam = Parent and Parent:FindFirstChild("TEAM")
 
 		if Hit.Transparency > 0.75
 			or Hit.Name == "Handle"
@@ -19,7 +18,6 @@ function WeaponRaycast.Cast(Start, Direction, Range, Ignore, PiercedHumanoid)
 			or Hit.Name == "Rail"
 			or Hit.Name == "Arrow"
 			or (ParentHumanoid and ParentHumanoid.Health == 0)
-			or (ParentHumanoid and ParentTeam and ParentTeam.Value == ParentTeam.Value)
 			or (ParentHumanoid and PiercedHumanoid and PiercedHumanoid[ParentHumanoid]) then
 			return WeaponRaycast.Cast(
 				EndPos + Direction * 0.01,

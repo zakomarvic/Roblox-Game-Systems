@@ -1,5 +1,9 @@
 local MeleeUtility = {}
 
+local ServerScriptService = game:GetService("ServerScriptService")
+local CombatSystem = ServerScriptService:WaitForChild("CombatSystem")
+local DamageService = require(CombatSystem:WaitForChild("DamageService"))
+
 function MeleeUtility.GetHumanoid(Character)
 	return Character and Character:FindFirstChildOfClass("Humanoid")
 end
@@ -37,16 +41,20 @@ function MeleeUtility.GetPromptPart(Visual)
 	return nil
 end
 
-function MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris)
-	if Damage <= 0 or not TargetHumanoid or TargetHumanoid.Health <= 0 then return end
+function MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris, Overkill)
+	if Damage <= 0 or not TargetHumanoid or TargetHumanoid.Health <= 0 then return false end
+
 	local Creator = TargetHumanoid:FindFirstChild("creator")
 	if Creator then Creator:Destroy() end
+
 	Creator = Instance.new("ObjectValue")
 	Creator.Name = "creator"
 	Creator.Value = Player
 	Creator.Parent = TargetHumanoid
 	if Debris then Debris:AddItem(Creator, 5) end
-	TargetHumanoid:TakeDamage(Damage)
+
+	-- Route melee damage through the same authoritative damage system as guns.
+	return DamageService.ApplyDamage(TargetHumanoid, Damage, Overkill)
 end
 
 function MeleeUtility.GetOwnedEquippedWeapon(Player, Tool)

@@ -59,7 +59,7 @@ function ProjectileThrower:Throw(Player, Tool, Origin, Direction, Settings)
 			end
 			if TargetHumanoid and TargetHumanoid.Health > 0 and TargetHumanoid.Parent ~= Character then
 				local Damage = tonumber(Settings.ThrowDamage) or tonumber(Settings.BaseDamage) or 0
-				MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris)
+				MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris, Settings.Overkill)
 				if type(Settings.ThrowOnCharacterHit) == "function" then Settings.ThrowOnCharacterHit(Thrown, Result, TargetHumanoid, TargetHumanoid.Parent) end
 			elseif type(Settings.ThrowOnSurfaceHit) == "function" then
 				Settings.ThrowOnSurfaceHit(Thrown, Result, Result.Instance)

@@ -15,6 +15,7 @@ local Setting = {
 	HeadshotEnabled = true;
 	HeadshotDamageMultiplier = 4;
 	Piercing = 0;
+	Overkill = false;
 
 	--==================================================
 	-- AMMO / MAGAZINE

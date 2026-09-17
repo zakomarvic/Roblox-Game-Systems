@@ -1,0 +1,28 @@
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local CharacterController = require(
+	ReplicatedStorage.CharacterSystem.Modules.CharacterController
+)
+
+local Controller = CharacterController.Get()
+
+--========================
+-- SPRINT INPUT
+--========================
+
+UserInputService.InputBegan:Connect(function(Input, GameProcessed)
+	if GameProcessed then
+		return
+	end
+
+	if Input.KeyCode == Enum.KeyCode.LeftShift then
+		Controller:SetSprinting(true)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(Input)
+	if Input.KeyCode == Enum.KeyCode.LeftShift then
+		Controller:SetSprinting(false)
+	end
+end)

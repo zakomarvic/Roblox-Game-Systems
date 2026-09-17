@@ -3,8 +3,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local CharacterSystem = ReplicatedStorage:WaitForChild("CharacterSystem")
-local Modules = CharacterSystem:WaitForChild("Modules")
-local CharacterRagdoll = require(Modules:WaitForChild("CharacterRagdoll"))
+local Ragdoll = CharacterSystem:WaitForChild("Ragdoll")
+local Remotes = CharacterSystem:WaitForChild("Remotes")
+
+local CharacterRagdoll = require(Ragdoll:WaitForChild("CharacterRagdoll"))
 
 local Remote = CharacterSystem:FindFirstChild("RagdollRemote")
 if not Remote then
