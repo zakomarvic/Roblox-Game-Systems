@@ -25,6 +25,14 @@
         "CharacterUseJumpPower": false,
         "GameSettingsAvatar": "R6"
       },
+      "StarterCharacterScripts": {
+        "$className": "StarterCharacterScripts",
+        "$path": "src/StarterPlayer/StarterCharacterScripts"
+      },
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$path": "src/StarterPlayer/StarterPlayerScripts"
+      },
       "$path": "src/StarterPlayer"
     }
   }
