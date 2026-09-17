@@ -60,7 +60,7 @@ function WeaponAnimation:_bindAnimator(Humanoid)
 	local Character = Humanoid.Parent
 	if not Character or not Character:IsA("Model") then return nil end
 
-	self.CharacterAnimationController = AnimationController.Get(Character)
+	self.CharacterAnimationController = AnimationController.GetController(Character)
 	self:_bindReviveState(Character)
 	self:_load()
 	return self.CharacterAnimationController.Animator
