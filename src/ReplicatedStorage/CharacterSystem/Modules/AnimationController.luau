@@ -1,10 +1,11 @@
 local AnimationController = {}
 AnimationController.__index = AnimationController
 
--- Shared character animation coordinator.
--- State animations (downed/revive/etc.) are owned here, while other systems
--- such as weapons may keep their own AnimationTracks. When a state animation
--- temporarily interrupts other tracks, they can be restored afterward.
+-- Central character animation coordinator.
+-- Systems request animation playback through this controller instead of
+-- directly creating/loading/playing AnimationTracks.
+
+local Controllers = setmetatable({}, {__mode = "k"})
 
 local function getAnimator(character)
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -22,22 +23,42 @@ local function getAnimator(character)
 end
 
 function AnimationController.new(character)
+	local existing = Controllers[character]
+	if existing then
+		return existing
+	end
+
 	local self = setmetatable({}, AnimationController)
 	self.Character = character
 	self.Animator = getAnimator(character)
 	self.Tracks = {}
 	self.InterruptedTracks = {}
 	self.Connections = {}
+	Controllers[character] = self
 	return self
 end
 
+function AnimationController.Get(character)
+	return Controllers[character] or AnimationController.new(character)
+end
+
 function AnimationController:SetCharacter(character)
+	if self.Character == character then
+		self.Animator = getAnimator(character)
+		return
+	end
+
+	if self.Character and Controllers[self.Character] == self then
+		Controllers[self.Character] = nil
+	end
+
 	self:Destroy()
 	self.Character = character
 	self.Animator = getAnimator(character)
 	self.Tracks = {}
 	self.InterruptedTracks = {}
 	self.Connections = {}
+	Controllers[character] = self
 end
 
 function AnimationController:Load(name, animationId, priority, looped)
@@ -140,7 +161,22 @@ function AnimationController:RestoreInterruptedTracks()
 	table.clear(self.InterruptedTracks)
 end
 
+function AnimationController:Unload(name)
+	local track = self.Tracks[name]
+	if not track then
+		return
+	end
+	if track.IsPlaying then
+		track:Stop(0)
+	end
+	self.Tracks[name] = nil
+end
+
 function AnimationController:Destroy()
+	if self.Character and Controllers[self.Character] == self then
+		Controllers[self.Character] = nil
+	end
+
 	for _, connection in ipairs(self.Connections) do
 		if connection and connection.Connected then
 			connection:Disconnect()
