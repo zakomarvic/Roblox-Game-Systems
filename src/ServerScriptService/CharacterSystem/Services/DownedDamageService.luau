@@ -1,6 +1,7 @@
 local DownedService = {}
 
 local Players = game:GetService("Players")
+local CharacterStateService = require(script.Parent:WaitForChild("CharacterStateService"))
 
 local MAX_HEALTH = 110
 local DOWNED_HEALTH = 1
@@ -72,6 +73,7 @@ local function setupCharacter(character)
 	if not humanoid then return end
 
 	CharacterConnections[character] = true
+	CharacterStateService.Initialize(character)
 	clearDowned(character, humanoid)
 	humanoid.MaxHealth = MAX_HEALTH
 	humanoid.Health = MAX_HEALTH
