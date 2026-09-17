@@ -129,7 +129,7 @@ end
 function AnimationController:RestoreInterruptedTracks()
 	for _, state in ipairs(self.InterruptedTracks) do
 		local track = state.Track
-		if track and track.Parent and not track.IsPlaying then
+		if track and not track.IsPlaying then
 			track:Play(0, state.Weight or 1, state.Speed or 1)
 			if track.Length > 0 then
 				track.TimePosition = math.clamp(state.TimePosition or 0, 0, track.Length)
