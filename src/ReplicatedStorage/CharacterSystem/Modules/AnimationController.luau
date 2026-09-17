@@ -7,13 +7,16 @@ AnimationController.__index = AnimationController
 
 local Controllers = setmetatable({}, {__mode = "k"})
 
+-- Central priority profiles. These intentionally preserve the priorities
+-- used by the working weapon animation implementation while moving the
+-- priority decision into the shared animation layer.
 local PriorityProfiles = {
-	Idle = Enum.AnimationPriority.Movement,
-	Fire = Enum.AnimationPriority.Action,
-	Reload = Enum.AnimationPriority.Action,
-	ShotgunClipin = Enum.AnimationPriority.Action,
-	Attack = Enum.AnimationPriority.Action2,
-	Throw = Enum.AnimationPriority.Action2,
+	Idle = Enum.AnimationPriority.Action4,
+	Fire = Enum.AnimationPriority.Action4,
+	Reload = Enum.AnimationPriority.Action4,
+	ShotgunClipin = Enum.AnimationPriority.Action4,
+	Attack = Enum.AnimationPriority.Action,
+	Throw = Enum.AnimationPriority.Action,
 }
 
 local function getAnimator(character)
