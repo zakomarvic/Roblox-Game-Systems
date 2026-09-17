@@ -2,11 +2,15 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local RunService = game:GetService("RunService")
+local ServerScriptService = game:GetService("ServerScriptService")
 
 local CharacterSystem = ReplicatedStorage:WaitForChild("CharacterSystem")
 local Modules = CharacterSystem:WaitForChild("Modules")
 local Settings = require(Modules:WaitForChild("ReviveSettings"))
 local Animations = require(Modules:WaitForChild("ReviveAnimations"))
+
+local InteractionSystem = ServerScriptService:WaitForChild("InteractionSystem")
+local InteractionService = require(InteractionSystem:WaitForChild("InteractionService"))
 
 local Remote = CharacterSystem:FindFirstChild("ReviveRemote")
 if not Remote then
@@ -18,9 +22,6 @@ end
 local DOWNED_ATTRIBUTE = "Downed"
 local REVIVING_ATTRIBUTE = "Reviving"
 local REVIVE_PROMPT = "RevivePrompt"
-local TRANSITION_LEAD_TIME = 0.08
-local TRANSITION_FADE_TIME = 0.04
-local LOOP_RESET_LEAD_TIME = 0.04
 
 local Prompts = {}
 local ActiveRevives = {}
@@ -35,11 +36,6 @@ end
 
 local function getHumanoid(character)
 	return character and character:FindFirstChildOfClass("Humanoid")
-end
-
-local function getAnimator(character)
-	local humanoid = getHumanoid(character)
-	return humanoid and humanoid:FindFirstChildOfClass("Animator")
 end
 
 local function isDowned(character)
@@ -233,7 +229,6 @@ local function beginNPCDownedAnimation(character)
 		return
 	end
 
-	-- Don't restart the downed animation if this NPC is already playing it.
 	local existingTracks = NPCTracks[character]
 	if existingTracks then
 		local transition = existingTracks.PlayerDowned
@@ -262,7 +257,6 @@ local function beginNPCDownedAnimation(character)
 
 	idle.Looped = true
 
-	-- If the transition animation is unavailable, go straight to idle.
 	if not transition then
 		maintainNPCIdle(character, idle)
 		return
@@ -272,8 +266,6 @@ local function beginNPCDownedAnimation(character)
 	transition:Play(0.05, 1, Animations.PlayerDowned.Speed or 1)
 	transition:AdjustSpeed(Animations.PlayerDowned.Speed or 1)
 
-	-- Wait for the actual animation to finish instead of calculating
-	-- a transition time from Length/TimePosition.
 	task.spawn(function()
 		local finished = false
 
@@ -287,7 +279,6 @@ local function beginNPCDownedAnimation(character)
 			end
 		end)
 
-		-- Wait until the animation actually ends.
 		while character.Parent
 			and isDowned(character)
 			and not character:GetAttribute(REVIVING_ATTRIBUTE)
@@ -307,8 +298,6 @@ local function beginNPCDownedAnimation(character)
 			return
 		end
 
-		-- Make absolutely sure the transition is no longer controlling
-		-- the animator before starting the looping idle.
 		if transition.IsPlaying then
 			transition:Stop(0)
 		end
@@ -349,13 +338,14 @@ local function restoreReviver(state)
 	end
 end
 
-local function cancelRevive(targetCharacter, reason)
+local function finishCancelRevive(targetCharacter, reason)
 	local state = ActiveRevives[targetCharacter]
-	if not state or state.Completing then
+	if not state then
 		return
 	end
 
 	ActiveRevives[targetCharacter] = nil
+
 	if state.Prompt and state.Prompt.Parent then
 		state.Prompt.Enabled = true
 	end
@@ -373,6 +363,16 @@ local function cancelRevive(targetCharacter, reason)
 		stopNPCAnimation(state.TargetCharacter, "RevivingPlayer", 0)
 		beginNPCDownedAnimation(state.TargetCharacter)
 	end
+end
+
+local function cancelRevive(targetCharacter, reason)
+	local interaction = InteractionService.GetActive(targetCharacter)
+	if interaction and interaction.Name == "Revive" then
+		InteractionService.Cancel(targetCharacter, reason)
+		return
+	end
+
+	finishCancelRevive(targetCharacter, reason)
 end
 
 local function canStartRevive(player, prompt)
@@ -407,15 +407,15 @@ local function canStartRevive(player, prompt)
 	return true, reviverCharacter, targetCharacter
 end
 
-local function startRevive(player, prompt)
+local function beginReviveInteraction(player, prompt, interactionState)
 	local valid, reviverCharacter, targetCharacter = canStartRevive(player, prompt)
-	if not valid or ActiveRevives[targetCharacter] then
-		return
+	if not valid then
+		return false, "InvalidState"
 	end
 
 	local reviverHumanoid = getHumanoid(reviverCharacter)
 	if not reviverHumanoid then
-		return
+		return false, "MissingHumanoid"
 	end
 
 	local targetPlayer = Players:GetPlayerFromCharacter(targetCharacter)
@@ -425,6 +425,7 @@ local function startRevive(player, prompt)
 		TargetPlayer = targetPlayer,
 		TargetCharacter = targetCharacter,
 		Prompt = prompt,
+		InteractionState = interactionState,
 		WalkSpeed = reviverHumanoid.WalkSpeed,
 		JumpPower = reviverHumanoid.JumpPower,
 		AutoRotate = reviverHumanoid.AutoRotate,
@@ -445,17 +446,31 @@ local function startRevive(player, prompt)
 	else
 		playNPCAnimation(targetCharacter, "RevivingPlayer", 0.05)
 	end
+
+	return true
 end
 
-local function completeRevive(player, prompt)
-	if not player or not prompt or prompt.Name ~= REVIVE_PROMPT then
+local function startRevive(player, prompt)
+	local promptParent = prompt and prompt.Parent
+	local targetCharacter = promptParent and promptParent.Parent
+	if not targetCharacter or not targetCharacter:IsA("Model") then
 		return
+	end
+
+	InteractionService.Start(player, "Revive", targetCharacter, {
+		Prompt = prompt,
+	})
+end
+
+local function finishCompleteRevive(player, prompt)
+	if not player or not prompt or prompt.Name ~= REVIVE_PROMPT then
+		return false, "InvalidInteraction"
 	end
 
 	local targetCharacter = prompt.Parent and prompt.Parent.Parent
 	local state = targetCharacter and ActiveRevives[targetCharacter]
 	if not state or state.ReviverPlayer ~= player or state.Completing then
-		return
+		return false, "NotActive"
 	end
 	state.Completing = true
 
@@ -463,24 +478,24 @@ local function completeRevive(player, prompt)
 	if not reviverCharacter or reviverCharacter ~= state.ReviverCharacter then
 		state.Completing = false
 		cancelRevive(targetCharacter, "ReviverChanged")
-		return
+		return false, "ReviverChanged"
 	end
 	if not isDowned(targetCharacter) or isDowned(reviverCharacter) then
 		state.Completing = false
 		cancelRevive(targetCharacter, "InvalidState")
-		return
+		return false, "InvalidState"
 	end
 	if getDistance(reviverCharacter, targetCharacter) > Settings.MaxActivationDistance + 1 then
 		state.Completing = false
 		cancelRevive(targetCharacter, "OutOfRange")
-		return
+		return false, "OutOfRange"
 	end
 
 	local targetHumanoid = getHumanoid(targetCharacter)
 	if not targetHumanoid then
 		state.Completing = false
 		cancelRevive(targetCharacter, "MissingHumanoid")
-		return
+		return false, "MissingHumanoid"
 	end
 
 	local revivedHealth = math.max(1, targetHumanoid.MaxHealth * Settings.RevivedHealthPercent)
@@ -521,6 +536,28 @@ local function completeRevive(player, prompt)
 		prompt:Destroy()
 	end
 	Prompts[targetCharacter] = nil
+
+	return true
+end
+
+local function completeRevive(player, prompt)
+	if not player or not prompt or prompt.Name ~= REVIVE_PROMPT then
+		return
+	end
+
+	local targetCharacter = prompt.Parent and prompt.Parent.Parent
+	if not targetCharacter then
+		return
+	end
+
+	local interaction = InteractionService.GetActive(targetCharacter)
+	if not interaction or interaction.Name ~= "Revive" or interaction.Player ~= player then
+		return
+	end
+
+	InteractionService.Complete(targetCharacter, {
+		Prompt = prompt,
+	})
 end
 
 local function createPrompt(character)
@@ -601,6 +638,34 @@ local function setupCharacter(character)
 	updateCharacter(character)
 end
 
+InteractionService.Register("Revive", {
+	MaxDistance = Settings.MaxActivationDistance + 1,
+
+	CanInteract = function(player, targetCharacter, context)
+		local prompt = context and context.Prompt
+		local valid, _, resolvedTarget = canStartRevive(player, prompt)
+		if not valid or resolvedTarget ~= targetCharacter then
+			return false, "InvalidRevive"
+		end
+		return true
+	end,
+
+	Start = function(interactionState)
+		local context = interactionState.Context or {}
+		local prompt = context.Prompt
+		return beginReviveInteraction(interactionState.Player, prompt, interactionState)
+	end,
+
+	Cancel = function(interactionState, reason)
+		finishCancelRevive(interactionState.Target, reason)
+	end,
+
+	Complete = function(interactionState, context)
+		local prompt = context and context.Prompt
+		return finishCompleteRevive(interactionState.Player, prompt)
+	end,
+})
+
 ProximityPromptService.PromptButtonHoldBegan:Connect(function(prompt, player)
 	if prompt.Name == REVIVE_PROMPT then
 		startRevive(player, prompt)
@@ -613,11 +678,11 @@ ProximityPromptService.PromptButtonHoldEnded:Connect(function(prompt, player)
 	end
 
 	local targetCharacter = prompt.Parent and prompt.Parent.Parent
-	local state = targetCharacter and ActiveRevives[targetCharacter]
-	if state and state.ReviverPlayer == player and not state.Completing then
+	local interaction = targetCharacter and InteractionService.GetActive(targetCharacter)
+	if interaction and interaction.Name == "Revive" and interaction.Player == player then
 		task.defer(function()
-			local current = ActiveRevives[targetCharacter]
-			if current and current.ReviverPlayer == player and not current.Completing then
+			local current = InteractionService.GetActive(targetCharacter)
+			if current and current.Name == "Revive" and current.Player == player then
 				cancelRevive(targetCharacter, "Cancelled")
 			end
 		end)
