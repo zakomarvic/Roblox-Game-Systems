@@ -12,6 +12,11 @@ CharacterStateService.States = {
 	Dead = "Dead",
 }
 
+local ValidStates = {}
+for _, state in pairs(CharacterStateService.States) do
+	ValidStates[state] = true
+end
+
 local Connections = {}
 
 local function isCharacter(character)
@@ -42,13 +47,29 @@ local function deriveState(character)
 	return CharacterStateService.States.Normal
 end
 
+local function applyStateAttributes(character, state)
+	if state == CharacterStateService.States.Downed then
+		character:SetAttribute(DOWNED_ATTRIBUTE, true)
+		character:SetAttribute(REVIVING_ATTRIBUTE, false)
+	elseif state == CharacterStateService.States.Reviving then
+		character:SetAttribute(DOWNED_ATTRIBUTE, false)
+		character:SetAttribute(REVIVING_ATTRIBUTE, true)
+	elseif state == CharacterStateService.States.BeingRevived then
+		character:SetAttribute(DOWNED_ATTRIBUTE, true)
+		character:SetAttribute(REVIVING_ATTRIBUTE, true)
+	elseif state == CharacterStateService.States.Normal or state == CharacterStateService.States.Dead then
+		character:SetAttribute(DOWNED_ATTRIBUTE, false)
+		character:SetAttribute(REVIVING_ATTRIBUTE, false)
+	end
+end
+
 function CharacterStateService.Get(character)
 	if not isCharacter(character) then
 		return nil
 	end
 
 	local state = character:GetAttribute(STATE_ATTRIBUTE)
-	if type(state) == "string" and state ~= "" then
+	if type(state) == "string" and ValidStates[state] then
 		return state
 	end
 
@@ -56,19 +77,27 @@ function CharacterStateService.Get(character)
 end
 
 function CharacterStateService.Set(character, state)
-	if not isCharacter(character) then
-		return false
-	end
-	if type(state) ~= "string" or state == "" then
+	if not isCharacter(character) or not ValidStates[state] then
 		return false
 	end
 
 	character:SetAttribute(STATE_ATTRIBUTE, state)
+	applyStateAttributes(character, state)
 	return true
 end
 
 function CharacterStateService.Is(character, state)
 	return CharacterStateService.Get(character) == state
+end
+
+function CharacterStateService.Refresh(character)
+	if not isCharacter(character) then
+		return nil
+	end
+
+	local state = deriveState(character)
+	character:SetAttribute(STATE_ATTRIBUTE, state)
+	return state
 end
 
 function CharacterStateService.Initialize(character)
@@ -82,7 +111,7 @@ function CharacterStateService.Initialize(character)
 
 	local function sync()
 		if character.Parent then
-			character:SetAttribute(STATE_ATTRIBUTE, deriveState(character))
+			CharacterStateService.Refresh(character)
 		end
 	end
 
@@ -112,8 +141,19 @@ function CharacterStateService.Initialize(character)
 		Connections[character] = nil
 	end)
 
-	sync()
-	return CharacterStateService.Get(character)
+	return CharacterStateService.Refresh(character)
+end
+
+function CharacterStateService.Destroy(character)
+	local connections = Connections[character]
+	if connections then
+		for _, connection in ipairs(connections) do
+			if connection.Connected then
+				connection:Disconnect()
+			end
+		end
+		Connections[character] = nil
+	end
 end
 
 return CharacterStateService
