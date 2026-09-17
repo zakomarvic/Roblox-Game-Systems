@@ -91,8 +91,8 @@ function WeaponFire:_GetAimPoint()
 		return self.Mouse.Hit.Position
 	end
 
-	-- GetMouseLocation() returns screen coordinates. ScreenPointToRay()
-	-- uses the same screen coordinate space and handles the GUI inset.
+	-- The cursor position is already the correct screen-space position.
+	-- ScreenPointToRay() converts that exact cursor position into a 3D camera ray.
 	local MouseLocation = UserInputService:GetMouseLocation()
 	local CameraRay = Camera:ScreenPointToRay(MouseLocation.X, MouseLocation.Y)
 
