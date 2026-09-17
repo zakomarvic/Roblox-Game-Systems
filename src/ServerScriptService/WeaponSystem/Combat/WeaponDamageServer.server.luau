@@ -22,6 +22,7 @@ local BulletEffects = require(Effects:WaitForChild("BulletEffects"))
 local ExplosionEffects = require(Effects:WaitForChild("ExplosionEffects"))
 local CombatSystem = game:GetService("ServerScriptService"):WaitForChild("CombatSystem")
 local DamageService = require(CombatSystem:WaitForChild("DamageService"))
+local HitboxService = require(CombatSystem:WaitForChild("HitboxService"))
 
 local DEBUG_RAYCASTS = false
 local DEBUG_RAYCAST_DURATION = 2
@@ -125,14 +126,12 @@ local function shouldSkipHit(HitPart)
 end
 
 local function resolveTarget(HitPart)
-	if not HitPart then return nil, nil end
-	local Model = HitPart:FindFirstAncestorOfClass("Model")
-	while Model do
-		local Humanoid = Model:FindFirstChildOfClass("Humanoid")
-		if Humanoid then return Model, Humanoid end
-		Model = Model.Parent and Model.Parent:FindFirstAncestorOfClass("Model")
+	local TargetCharacter, TargetHumanoid = HitboxService.GetCharacter(HitPart), HitboxService.GetHumanoid(HitPart)
+	local BodyPartName = HitboxService.GetBodyPartName(HitPart)
+	if not TargetCharacter or not TargetHumanoid or not BodyPartName then
+		return nil, nil, nil
 	end
-	return nil, nil
+	return TargetCharacter, TargetHumanoid, BodyPartName
 end
 
 ProjectileFired.OnServerEvent:Connect(function(Player, Tool, Origin, Direction)
@@ -207,7 +206,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 	debugDamage(Player, "RAY", string.format("origin=(%.2f, %.2f, %.2f) aim=(%.2f, %.2f, %.2f) direction=(%.4f, %.4f, %.4f)", Origin.X, Origin.Y, Origin.Z, AimPoint.X, AimPoint.Y, AimPoint.Z, Direction.X, Direction.Y, Direction.Z))
 
 	while true do
-		local Result = workspace:Raycast(RayStart, Direction * MAX_SHOT_DISTANCE, Params)
+		local Result = HitboxService.Raycast(RayStart, Direction * MAX_SHOT_DISTANCE, Params)
 		if not Result then
 			debugDamage(Player, "MISS", "server raycast found no hit")
 			break
@@ -217,11 +216,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 		ShotEndPosition = Result.Position
 		LastHitPosition = Result.Position
 
-		-- Resolve a character BEFORE applying the generic skip rules. This is
-		-- important because body parts may be transparent or use names that
-		-- overlap with generic visual/decorative parts. A valid character hit
-		-- must always be treated as a character hit.
-		local TargetCharacter, TargetHumanoid = resolveTarget(HitPart)
+		local TargetCharacter, TargetHumanoid, HurtboxBodyPart = resolveTarget(HitPart)
 		local TargetTorso = getTorso(TargetCharacter)
 
 		if TargetCharacter and TargetHumanoid then
@@ -246,14 +241,14 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 
 			local Damage = tonumber(Module.BaseDamage)
 			if not Damage or Damage <= 0 then return reject("invalid BaseDamage") end
-			if HitPart.Name == "Head" and Module.HeadshotEnabled then
+			if HurtboxBodyPart == "Head" and Module.HeadshotEnabled then
 				Damage *= tonumber(Module.HeadshotDamageMultiplier) or 1
 			end
 			local Knockback = tonumber(Module.Knockback) or 0
 			local Lifesteal = tonumber(Module.Lifesteal) or 0
 			local BeforeHealth = TargetHumanoid.Health
 			local DownedBefore = TargetCharacter:GetAttribute("Downed") == true
-			debugDamage(Player, "APPLY", string.format("weapon=%s target=%s hit=%s damage=%.2f overkill=%s healthBefore=%.2f downedBefore=%s", Tool.Name, TargetCharacter.Name, HitPart.Name, Damage, tostring(Module.Overkill == true), BeforeHealth, tostring(DownedBefore)))
+			debugDamage(Player, "APPLY", string.format("weapon=%s target=%s hit=%s damage=%.2f overkill=%s healthBefore=%.2f downedBefore=%s", Tool.Name, TargetCharacter.Name, HurtboxBodyPart, Damage, tostring(Module.Overkill == true), BeforeHealth, tostring(DownedBefore)))
 			addCreator(TargetHumanoid, Player)
 			local Applied = DamageService.ApplyDamage(TargetHumanoid, Damage, Module.Overkill)
 			debugDamage(Player, "RESULT", string.format("target=%s DamageService=%s healthAfter=%.2f downedAfter=%s", TargetCharacter.Name, tostring(Applied), TargetHumanoid.Health, tostring(TargetCharacter:GetAttribute("Downed") == true)))
@@ -264,9 +259,6 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 				BulletEffects.Apply("Incendiary", {Player=Player, Tool=Tool, Module=Module, TargetCharacter=TargetCharacter, TargetHumanoid=TargetHumanoid, TargetTorso=TargetTorso, HitPart=HitPart, Direction=Direction, Duration=Module.FlamingBulletDuration})
 			end
 
-			-- Piercing is now handled only after a successful character hit.
-			-- A normal non-piercing shot stops immediately on the character,
-			-- regardless of which body part was hit.
 			if PierceRemaining <= 0 then break end
 			PierceRemaining -= 1
 			table.insert(FilterInstances, TargetCharacter)
@@ -275,8 +267,6 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 			continue
 		end
 
-		-- Only non-character parts reach the generic skip rules. This prevents
-		-- the penetration/filter logic from accidentally skipping body parts.
 		if shouldSkipHit(HitPart) then
 			table.insert(FilterInstances, HitPart)
 			Params.FilterDescendantsInstances = FilterInstances
@@ -284,7 +274,6 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 			continue
 		end
 
-		-- A solid non-character object stops the shot.
 		debugDamage(Player, "MISS", string.format("server ray stopped on %s", HitPart:GetFullName()))
 		break
 	end
@@ -328,7 +317,7 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool, Clie
 	local OverlapParams = OverlapParams.new()
 	OverlapParams.FilterType = Enum.RaycastFilterType.Exclude
 	OverlapParams.FilterDescendantsInstances = {Character, Tool}
-	local Parts = workspace:GetPartBoundsInRadius(Position, Radius, OverlapParams)
+	local Parts = HitboxService.GetPartsInRadius(Position, Radius, OverlapParams)
 	local Processed = {}
 	for _, Part in ipairs(Parts) do
 		local TargetCharacter, TargetHumanoid = resolveTarget(Part)
