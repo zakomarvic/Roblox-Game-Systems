@@ -54,6 +54,7 @@ function Incendiary.Apply(Context)
 	end
 
 	task.spawn(function()
+		local DamageService = require(game:GetService("ServerScriptService"):WaitForChild("CombatSystem"):WaitForChild("DamageService"))
 		local Remaining = Duration
 
 		while Remaining > 0 and TargetHumanoid.Parent and TargetHumanoid.Health > 0 do
@@ -72,7 +73,7 @@ function Incendiary.Apply(Context)
 				Debris:AddItem(Creator, 5)
 			end
 
-			TargetHumanoid:TakeDamage(DAMAGE_PER_SECOND * TICK_RATE)
+			DamageService.ApplyDamage(TargetHumanoid, DAMAGE_PER_SECOND * TICK_RATE, false)
 		end
 
 		for _, Fire in ipairs(Fires) do
