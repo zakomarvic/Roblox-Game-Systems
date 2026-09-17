@@ -7,8 +7,6 @@ local MAX_HEALTH = 110
 local DOWNED_HEALTH = 1
 local DOWNED_INVULNERABILITY_DURATION = 0.3
 local DOWNED_ATTRIBUTE = "Downed"
-local REVIVING_ATTRIBUTE = "Reviving"
-local DOWNED_IMAGE = "rbxassetid://8121963838"
 local DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE = "DownedInvulnerableUntil"
 
 local CharacterConnections = {}
@@ -38,15 +36,18 @@ local function addDownedIndicator(character)
 	image.Name = "Icon"
 	image.BackgroundTransparency = 1
 	image.Size = UDim2.fromScale(1, 1)
-	image.Image = DOWNED_IMAGE
+	image.Image = "rbxassetid://8121963838"
 	image.Parent = billboard
 end
 
 local function setDowned(character, humanoid)
 	if not character.Parent or not humanoid or humanoid.Health <= 0 then return false end
-	if character:GetAttribute(DOWNED_ATTRIBUTE) then return false end
+	if CharacterStateService.Is(character, CharacterStateService.States.Downed)
+		or CharacterStateService.Is(character, CharacterStateService.States.BeingRevived) then
+		return false
+	end
 
-	character:SetAttribute(DOWNED_ATTRIBUTE, true)
+	CharacterStateService.Set(character, CharacterStateService.States.Downed)
 	character:SetAttribute(DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE, os.clock() + DOWNED_INVULNERABILITY_DURATION)
 	humanoid.Health = DOWNED_HEALTH
 	humanoid.WalkSpeed = 0
@@ -58,11 +59,18 @@ local function setDowned(character, humanoid)
 	return true
 end
 
-local function clearDowned(character, humanoid)
+local function clearDowned(character)
 	if not character then return false end
 	local wasDowned = character:GetAttribute(DOWNED_ATTRIBUTE) == true
-	character:SetAttribute(DOWNED_ATTRIBUTE, false)
 	character:SetAttribute(DOWNED_INVULNERABLE_UNTIL_ATTRIBUTE, nil)
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health <= 0 then
+		CharacterStateService.Set(character, CharacterStateService.States.Dead)
+	else
+		CharacterStateService.Set(character, CharacterStateService.States.Normal)
+	end
+
 	removeDownedIndicator(character)
 	return wasDowned
 end
@@ -74,7 +82,7 @@ local function setupCharacter(character)
 
 	CharacterConnections[character] = true
 	CharacterStateService.Initialize(character)
-	clearDowned(character, humanoid)
+	clearDowned(character)
 	humanoid.MaxHealth = MAX_HEALTH
 	humanoid.Health = MAX_HEALTH
 	humanoid.BreakJointsOnDeath = false
@@ -111,12 +119,14 @@ function DownedService.Clear(targetHumanoid)
 	if not targetHumanoid or not targetHumanoid:IsA("Humanoid") then return false end
 	local character = targetHumanoid.Parent
 	if not character or not character:IsA("Model") then return false end
-	return clearDowned(character, targetHumanoid)
+	return clearDowned(character)
 end
 
 function DownedService.IsDowned(targetHumanoid)
 	local character = targetHumanoid and targetHumanoid.Parent
-	return character ~= nil and character:IsA("Model") and character:GetAttribute(DOWNED_ATTRIBUTE) == true
+	return character ~= nil and character:IsA("Model")
+		and (CharacterStateService.Is(character, CharacterStateService.States.Downed)
+			or CharacterStateService.Is(character, CharacterStateService.States.BeingRevived))
 end
 
 function DownedService.IsInvulnerable(targetHumanoid)
