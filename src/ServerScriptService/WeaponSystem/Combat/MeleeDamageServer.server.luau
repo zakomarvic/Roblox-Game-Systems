@@ -17,6 +17,7 @@ MeleeRemote.Parent = Remotes
 
 local MeleeUtility = require(ServerModules:WaitForChild("MeleeUtility"))
 local ProjectileThrower = require(ServerModules:WaitForChild("ProjectileThrower"))
+local HitboxService = require(ServerScriptService:WaitForChild("CombatSystem"):WaitForChild("HitboxService"))
 local DestructibleService = require(ServerScriptService.Destruction.Modules:WaitForChild("DestructibleService"))
 local Thrower = ProjectileThrower.new()
 
@@ -34,11 +35,15 @@ local function getValidTarget(Player, TargetHumanoid, HitPart)
 	if typeof(TargetHumanoid) ~= "Instance" or not TargetHumanoid:IsA("Humanoid") then return end
 	if typeof(HitPart) ~= "Instance" or not HitPart:IsA("BasePart") then return end
 	if TargetHumanoid.Health <= 0 then return end
-	local TargetCharacter = TargetHumanoid.Parent
+
+	local TargetCharacter = HitboxService.GetCharacter(HitPart)
+	local ResolvedHumanoid = HitboxService.GetHumanoid(HitPart)
+	local BodyPartName = HitboxService.GetBodyPartName(HitPart)
+	if not TargetCharacter or ResolvedHumanoid ~= TargetHumanoid or not BodyPartName then return end
+
 	local Character = Player.Character
-	if not TargetCharacter or not TargetCharacter:IsA("Model") or TargetCharacter == Character then return end
+	if not TargetCharacter:IsA("Model") or TargetCharacter == Character then return end
 	if TargetCharacter:FindFirstChildOfClass("Humanoid") ~= TargetHumanoid then return end
-	if not HitPart:IsDescendantOf(TargetCharacter) then return end
 	local TargetTorso = MeleeUtility.GetTorso(TargetCharacter)
 	if not TargetTorso then return end
 	return TargetCharacter, TargetTorso
@@ -53,7 +58,7 @@ local function validateLineOfSight(Character, Tool, Handle, HitPart, TargetRoot)
 	Params.FilterDescendantsInstances = {Character, Tool}
 	Params.IgnoreWater = true
 
-	local Result = workspace:Raycast(Handle.Position, Offset, Params)
+	local Result = HitboxService.Raycast(Handle.Position, Offset, Params)
 	return not Result or Result.Instance:IsDescendantOf(TargetRoot)
 end
 
