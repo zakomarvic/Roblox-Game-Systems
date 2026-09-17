@@ -71,19 +71,6 @@ function WeaponLifecycle:BindCharacter(Player, RunService, Tool)
 		end))
 	end
 
-	local function BindReviveState(Character, Humanoid)
-		self:AddPersistentConnection(Character:GetAttributeChangedSignal("Reviving"):Connect(function()
-			if Character:GetAttribute("Reviving") == false and not self.Equipped and Humanoid.Parent then
-				Humanoid.AutoRotate = true
-			elseif Character:GetAttribute("Reviving") == false and self.Equipped and Humanoid.Parent then
-				local D = self.Dependencies
-				if D.PlayIdleAnim then
-					D.PlayIdleAnim(D.IdleAnimationSpeed or 1)
-				end
-			end
-		end))
-	end
-
 	local Character = Player.Character or Player.CharacterAdded:Wait()
 	local Humanoid = Character:WaitForChild("Humanoid")
 	if Humanoid.Health <= 0 then
@@ -94,7 +81,6 @@ function WeaponLifecycle:BindCharacter(Player, RunService, Tool)
 	end
 	self:SetCharacter(Character, Humanoid)
 	BindDeath(Humanoid)
-	BindReviveState(Character, Humanoid)
 
 	self:AddPersistentConnection(Player.CharacterAdded:Connect(function(NewCharacter)
 		local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
@@ -104,7 +90,6 @@ function WeaponLifecycle:BindCharacter(Player, RunService, Tool)
 		if Tool and Tool.Parent == NewCharacter then Tool.Parent = Player.Backpack end
 		self:SetCharacter(NewCharacter, NewHumanoid)
 		BindDeath(NewHumanoid)
-		BindReviveState(NewCharacter, NewHumanoid)
 
 		if NewHumanoid.Health > 0 then
 			RunService.Heartbeat:Wait()
@@ -127,16 +112,13 @@ function WeaponLifecycle:Equip()
 	if D.Camera then D.Camera:SetEquipped(true); D.Camera:Start() end
 	if D.Aim then D.Aim:Reset() end
 	if D.Input then D.Input:Bind() end
-	if D.PlayIdleAnim then
-		D.PlayIdleAnim(D.IdleAnimationSpeed or 1)
-	end
+	if D.OnEquip then D.OnEquip(self) end
 	if D.SprintChanged and D.OnSprint then
 		local SprintEvent = D.SprintChanged
 		self:AddConnection(SprintEvent.Event:Connect(function(IsSprinting)
 			if self.Equipped and not self.Blocked then D.OnSprint(IsSprinting) end
 		end))
 	end
-	if D.OnEquip then D.OnEquip(self) end
 	return true
 end
 
@@ -152,16 +134,9 @@ function WeaponLifecycle:Unequip()
 	if D.Input then D.Input:Unbind() end
 	if D.Camera then D.Camera:SetEquipped(false); D.Camera:Stop() end
 	if D.Aim then D.Aim:Reset() end
-	if D.StopIdleAnim then D.StopIdleAnim() end
-	if self.Humanoid and self.Humanoid.Parent and self.Character and self.Character:GetAttribute("Reviving") ~= true then
-		self.Humanoid.AutoRotate = true
-	end
 	if D.Controller then D.Controller:SetEnabled(not self.Blocked) end
 	self:CleanupConnections()
 	if D.OnUnequip then D.OnUnequip(self) end
-	if self.Humanoid and self.Humanoid.Parent and self.Character and self.Character:GetAttribute("Reviving") == true then
-		self.Humanoid.AutoRotate = true
-	end
 end
 
 function WeaponLifecycle:Block()
