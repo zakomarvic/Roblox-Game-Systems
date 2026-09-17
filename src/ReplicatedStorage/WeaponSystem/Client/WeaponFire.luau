@@ -91,18 +91,19 @@ function WeaponFire:_GetAimPoint()
 		return self.Mouse.Hit.Position
 	end
 
-	-- The cursor position is already the correct screen-space position.
-	-- ScreenPointToRay() converts that exact cursor position into a 3D camera ray.
-	local MouseLocation = UserInputService:GetMouseLocation()
-	local CameraRay = Camera:ScreenPointToRay(MouseLocation.X, MouseLocation.Y)
+	-- Mouse.UnitRay is Roblox's cursor ray. It avoids all screen/viewport/GUI-inset conversions.
+	local MouseRay = self.Mouse and self.Mouse.UnitRay
+	if MouseRay then
+		local Params = RaycastParams.new()
+		Params.FilterType = Enum.RaycastFilterType.Exclude
+		Params.FilterDescendantsInstances = {self.Character, self.Tool}
+		Params.IgnoreWater = true
 
-	local Params = RaycastParams.new()
-	Params.FilterType = Enum.RaycastFilterType.Exclude
-	Params.FilterDescendantsInstances = {self.Character, self.Tool}
-	Params.IgnoreWater = true
+		local MouseResult = Workspace:Raycast(MouseRay.Origin, MouseRay.Direction * 5000, Params)
+		return MouseResult and MouseResult.Position or (MouseRay.Origin + MouseRay.Direction * 5000)
+	end
 
-	local CameraResult = Workspace:Raycast(CameraRay.Origin, CameraRay.Direction * 5000, Params)
-	return CameraResult and CameraResult.Position or (CameraRay.Origin + CameraRay.Direction * 5000)
+	return self.Mouse.Hit.Position
 end
 
 function WeaponFire:_GetMuzzleOrigin(ShootingHandle)
