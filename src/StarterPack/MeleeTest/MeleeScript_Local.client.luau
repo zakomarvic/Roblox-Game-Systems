@@ -34,17 +34,14 @@ local function removeDefaultGrip()
 	if not Character then return end
 	local RightArm = Character:FindFirstChild("Right Arm") or Character:FindFirstChild("RightHand")
 	if not RightArm then return end
-
 	local DefaultGrip = RightArm:FindFirstChild("RightGrip")
 	if DefaultGrip then DefaultGrip:Destroy() end
 	if CustomGrip then CustomGrip:Destroy(); CustomGrip = nil end
 	if not Handle then return end
-
 	Handle.CanCollide = false
 	Handle.CanTouch = false
 	Handle.CanQuery = true
 	Handle.Massless = true
-
 	CustomGrip = Instance.new("Motor6D")
 	CustomGrip.Name = "MeleeGrip"
 	CustomGrip.Part0 = RightArm
@@ -84,31 +81,23 @@ local function throwWeapon()
 	if Camera then
 		local MousePosition = UserInputService:GetMouseLocation()
 		local Ray = Camera:ViewportPointToRay(MousePosition.X, MousePosition.Y)
-
 		local Params = RaycastParams.new()
 		Params.FilterType = Enum.RaycastFilterType.Exclude
 		Params.FilterDescendantsInstances = {Character, Tool}
 		Params.IgnoreWater = true
-
 		local Result = workspace:Raycast(Ray.Origin, Ray.Direction * 1000, Params)
 		local AimPoint = Result and Result.Position or (Ray.Origin + Ray.Direction * 1000)
 		local ThrowDirection = (AimPoint - Handle.Position).Unit
-
 		MeleeRemote:FireServer("Throw", Tool, Handle.Position, ThrowDirection)
 	end
 
-	task.delay(0.15, function()
-		Throwing = false
-	end)
+	task.delay(0.15, function() Throwing = false end)
 end
 
 local function setup()
 	getCharacter()
 	Handle = Tool:FindFirstChild("Handle")
-	if not Handle then
-		warn("[MeleeTest] Tool needs a Handle")
-		return
-	end
+	if not Handle then warn("[MeleeTest] Tool needs a Handle"); return end
 
 	OldAutoRotate = Humanoid.AutoRotate
 	Humanoid.AutoRotate = true
@@ -124,18 +113,7 @@ local function setup()
 		warn("[MeleeTest] No DmgPoint attachments found inside Handle. Add one or more Attachments named DmgPoint (or tag them DmgPoint).")
 	end
 
-	Hitbox = MeleeHitbox.new({
-		Origin = Handle,
-		RaycastParams = Params,
-		Resolution = Setting.MeleeResolution,
-		CastData = {
-			CastType = Setting.MeleeCastType,
-			Size = Setting.MeleeCastSize,
-			CFrame = Setting.MeleeCastCFrame,
-			Radius = Setting.MeleeCastRadius,
-		},
-	})
-
+	Hitbox = MeleeHitbox.new({Origin = Handle, RaycastParams = Params, Resolution = Setting.MeleeResolution, CastData = {CastType = Setting.MeleeCastType, Size = Setting.MeleeCastSize, CFrame = Setting.MeleeCastCFrame, Radius = Setting.MeleeCastRadius}})
 	AnimationController = WeaponAnimation.new({Tool = Tool, Humanoid = Humanoid, Module = Setting})
 
 	Controller = MeleeController.new({
@@ -147,9 +125,7 @@ local function setup()
 		OnStart = function()
 			if Throwing then return end
 			MeleeRemote:FireServer("Start", Tool)
-			if Setting.AttackAnimationID ~= nil then
-				AnimationController:Play("AttackAnim", Setting.AttackAnimationSpeed or 1, 0.03)
-			end
+			if Setting.AttackAnimationID ~= nil then AnimationController:Play("AttackAnim", Setting.AttackAnimationSpeed or 1, 0.03) end
 		end,
 		OnHit = function(Hit)
 			local Target = Hit.TargetInstance or Hit.TargetHumanoid or Hit.TargetCharacter or Hit.HitPart
@@ -176,14 +152,12 @@ Tool.Unequipped:Connect(function()
 	Equipped = false
 	Throwing = false
 	if Controller then Controller:Destroy() end
-	if AnimationController then AnimationController:StopAll() end
+	if AnimationController then AnimationController:Destroy() end
 	Controller = nil
 	AnimationController = nil
 	Hitbox = nil
 	clearGrip()
-	if Humanoid and Humanoid.Parent then
-		Humanoid.AutoRotate = OldAutoRotate ~= nil and OldAutoRotate or true
-	end
+	if Humanoid and Humanoid.Parent then Humanoid.AutoRotate = OldAutoRotate ~= nil and OldAutoRotate or true end
 	OldAutoRotate = nil
 end)
 
@@ -191,9 +165,7 @@ Tool.Activated:Connect(attack)
 
 UserInputService.InputBegan:Connect(function(Input, GameProcessed)
 	if GameProcessed or not Equipped then return end
-	if Input.KeyCode == Setting.ThrowKey then
-		throwWeapon()
-	end
+	if Input.KeyCode == Setting.ThrowKey then throwWeapon() end
 end)
 
 Player.CharacterAdded:Connect(function()
