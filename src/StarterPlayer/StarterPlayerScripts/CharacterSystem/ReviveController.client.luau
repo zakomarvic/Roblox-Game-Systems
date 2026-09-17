@@ -6,6 +6,7 @@ local LocalPlayer = Players.LocalPlayer
 local CharacterSystem = ReplicatedStorage:WaitForChild("CharacterSystem")
 local Modules = CharacterSystem:WaitForChild("Modules")
 local Animations = require(Modules:WaitForChild("ReviveAnimations"))
+local AnimationController = require(Modules:WaitForChild("AnimationController"))
 local Remote = CharacterSystem:WaitForChild("ReviveRemote")
 
 local TRANSITION_LEAD_TIME = 0.08
@@ -19,6 +20,8 @@ local Tracks = {}
 local DownedConnection
 local AnimationPlayedConnection
 local RecoveryPlaying = false
+local CharacterAnimationController
+local InterruptedAnimations = false
 
 local function isOwnedTrack(track)
 	for _, ownedTrack in pairs(Tracks) do
@@ -49,11 +52,28 @@ local function stopConflictingTracks(except)
 		return
 	end
 
+	-- Capture the tracks that were active before the revive/downed animation
+	-- took control. This lets weapon idle and other character animations resume
+	-- after the state animation finishes.
+	if CharacterAnimationController and not InterruptedAnimations then
+		CharacterAnimationController:InterruptOtherTracks(except)
+		InterruptedAnimations = true
+	end
+
 	for _, track in ipairs(Animator:GetPlayingAnimationTracks()) do
 		if track ~= except and not isOwnedTrack(track) then
 			track:Stop(0)
 		end
 	end
+end
+
+local function restoreInterruptedAnimations()
+	if not CharacterAnimationController or not InterruptedAnimations then
+		return
+	end
+
+	CharacterAnimationController:RestoreInterruptedTracks()
+	InterruptedAnimations = false
 end
 
 local function loadTracks(character)
@@ -62,18 +82,16 @@ local function loadTracks(character)
 	Animator = Humanoid:WaitForChild("Animator")
 	Tracks = {}
 	RecoveryPlaying = false
+	InterruptedAnimations = false
+
+	if CharacterAnimationController then
+		CharacterAnimationController:Destroy()
+	end
+	CharacterAnimationController = AnimationController.new(character)
 
 	for name, data in pairs(Animations) do
-		local animation = Instance.new("Animation")
-		animation.Name = name
-		animation.AnimationId = "rbxassetid://" .. tostring(data.Id)
-
-		local track = Animator:LoadAnimation(animation)
-		track.Looped = data.Looped == true
-		track.Priority = Enum.AnimationPriority.Action4
+		local track = CharacterAnimationController:Load(name, data.Id, Enum.AnimationPriority.Action4, data.Looped == true)
 		Tracks[name] = track
-
-		animation:Destroy()
 	end
 
 	if AnimationPlayedConnection then
@@ -121,8 +139,6 @@ local function maintainDownedIdle()
 				if not idle.IsPlaying then
 					playTrack("DownedIdle", 0)
 				elseif idle.Length > 0 and idle.TimePosition >= math.max(0, idle.Length - LOOP_RESET_LEAD_TIME) then
-					-- Prevent an uploaded loop clip from exposing a standing final
-					-- keyframe before the next loop begins.
 					idle.TimePosition = 0
 				end
 			end
@@ -195,6 +211,7 @@ local function playRecoveryAnimation()
 	local track = Tracks.DownedSelfRevive
 	if not track then
 		RecoveryPlaying = false
+		restoreInterruptedAnimations()
 		return
 	end
 
@@ -209,6 +226,7 @@ local function playRecoveryAnimation()
 			stopTrack("DownedSelfRevive", 0)
 		end
 		RecoveryPlaying = false
+		restoreInterruptedAnimations()
 	end)
 end
 
@@ -255,6 +273,8 @@ Remote.OnClientEvent:Connect(function(action, animationName)
 		if Character and Character:GetAttribute("Downed") == true and not RecoveryPlaying then
 			playTrack("DownedIdle", 0)
 			maintainDownedIdle()
+		else
+			restoreInterruptedAnimations()
 		end
 
 	elseif action == "Complete" then
@@ -265,6 +285,8 @@ Remote.OnClientEvent:Connect(function(action, animationName)
 		if Character and Character:GetAttribute("Downed") == true then
 			playTrack("DownedIdle", 0)
 			maintainDownedIdle()
+		else
+			restoreInterruptedAnimations()
 		end
 	end
 end)
