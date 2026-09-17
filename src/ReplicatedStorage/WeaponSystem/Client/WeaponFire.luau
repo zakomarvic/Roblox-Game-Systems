@@ -1,5 +1,4 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
 local Workspace = workspace
 
 local WeaponFire = {}
@@ -23,6 +22,7 @@ function WeaponFire.new(Config)
 	self.Character = Config.Character
 	self.Humanoid = Config.Humanoid
 	self.Mouse = Config.Mouse
+	self.PlayFireAnim = Config.PlayFireAnim
 	self.GetFireAnim = Config.GetFireAnim
 	self.FireAnim = Config.FireAnim
 	self.Raycast = Config.Raycast
@@ -91,7 +91,6 @@ function WeaponFire:_GetAimPoint()
 		return self.Mouse.Hit.Position
 	end
 
-	-- Mouse.UnitRay is Roblox's cursor ray. It avoids all screen/viewport/GUI-inset conversions.
 	local MouseRay = self.Mouse and self.Mouse.UnitRay
 	if MouseRay then
 		local Params = RaycastParams.new()
@@ -113,15 +112,6 @@ function WeaponFire:_GetMuzzleOrigin(ShootingHandle)
 		return ShootingHandle.CFrame:PointToWorldSpace(Offset)
 	end
 	return ShootingHandle.Position
-end
-
-function WeaponFire:_GetDirection(Start)
-	local AimPoint = self:_GetAimPoint()
-	local AimDirection = (AimPoint - Start).Magnitude > 0 and (AimPoint - Start).Unit or Vector3.zAxis
-
-	local Spread = self.Module.Spread or 0
-	Spread *= (self.IsAiming and 1 - (self.Module.SpreadRedution or 0) or 1)
-	return (CFrame.lookAt(Start, Start + AimDirection) * CFrame.Angles(math.rad(-Spread + math.random() * (Spread * 2)), math.rad(-Spread + math.random() * (Spread * 2)), 0)).LookVector
 end
 
 function WeaponFire:_GetRaycastParams()
@@ -179,8 +169,12 @@ end
 function WeaponFire:Fire(ShootingHandle)
 	local Module = self.Module
 	WeaponFireEffects.PlayFirePresentation(self.Tool, ShootingHandle, WeaponEffects)
-	local FireAnim = self.GetFireAnim and self.GetFireAnim() or self.FireAnim
-	if FireAnim then FireAnim:Play(nil, nil, Module.FireAnimationSpeed or 1) end
+	if self.PlayFireAnim then
+		self.PlayFireAnim(Module.FireAnimationSpeed or 1)
+	else
+		local FireAnim = self.GetFireAnim and self.GetFireAnim() or self.FireAnim
+		if FireAnim then FireAnim:Play(nil, nil, Module.FireAnimationSpeed or 1) end
+	end
 
 	local Start = self:_GetMuzzleOrigin(ShootingHandle)
 	if not Start then return end
