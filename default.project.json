@@ -26,12 +26,10 @@
         "GameSettingsAvatar": "R6"
       },
       "StarterCharacterScripts": {
-        "$className": "StarterCharacterScripts",
-        "$path": "src/StarterPlayer/StarterCharacterScripts"
+        "$className": "StarterCharacterScripts"
       },
       "StarterPlayerScripts": {
-        "$className": "StarterPlayerScripts",
-        "$path": "src/StarterPlayer/StarterPlayerScripts"
+        "$className": "StarterPlayerScripts"
       },
       "$path": "src/StarterPlayer"
     }
