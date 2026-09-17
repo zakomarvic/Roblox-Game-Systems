@@ -1,5 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 local Workspace = workspace
 
 local WeaponFire = {}
@@ -10,7 +11,6 @@ local Remotes = WeaponSystem:WaitForChild("Remotes")
 local WeaponEffects = Remotes:WaitForChild("WeaponEffects")
 local Explosion = Remotes:WaitForChild("Explosion")
 local ProjectileFired = Remotes:WaitForChild("ProjectileFired")
-local RaycastDebug = Remotes:WaitForChild("RaycastDebug")
 local ShotResult = Remotes:WaitForChild("ShotResult")
 local BulletVisualizer = require(WeaponSystem.Effects:WaitForChild("BulletVisualizer"))
 local ProjectileController = require(WeaponSystem.Projectile:WaitForChild("ProjectileController"))
@@ -92,8 +92,14 @@ function WeaponFire:_GetAimPoint()
 		return self.Mouse.Hit.Position
 	end
 
+	-- GetMouseLocation() is in screen coordinates and includes the GUI inset.
+	-- ViewportPointToRay() expects viewport coordinates, so remove the inset first.
 	local MouseLocation = UserInputService:GetMouseLocation()
-	local CameraRay = Camera:ViewportPointToRay(MouseLocation.X, MouseLocation.Y)
+	local GuiInset = GuiService:GetGuiInset()
+	local ViewportX = MouseLocation.X - GuiInset.X
+	local ViewportY = MouseLocation.Y - GuiInset.Y
+	local CameraRay = Camera:ViewportPointToRay(ViewportX, ViewportY)
+
 	local Params = RaycastParams.new()
 	Params.FilterType = Enum.RaycastFilterType.Exclude
 	Params.FilterDescendantsInstances = {self.Character, self.Tool}
@@ -194,7 +200,6 @@ function WeaponFire:Fire(ShootingHandle)
 	end
 
 	self.InflictTarget:FireServer(Start, AimPoint, Direction)
-	RaycastDebug:FireServer(self.Tool, Start, Direction)
 end
 
 function WeaponFire:Destroy()
