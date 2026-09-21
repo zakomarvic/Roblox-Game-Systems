@@ -8,6 +8,13 @@ local CURRENT_REGION_ATTRIBUTE = "CurrentRegion"
 local CURRENT_REGION_ID_ATTRIBUTE = "CurrentRegionId"
 local REFRESH_INTERVAL = 0.15
 
+local RULE_NAMES = {
+	"FireWeapon",
+	"TakeDamage",
+	"Combat",
+	"Arrest",
+}
+
 local RegionDefinitions = require(script.Parent:WaitForChild("RegionDefinitions"))
 
 local RegionsFolder = Workspace:FindFirstChild(REGION_FOLDER_NAME)
@@ -63,8 +70,17 @@ local function getRuleValue(region, ruleName)
 	end
 
 	local regionType = getRegionType(region)
-	local definition = regionType and RegionDefinitions.Types[regionType]
-	return definition and definition[ruleName] or nil
+	if not regionType then
+		return nil
+	end
+
+	local definition = RegionDefinitions.Types[regionType]
+	if type(definition) ~= "table" then
+		return nil
+	end
+
+	local value = definition[ruleName]
+	return type(value) == "boolean" and value or nil
 end
 
 local function isRegionPart(region)
@@ -187,14 +203,18 @@ end
 
 function RegionService.GetRules(character)
 	local rules = {}
+
 	for _, region in ipairs(RegionService.GetRegions(character)) do
-		for ruleName in pairs(RegionDefinitions.Types[getRegionType(region)] or {}) do
-			local value = getRuleValue(region, ruleName)
-			if value ~= nil and rules[ruleName] == nil then
-				rules[ruleName] = value
+		for _, ruleName in ipairs(RULE_NAMES) do
+			if rules[ruleName] == nil then
+				local value = getRuleValue(region, ruleName)
+				if value ~= nil then
+					rules[ruleName] = value
+				end
 			end
 		end
 	end
+
 	return rules
 end
 
@@ -208,18 +228,19 @@ function RegionService.Can(character, action)
 		return true
 	end
 
-	local ruleName = action
 	local sawRule = false
 	local allowed = true
 
 	for _, region in ipairs(regions) do
-		local value = getRuleValue(region, ruleName)
+		local value = getRuleValue(region, action)
 		if value ~= nil then
 			sawRule = true
+
 			if value == false then
 				return false, "RegionRestricted", region
 			end
-			allowed = allowed and value == true
+
+			allowed = allowed and value
 		end
 	end
 
