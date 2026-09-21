@@ -4,6 +4,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local CharacterSystem = ServerScriptService:WaitForChild("CharacterSystem")
 local CharacterServices = CharacterSystem:WaitForChild("Services")
 local CharacterStateService = require(CharacterServices:WaitForChild("CharacterStateService"))
+local RegionService = require(ServerScriptService:WaitForChild("RegionSystem"):WaitForChild("RegionService"))
 
 WeaponStateService.States = {
 	Unequipped = "Unequipped",
@@ -163,6 +164,10 @@ function WeaponStateService.TryFire(Player, Tool)
 	if not State or not isEquipped(Player, Tool) then
 		return false, State, Settings
 	end
+	local Character = Player.Character
+	if not Character or not RegionService.Can(Character, "FireWeapon") then
+		return false, State, Settings
+	end
 	if State.Current == WeaponStateService.States.Disabled
 		or State.Current == WeaponStateService.States.Reloading
 		or State.Current == WeaponStateService.States.Throwing
@@ -249,6 +254,10 @@ function WeaponStateService.TryThrow(Player, Tool)
 	if not State or not isEquipped(Player, Tool) then
 		return false, State, Settings
 	end
+	local Character = Player.Character
+	if not Character or not RegionService.Can(Character, "FireWeapon") then
+		return false, State, Settings
+	end
 	if State.Current == WeaponStateService.States.Disabled
 		or State.Current == WeaponStateService.States.Reloading
 		or State.Current == WeaponStateService.States.Firing
@@ -263,6 +272,10 @@ end
 function WeaponStateService.TryMeleeAttack(Player, Tool)
 	local State, Settings = WeaponStateService.Get(Player, Tool)
 	if not State or not isEquipped(Player, Tool) then
+		return false, State, Settings
+	end
+	local Character = Player.Character
+	if not Character or not RegionService.Can(Character, "Combat") then
 		return false, State, Settings
 	end
 	if State.Current == WeaponStateService.States.Disabled
