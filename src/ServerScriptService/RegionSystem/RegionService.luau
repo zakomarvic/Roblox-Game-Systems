@@ -45,7 +45,11 @@ local function isCharacter(value)
 end
 
 local function getRoot(character)
-	return character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+	if not character or not character:IsA("Model") then
+		return nil
+	end
+
+	return character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart
 end
 
 local function getRegionType(region)
@@ -159,6 +163,10 @@ local function updateCharacter(character)
 end
 
 function RegionService.GetRegions(character)
+	if not isCharacter(character) then
+		return {}
+	end
+
 	local regions = CharacterRegions[character]
 	if regions then
 		local result = {}
