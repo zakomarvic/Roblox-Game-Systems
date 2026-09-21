@@ -1,4 +1,5 @@
 local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
 
 local RegionService = {}
 
@@ -17,6 +18,7 @@ if not RegionsFolder then
 end
 
 local CharacterRegions = {}
+local TrackedCharacters = {}
 local Connections = {}
 local Started = false
 
@@ -234,27 +236,63 @@ function RegionService.Refresh(character)
 	end
 end
 
+local function trackCharacter(character)
+	if not isCharacter(character) or not character:FindFirstChildOfClass("Humanoid") or TrackedCharacters[character] then
+		return
+	end
+
+	TrackedCharacters[character] = true
+	Connections[character] = character.AncestryChanged:Connect(function(_, parent)
+		if parent ~= nil then
+			return
+		end
+		TrackedCharacters[character] = nil
+		CharacterRegions[character] = nil
+		local connection = Connections[character]
+		if connection then
+			connection:Disconnect()
+		end
+		Connections[character] = nil
+	end)
+end
+
 function RegionService.Start()
 	if Started then
 		return
 	end
 	Started = true
 
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player.Character then
+			trackCharacter(player.Character)
+		end
+		player.CharacterAdded:Connect(trackCharacter)
+	end
+
+	Players.PlayerAdded:Connect(function(player)
+		player.CharacterAdded:Connect(trackCharacter)
+	end)
+
+	for _, instance in ipairs(workspace:GetDescendants()) do
+		if instance:IsA("Humanoid") and instance.Parent and instance.Parent:IsA("Model") then
+			trackCharacter(instance.Parent)
+		end
+	end
+
+	workspace.DescendantAdded:Connect(function(instance)
+		if instance:IsA("Humanoid") and instance.Parent and instance.Parent:IsA("Model") then
+			trackCharacter(instance.Parent)
+		end
+	end)
+
 	task.spawn(function()
 		while Started do
-			for _, character in ipairs(workspace:GetChildren()) do
-				if isCharacter(character) and getRoot(character) and character:FindFirstChildOfClass("Humanoid") then
+			for character in pairs(TrackedCharacters) do
+				if getRoot(character) then
 					updateCharacter(character)
 				end
 			end
 			task.wait(REFRESH_INTERVAL)
-		end
-	end)
-
-	workspace.DescendantRemoving:Connect(function(instance)
-		if isCharacter(instance) then
-			CharacterRegions[instance] = nil
-			Connections[instance] = nil
 		end
 	end)
 end
