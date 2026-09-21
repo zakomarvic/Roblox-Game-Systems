@@ -68,23 +68,36 @@ local function getRegionPriority(region)
 end
 
 local function getRuleValue(region, ruleName)
-	local override = region:GetAttribute(ruleName)
-	if type(override) == "boolean" then
-		return override
-	end
-
-	local regionType = getRegionType(region)
-	if not regionType then
+	if not region or not region:IsA("Instance") then
 		return nil
 	end
 
-	local definition = RegionDefinitions.Types[regionType]
+	local override = region:GetAttribute(ruleName)
+	if override ~= nil then
+		return override == true
+	end
+
+	local regionType = region:GetAttribute("RegionType")
+	if type(regionType) ~= "string" then
+		return nil
+	end
+
+	local types = RegionDefinitions.Types
+	if type(types) ~= "table" then
+		return nil
+	end
+
+	local definition = types[regionType]
 	if type(definition) ~= "table" then
 		return nil
 	end
 
 	local value = definition[ruleName]
-	return type(value) == "boolean" and value or nil
+	if type(value) == "boolean" then
+		return value
+	end
+
+	return nil
 end
 
 local function isRegionPart(region)
