@@ -2,22 +2,22 @@ local RegionDefinitions = {}
 
 RegionDefinitions.Types = {
 	SafeZone = {
-		WeaponsDisabled = true,
-		DamageDisabled = true,
-		CombatEnabled = false,
-		ArrestAllowed = false,
+		FireWeapon = false,
+		TakeDamage = false,
+		Combat = false,
+		Arrest = false,
 	},
 	CombatZone = {
-		WeaponsDisabled = false,
-		DamageDisabled = false,
-		CombatEnabled = true,
-		ArrestAllowed = true,
+		FireWeapon = true,
+		TakeDamage = true,
+		Combat = true,
+		Arrest = true,
 	},
 	RestrictedZone = {
-		WeaponsDisabled = false,
-		DamageDisabled = false,
-		CombatEnabled = true,
-		ArrestAllowed = false,
+		FireWeapon = true,
+		TakeDamage = true,
+		Combat = true,
+		Arrest = false,
 	},
 }
 
