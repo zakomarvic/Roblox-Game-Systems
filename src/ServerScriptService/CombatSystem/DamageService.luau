@@ -4,6 +4,7 @@ local CharacterSystem = game:GetService("ServerScriptService"):WaitForChild("Cha
 local Services = CharacterSystem:WaitForChild("Services")
 local DownedService = require(Services:WaitForChild("DownedDamageService"))
 local CharacterStateService = require(Services:WaitForChild("CharacterStateService"))
+local RegionService = require(game:GetService("ServerScriptService"):WaitForChild("RegionSystem"):WaitForChild("RegionService"))
 
 local MAX_HEALTH = 110
 local DOWNED_HEALTH_THRESHOLD = 10
@@ -33,6 +34,7 @@ function DamageService.ApplyDamage(targetHumanoid, damage, overkill)
 
 	local character = getCharacter(targetHumanoid)
 	if not character then return false end
+	if not RegionService.Can(character, "TakeDamage") then return false end
 
 	CharacterStateService.Initialize(character)
 

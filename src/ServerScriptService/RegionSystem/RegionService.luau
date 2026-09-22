@@ -8,6 +8,13 @@ local CURRENT_REGION_ATTRIBUTE = "CurrentRegion"
 local CURRENT_REGION_ID_ATTRIBUTE = "CurrentRegionId"
 local REFRESH_INTERVAL = 0.15
 
+local RULE_NAMES = {
+	"FireWeapon",
+	"TakeDamage",
+	"Combat",
+	"Arrest",
+}
+
 local RegionDefinitions = require(script.Parent:WaitForChild("RegionDefinitions"))
 
 local RegionsFolder = Workspace:FindFirstChild(REGION_FOLDER_NAME)
@@ -38,7 +45,11 @@ local function isCharacter(value)
 end
 
 local function getRoot(character)
-	return character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+	if not character or not character:IsA("Model") then
+		return nil
+	end
+
+	return character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart
 end
 
 local function getRegionType(region)
@@ -57,14 +68,36 @@ local function getRegionPriority(region)
 end
 
 local function getRuleValue(region, ruleName)
-	local override = region:GetAttribute(ruleName)
-	if type(override) == "boolean" then
-		return override
+	if not region or not region:IsA("Instance") then
+		return nil
 	end
 
-	local regionType = getRegionType(region)
-	local definition = regionType and RegionDefinitions.Types[regionType]
-	return definition and definition[ruleName] or nil
+	local override = region:GetAttribute(ruleName)
+	if override ~= nil then
+		return override == true
+	end
+
+	local regionType = region:GetAttribute("RegionType")
+	if type(regionType) ~= "string" then
+		return nil
+	end
+
+	local types = RegionDefinitions.Types
+	if type(types) ~= "table" then
+		return nil
+	end
+
+	local definition = types[regionType]
+	if type(definition) ~= "table" then
+		return nil
+	end
+
+	local value = definition[ruleName]
+	if type(value) == "boolean" then
+		return value
+	end
+
+	return nil
 end
 
 local function isRegionPart(region)
@@ -143,6 +176,10 @@ local function updateCharacter(character)
 end
 
 function RegionService.GetRegions(character)
+	if not isCharacter(character) then
+		return {}
+	end
+
 	local regions = CharacterRegions[character]
 	if regions then
 		local result = {}
@@ -187,14 +224,18 @@ end
 
 function RegionService.GetRules(character)
 	local rules = {}
+
 	for _, region in ipairs(RegionService.GetRegions(character)) do
-		for ruleName in pairs(RegionDefinitions.Types[getRegionType(region)] or {}) do
-			local value = getRuleValue(region, ruleName)
-			if value ~= nil and rules[ruleName] == nil then
-				rules[ruleName] = value
+		for _, ruleName in ipairs(RULE_NAMES) do
+			if rules[ruleName] == nil then
+				local value = getRuleValue(region, ruleName)
+				if value ~= nil then
+					rules[ruleName] = value
+				end
 			end
 		end
 	end
+
 	return rules
 end
 
@@ -208,18 +249,19 @@ function RegionService.Can(character, action)
 		return true
 	end
 
-	local ruleName = action
 	local sawRule = false
 	local allowed = true
 
 	for _, region in ipairs(regions) do
-		local value = getRuleValue(region, ruleName)
+		local value = getRuleValue(region, action)
 		if value ~= nil then
 			sawRule = true
+
 			if value == false then
 				return false, "RegionRestricted", region
 			end
-			allowed = allowed and value == true
+
+			allowed = allowed and value
 		end
 	end
 
