@@ -51,12 +51,11 @@ local function getStarterInventory()
 	return inventory
 end
 
-local function mergeMissingStarterItems(inventory)
-	local starterInventory = getStarterInventory()
-
-	for itemId, count in pairs(starterInventory) do
-		if inventory[itemId] == nil then
-			inventory[itemId] = count
+local function ensureStarterItems(inventory)
+	for itemId, definition in pairs(ItemDefinitions.Items) do
+		local starterCount = math.max(0, math.floor(tonumber(definition.StarterCount) or 0))
+		if starterCount > 0 then
+			inventory[itemId] = math.max(inventory[itemId] or 0, starterCount)
 		end
 	end
 
@@ -102,13 +101,10 @@ function InventoryPersistenceService.Load(player)
 		local savedInventory = type(data) == "table" and data.Inventory or data
 		local inventory = sanitizeInventory(savedInventory)
 
-		-- Existing saves from before the inventory version marker did not
-		-- contain the current StarterPack weapon entries. Give those legacy
-		-- saves the configured starter items once, then persist the version.
-		local dataVersion = type(data) == "table" and data.Version or nil
-		if dataVersion ~= INVENTORY_DATA_VERSION then
-			inventory = mergeMissingStarterItems(inventory)
-		end
+		-- StarterCount is a baseline grant, not an optional inventory entry.
+		-- Always restore it after loading so StarterPack weapons cannot be
+		-- permanently lost because of an older save or a previous penalty.
+		ensureStarterItems(inventory)
 
 		InventoryService.Replace(player, inventory)
 	end
