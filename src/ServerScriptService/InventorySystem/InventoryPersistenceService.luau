@@ -11,6 +11,7 @@ local InventoryStore = DataStoreService:GetDataStore("PlayerInventory_v1")
 
 local MAX_RETRIES = 3
 local AUTOSAVE_INTERVAL = 60
+local INVENTORY_DATA_VERSION = 2
 
 local Saving = {}
 local Loaded = {}
@@ -44,6 +45,18 @@ local function getStarterInventory()
 		local starterCount = math.max(0, math.floor(tonumber(definition.StarterCount) or 0))
 		if starterCount > 0 then
 			inventory[itemId] = starterCount
+		end
+	end
+
+	return inventory
+end
+
+local function mergeMissingStarterItems(inventory)
+	local starterInventory = getStarterInventory()
+
+	for itemId, count in pairs(starterInventory) do
+		if inventory[itemId] == nil then
+			inventory[itemId] = count
 		end
 	end
 
@@ -87,7 +100,17 @@ function InventoryPersistenceService.Load(player)
 		InventoryService.Replace(player, getStarterInventory())
 	else
 		local savedInventory = type(data) == "table" and data.Inventory or data
-		InventoryService.Replace(player, sanitizeInventory(savedInventory))
+		local inventory = sanitizeInventory(savedInventory)
+
+		-- Existing saves from before the inventory version marker did not
+		-- contain the current StarterPack weapon entries. Give those legacy
+		-- saves the configured starter items once, then persist the version.
+		local dataVersion = type(data) == "table" and data.Version or nil
+		if dataVersion ~= INVENTORY_DATA_VERSION then
+			inventory = mergeMissingStarterItems(inventory)
+		end
+
+		InventoryService.Replace(player, inventory)
 	end
 
 	Loaded[player] = true
@@ -113,6 +136,7 @@ function InventoryPersistenceService.Save(player)
 		success = pcall(function()
 			return InventoryStore:UpdateAsync(getKey(player), function()
 				return {
+					Version = INVENTORY_DATA_VERSION,
 					Inventory = snapshot or {},
 				}
 			end)
@@ -168,7 +192,7 @@ game:BindToClose(function()
 
 	local deadline = os.clock() + 25
 	while remaining > 0 and os.clock() < deadline do
-		 task.wait()
+		task.wait()
 	end
 end)
 
