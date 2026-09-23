@@ -1,3 +1,4 @@
+local CombatTagService = require(game:GetService("ServerScriptService"):WaitForChild("CombatSystem"):WaitForChild("CombatTagService"))
 local ItemDefinitions = require(game:GetService("ServerScriptService"):WaitForChild("InventorySystem"):WaitForChild("ItemDefinitions"))
 local InventoryService = require(game:GetService("ServerScriptService"):WaitForChild("InventorySystem"):WaitForChild("InventoryService"))
 local CashService = require(game:GetService("ServerScriptService"):WaitForChild("Economy"):WaitForChild("Modules"):WaitForChild("CashService"))
@@ -68,6 +69,9 @@ function CombatLogService.ApplyPenalty(player)
 	end
 
 	player:SetAttribute("CombatLogEligible", false)
+	task.defer(function()
+		Penalized[player] = nil
+	end)
 
 	return true, {
 		CashLost = cashPenalty,
