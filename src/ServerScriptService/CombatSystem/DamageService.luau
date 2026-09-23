@@ -66,7 +66,6 @@ function DamageService.ApplyDamage(targetHumanoid, damage, overkill, attackerPla
 			if typeof(attackerPlayer) == "Instance" and attackerPlayer:IsA("Player") then
 				CombatTagService.TagPlayer(attackerPlayer)
 			end
-			CombatTagService.TagCharacter(character)
 			return true
 		end
 
@@ -82,7 +81,6 @@ function DamageService.ApplyDamage(targetHumanoid, damage, overkill, attackerPla
 			if typeof(attackerPlayer) == "Instance" and attackerPlayer:IsA("Player") then
 				CombatTagService.TagPlayer(attackerPlayer)
 			end
-			CombatTagService.TagCharacter(character)
 			return true
 		end
 
