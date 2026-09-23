@@ -54,7 +54,7 @@ function MeleeUtility.ApplyDamage(Player, TargetHumanoid, Damage, Debris, Overki
 	if Debris then Debris:AddItem(Creator, 5) end
 
 	-- Route melee damage through the same authoritative damage system as guns.
-	return DamageService.ApplyDamage(TargetHumanoid, Damage, Overkill)
+	return DamageService.ApplyDamage(TargetHumanoid, Damage, Overkill, Player)
 end
 
 function MeleeUtility.GetOwnedEquippedWeapon(Player, Tool)

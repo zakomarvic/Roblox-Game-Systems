@@ -16,6 +16,7 @@ local RULE_NAMES = {
 }
 
 local RegionDefinitions = require(script.Parent:WaitForChild("RegionDefinitions"))
+local CombatTagService = require(game:GetService("ServerScriptService"):WaitForChild("CombatSystem"):WaitForChild("CombatTagService"))
 
 local RegionsFolder = Workspace:FindFirstChild(REGION_FOLDER_NAME)
 if not RegionsFolder then
@@ -242,6 +243,11 @@ end
 function RegionService.Can(character, action)
 	if not isCharacter(character) or type(action) ~= "string" then
 		return false, "Invalid"
+	end
+
+	if (action == "FireWeapon" or action == "TakeDamage" or action == "Combat")
+		and CombatTagService.IsTagged(character) then
+		return true, "CombatTagged"
 	end
 
 	local regions = RegionService.GetRegions(character)

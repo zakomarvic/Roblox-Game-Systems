@@ -5,6 +5,7 @@ local Services = CharacterSystem:WaitForChild("Services")
 local DownedService = require(Services:WaitForChild("DownedDamageService"))
 local CharacterStateService = require(Services:WaitForChild("CharacterStateService"))
 local RegionService = require(game:GetService("ServerScriptService"):WaitForChild("RegionSystem"):WaitForChild("RegionService"))
+local CombatTagService = require(script.Parent:WaitForChild("CombatTagService"))
 
 local MAX_HEALTH = 110
 local DOWNED_HEALTH_THRESHOLD = 10
@@ -27,7 +28,7 @@ local function isInvulnerable(character)
 	return type(untilTime) == "number" and os.clock() < untilTime
 end
 
-function DamageService.ApplyDamage(targetHumanoid, damage, overkill)
+function DamageService.ApplyDamage(targetHumanoid, damage, overkill, attackerPlayer)
 	if not targetHumanoid or not targetHumanoid:IsA("Humanoid") then return false end
 	if type(damage) ~= "number" or damage <= 0 then return false end
 	if targetHumanoid.Health <= 0 then return false end
@@ -62,6 +63,9 @@ function DamageService.ApplyDamage(targetHumanoid, damage, overkill)
 			if targetHumanoid.Health <= 0 then
 				targetHumanoid:ChangeState(Enum.HumanoidStateType.Dead)
 			end
+			if typeof(attackerPlayer) == "Instance" and attackerPlayer:IsA("Player") then
+				CombatTagService.TagPlayer(attackerPlayer)
+			end
 			return true
 		end
 
@@ -74,11 +78,18 @@ function DamageService.ApplyDamage(targetHumanoid, damage, overkill)
 			if targetHumanoid.Health <= 0 then
 				targetHumanoid:ChangeState(Enum.HumanoidStateType.Dead)
 			end
+			if typeof(attackerPlayer) == "Instance" and attackerPlayer:IsA("Player") then
+				CombatTagService.TagPlayer(attackerPlayer)
+			end
 			return true
 		end
 
 		-- Non-overkill lethal damage becomes Downed instead of death.
 		DownedService.Down(targetHumanoid)
+		if typeof(attackerPlayer) == "Instance" and attackerPlayer:IsA("Player") then
+			CombatTagService.TagPlayer(attackerPlayer)
+		end
+		CombatTagService.TagCharacter(character)
 		return true
 	end
 
@@ -95,6 +106,10 @@ function DamageService.ApplyDamage(targetHumanoid, damage, overkill)
 		DownedService.Down(targetHumanoid)
 	end
 
+	if typeof(attackerPlayer) == "Instance" and attackerPlayer:IsA("Player") then
+		CombatTagService.TagPlayer(attackerPlayer)
+	end
+	CombatTagService.TagCharacter(character)
 	return true
 end
 
