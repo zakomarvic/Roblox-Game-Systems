@@ -3,6 +3,7 @@ local DataStoreService = game:GetService("DataStoreService")
 
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
 local ItemDefinitions = require(script.Parent:WaitForChild("ItemDefinitions"))
+local CombatLogService = require(game:GetService("ServerScriptService"):WaitForChild("CombatSystem"):WaitForChild("CombatLogService"))
 
 local InventoryPersistenceService = {}
 
@@ -137,6 +138,7 @@ function InventoryPersistenceService.Release(player)
 end
 
 Players.PlayerRemoving:Connect(function(player)
+	CombatLogService.ApplyPenalty(player)
 	InventoryPersistenceService.Save(player)
 	InventoryPersistenceService.Release(player)
 end)
