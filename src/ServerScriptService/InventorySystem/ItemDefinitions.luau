@@ -25,6 +25,30 @@ ItemDefinitions.Items = {
 		Type = ItemDefinitions.Types.Consumable,
 		DisplayName = "Ammo Pack",
 	},
+
+	AK47 = {
+		Id = "AK47",
+		Type = ItemDefinitions.Types.Weapon,
+		DisplayName = "AK-47",
+		ToolName = "AK-47(but better)",
+		StarterCount = 1,
+	},
+
+	RPG7 = {
+		Id = "RPG7",
+		Type = ItemDefinitions.Types.Weapon,
+		DisplayName = "RPG-7",
+		ToolName = "RPG-7",
+		StarterCount = 1,
+	},
+
+	MeleeTest = {
+		Id = "MeleeTest",
+		Type = ItemDefinitions.Types.Weapon,
+		DisplayName = "Melee Test",
+		ToolName = "MeleeTest",
+		StarterCount = 1,
+	},
 }
 
 function ItemDefinitions.Get(itemId)
