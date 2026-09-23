@@ -1,10 +1,9 @@
-local Players = game:GetService("Players")
-
 local ItemDefinitions = require(script.Parent:WaitForChild("ItemDefinitions"))
 
 local InventoryService = {}
 
 local Inventories = {}
+local Loaded = {}
 
 local function validatePlayer(player)
 	return typeof(player) == "Instance" and player:IsA("Player")
@@ -35,6 +34,19 @@ end
 
 function InventoryService.IsInitialized(player)
 	return validatePlayer(player) and Inventories[player] ~= nil
+end
+
+function InventoryService.IsLoaded(player)
+	return validatePlayer(player) and Loaded[player] == true
+end
+
+function InventoryService.MarkLoaded(player)
+	if not validatePlayer(player) then
+		return false
+	end
+
+	Loaded[player] = true
+	return true
 end
 
 function InventoryService.HasItem(player, itemId, amount)
@@ -117,6 +129,30 @@ function InventoryService.GetSnapshot(player)
 	return snapshot
 end
 
+function InventoryService.Replace(player, snapshot)
+	local inventory = getInventoryTable(player)
+	if not inventory then
+		return false
+	end
+
+	table.clear(inventory)
+
+	if type(snapshot) ~= "table" then
+		return true
+	end
+
+	for itemId, count in pairs(snapshot) do
+		if ItemDefinitions.Exists(itemId) and type(count) == "number" then
+			local amount = math.max(0, math.floor(count))
+			if amount > 0 then
+				inventory[itemId] = amount
+			end
+		end
+	end
+
+	return true
+end
+
 function InventoryService.Clear(player)
 	local inventory = getInventoryTable(player)
 	if not inventory then
@@ -133,11 +169,8 @@ function InventoryService.Destroy(player)
 	end
 
 	Inventories[player] = nil
+	Loaded[player] = nil
 	return true
 end
-
-Players.PlayerRemoving:Connect(function(player)
-	InventoryService.Destroy(player)
-end)
 
 return InventoryService
