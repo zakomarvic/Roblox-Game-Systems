@@ -262,6 +262,10 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 for _, player in ipairs(Players:GetPlayers()) do
+	if player:GetAttribute(COMBAT_LOG_ELIGIBLE_ATTRIBUTE) == nil then
+		player:SetAttribute(COMBAT_LOG_ELIGIBLE_ATTRIBUTE, false)
+	end
+
 	if player.Character then
 		watchCharacter(player.Character)
 	end
