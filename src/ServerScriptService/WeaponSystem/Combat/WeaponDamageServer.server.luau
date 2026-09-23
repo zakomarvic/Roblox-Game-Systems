@@ -249,7 +249,7 @@ InflictTarget.OnServerEvent:Connect(function(Player, Origin, AimPoint, ShotDirec
 			local DownedBefore = TargetCharacter:GetAttribute("Downed") == true
 			debugDamage(Player, "APPLY", string.format("weapon=%s target=%s hit=%s damage=%.2f overkill=%s healthBefore=%.2f downedBefore=%s", Tool.Name, TargetCharacter.Name, HurtboxBodyPart, AppliedDamage, tostring(Module.Overkill == true), BeforeHealth, tostring(DownedBefore)))
 			addCreator(TargetHumanoid, Player)
-			local Applied = DamageService.ApplyDamage(TargetHumanoid, AppliedDamage, Module.Overkill)
+			local Applied = DamageService.ApplyDamage(TargetHumanoid, AppliedDamage, Module.Overkill, Player)
 			debugDamage(Player, "RESULT", string.format("target=%s DamageService=%s healthAfter=%.2f downedAfter=%s", TargetCharacter.Name, tostring(Applied), TargetHumanoid.Health, tostring(TargetCharacter:GetAttribute("Downed") == true)))
 			HitAnyCharacter = true
 			if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += Direction * Knockback end
@@ -330,7 +330,7 @@ Explosion.OnServerEvent:Connect(function(Player, Position, Direction, Tool, Clie
 				local ExplosionDirection = Distance > 0 and Offset.Unit or Direction
 				if AppliedDamage > 0 then
 					addCreator(TargetHumanoid, Player)
-					DamageService.ApplyDamage(TargetHumanoid, AppliedDamage, Module.Overkill)
+					DamageService.ApplyDamage(TargetHumanoid, AppliedDamage, Module.Overkill, Player)
 				end
 				if Knockback > 0 then TargetTorso.AssemblyLinearVelocity += ExplosionDirection * (Knockback * Falloff) end
 			end
