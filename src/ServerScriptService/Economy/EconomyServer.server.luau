@@ -5,6 +5,7 @@ local Modules = script.Parent:WaitForChild("Modules")
 local CashService = require(Modules:WaitForChild("CashService"))
 local EconomyDrop = require(Modules:WaitForChild("EconomyDrop"))
 local Rewards = require(Modules:WaitForChild("Rewards"))
+local CombatLogService = require(game:GetService("ServerScriptService"):WaitForChild("CombatSystem"):WaitForChild("CombatLogService"))
 require(Modules:WaitForChild("ShopService"))
 
 local CashStore = DataStoreService:GetDataStore("PlayerEconomy_v1")
@@ -156,6 +157,8 @@ Players.PlayerAdded:Connect(function(Player)
 end)
 
 Players.PlayerRemoving:Connect(function(Player)
+	CombatLogService.ApplyPenalty(Player)
+
 	if DeathConnections[Player] then
 		DeathConnections[Player]:Disconnect()
 		DeathConnections[Player] = nil

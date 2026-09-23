@@ -3,6 +3,7 @@ local DataStoreService = game:GetService("DataStoreService")
 
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
 local ItemDefinitions = require(script.Parent:WaitForChild("ItemDefinitions"))
+local CombatLogService = require(game:GetService("ServerScriptService"):WaitForChild("CombatSystem"):WaitForChild("CombatLogService"))
 
 local InventoryPersistenceService = {}
 
@@ -10,6 +11,7 @@ local InventoryStore = DataStoreService:GetDataStore("PlayerInventory_v1")
 
 local MAX_RETRIES = 3
 local AUTOSAVE_INTERVAL = 60
+local INVENTORY_DATA_VERSION = 2
 
 local Saving = {}
 local Loaded = {}
@@ -43,6 +45,17 @@ local function getStarterInventory()
 		local starterCount = math.max(0, math.floor(tonumber(definition.StarterCount) or 0))
 		if starterCount > 0 then
 			inventory[itemId] = starterCount
+		end
+	end
+
+	return inventory
+end
+
+local function ensureStarterItems(inventory)
+	for itemId, definition in pairs(ItemDefinitions.Items) do
+		local starterCount = math.max(0, math.floor(tonumber(definition.StarterCount) or 0))
+		if starterCount > 0 then
+			inventory[itemId] = math.max(inventory[itemId] or 0, starterCount)
 		end
 	end
 
@@ -86,7 +99,14 @@ function InventoryPersistenceService.Load(player)
 		InventoryService.Replace(player, getStarterInventory())
 	else
 		local savedInventory = type(data) == "table" and data.Inventory or data
-		InventoryService.Replace(player, sanitizeInventory(savedInventory))
+		local inventory = sanitizeInventory(savedInventory)
+
+		-- StarterCount is a baseline grant, not an optional inventory entry.
+		-- Always restore it after loading so StarterPack weapons cannot be
+		-- permanently lost because of an older save or a previous penalty.
+		ensureStarterItems(inventory)
+
+		InventoryService.Replace(player, inventory)
 	end
 
 	Loaded[player] = true
@@ -112,6 +132,7 @@ function InventoryPersistenceService.Save(player)
 		success = pcall(function()
 			return InventoryStore:UpdateAsync(getKey(player), function()
 				return {
+					Version = INVENTORY_DATA_VERSION,
 					Inventory = snapshot or {},
 				}
 			end)
@@ -137,6 +158,7 @@ function InventoryPersistenceService.Release(player)
 end
 
 Players.PlayerRemoving:Connect(function(player)
+	CombatLogService.ApplyPenalty(player)
 	InventoryPersistenceService.Save(player)
 	InventoryPersistenceService.Release(player)
 end)
@@ -166,7 +188,7 @@ game:BindToClose(function()
 
 	local deadline = os.clock() + 25
 	while remaining > 0 and os.clock() < deadline do
-		 task.wait()
+		task.wait()
 	end
 end)
 

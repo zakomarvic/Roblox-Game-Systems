@@ -5,6 +5,7 @@ local CombatTagService = {}
 local DEFAULT_DURATION = 20
 local TAG_ATTRIBUTE = "CombatTagged"
 local EXPIRES_ATTRIBUTE = "CombatTagExpiresAt"
+local COMBAT_LOG_ELIGIBLE_ATTRIBUTE = "CombatLogEligible"
 
 local TaggedPlayers = {}
 local TaggedCharacters = {}
@@ -236,10 +237,15 @@ function CombatTagService.ClearCharacter(character)
 end
 
 Players.PlayerAdded:Connect(function(player)
+	player:SetAttribute(COMBAT_LOG_ELIGIBLE_ATTRIBUTE, false)
 	player.CharacterAdded:Connect(function(character)
 		clearPlayer(player)
 		watchCharacter(character)
 	end)
+
+	if player:GetAttribute(COMBAT_LOG_ELIGIBLE_ATTRIBUTE) == nil then
+		player:SetAttribute(COMBAT_LOG_ELIGIBLE_ATTRIBUTE, false)
+	end
 
 	if player.Character then
 		clearPlayer(player)
@@ -248,10 +254,18 @@ Players.PlayerAdded:Connect(function(player)
 end)
 
 Players.PlayerRemoving:Connect(function(player)
+	if CombatTagService.IsTagged(player) then
+		player:SetAttribute(COMBAT_LOG_ELIGIBLE_ATTRIBUTE, true)
+	end
+
 	clearPlayer(player)
 end)
 
 for _, player in ipairs(Players:GetPlayers()) do
+	if player:GetAttribute(COMBAT_LOG_ELIGIBLE_ATTRIBUTE) == nil then
+		player:SetAttribute(COMBAT_LOG_ELIGIBLE_ATTRIBUTE, false)
+	end
+
 	if player.Character then
 		watchCharacter(player.Character)
 	end
