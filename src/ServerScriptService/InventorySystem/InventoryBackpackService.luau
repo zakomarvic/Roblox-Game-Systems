@@ -107,6 +107,10 @@ function InventoryBackpackService.SyncPlayer(player)
 		return false
 	end
 
+	if not InventoryService.IsLoaded(player) then
+		return false
+	end
+
 	if Syncing[player] then
 		return false
 	end
@@ -121,12 +125,6 @@ function InventoryBackpackService.SyncPlayer(player)
 
 	for itemId, definition in pairs(ItemDefinitions.Items) do
 		if definition.Type == ItemDefinitions.Types.Weapon and definition.ToolName then
-			local starterCount = math.max(0, math.floor(tonumber(definition.StarterCount) or 0))
-
-			if InventoryService.GetItemCount(player, itemId) == 0 and starterCount > 0 then
-				InventoryService.AddItem(player, itemId, starterCount)
-			end
-
 			ensureToolCount(player, itemId, definition)
 		end
 	end
@@ -159,14 +157,16 @@ local function watchContainer(player, container)
 	end))
 end
 
-local function setupPlayer(player)
+function InventoryBackpackService.StartPlayer(player)
+	if typeof(player) ~= "Instance" or not player:IsA("Player") then
+		return false
+	end
+
 	if PlayerConnections[player] then
-		return
+		return true
 	end
 
 	PlayerConnections[player] = {}
-
-	InventoryService.Initialize(player)
 
 	table.insert(PlayerConnections[player], player.CharacterAdded:Connect(function(character)
 		local backpack = getBackpack(player)
@@ -183,9 +183,10 @@ local function setupPlayer(player)
 	end
 
 	scheduleSync(player)
+	return true
 end
 
-local function cleanupPlayer(player)
+function InventoryBackpackService.StopPlayer(player)
 	local connections = PlayerConnections[player]
 	if connections then
 		for _, connection in ipairs(connections) do
@@ -197,11 +198,8 @@ local function cleanupPlayer(player)
 	Syncing[player] = nil
 end
 
-for _, player in ipairs(Players:GetPlayers()) do
-	setupPlayer(player)
-end
-
-Players.PlayerAdded:Connect(setupPlayer)
-Players.PlayerRemoving:Connect(cleanupPlayer)
+Players.PlayerRemoving:Connect(function(player)
+	InventoryBackpackService.StopPlayer(player)
+end)
 
 return InventoryBackpackService
