@@ -1,5 +1,4 @@
 local CombatTagService = require(game:GetService("ServerScriptService"):WaitForChild("CombatSystem"):WaitForChild("CombatTagService"))
-local ItemDefinitions = require(game:GetService("ServerScriptService"):WaitForChild("InventorySystem"):WaitForChild("ItemDefinitions"))
 local InventoryService = require(game:GetService("ServerScriptService"):WaitForChild("InventorySystem"):WaitForChild("InventoryService"))
 local CashService = require(game:GetService("ServerScriptService"):WaitForChild("Economy"):WaitForChild("Modules"):WaitForChild("CashService"))
 
@@ -7,38 +6,6 @@ local CombatLogService = {}
 
 local CASH_PENALTY_PERCENT = 0.25
 local Penalized = {}
-
-local function getWeaponItemId(tool)
-	if not tool or not tool:IsA("Tool") then
-		return nil
-	end
-
-	for itemId, definition in pairs(ItemDefinitions.Items) do
-		if definition.Type == ItemDefinitions.Types.Weapon and definition.ToolName == tool.Name then
-			return itemId
-		end
-	end
-
-	return nil
-end
-
-local function getBackpackWeaponLoss(player)
-	local loss = {}
-
-	local backpack = player:FindFirstChildOfClass("Backpack")
-	if not backpack then
-		return loss
-	end
-
-	for _, child in ipairs(backpack:GetChildren()) do
-		local itemId = getWeaponItemId(child)
-		if itemId then
-			loss[itemId] = (loss[itemId] or 0) + 1
-		end
-	end
-
-	return loss
-end
 
 function CombatLogService.GetCashPenaltyPercent()
 	return CASH_PENALTY_PERCENT
@@ -63,10 +30,10 @@ function CombatLogService.ApplyPenalty(player)
 		CashService.Remove(player, cashPenalty)
 	end
 
-	local weaponLoss = getBackpackWeaponLoss(player)
-	for itemId, count in pairs(weaponLoss) do
-		InventoryService.RemoveItem(player, itemId, count)
-	end
+	-- Combat logging uses the same inventory wipe as dying/resetting.
+	-- StarterCount grants are restored when the player next loads.
+	local inventory = InventoryService.GetSnapshot(player)
+	InventoryService.Clear(player)
 
 	player:SetAttribute("CombatLogEligible", false)
 	task.defer(function()
@@ -75,7 +42,7 @@ function CombatLogService.ApplyPenalty(player)
 
 	return true, {
 		CashLost = cashPenalty,
-		WeaponsLost = weaponLoss,
+		InventoryLost = inventory or {},
 	}
 end
 
